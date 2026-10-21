@@ -1,0 +1,4 @@
+# Los .bat de Windows necesitan CRLF (con LF, cmd puede fallar en etiquetas/goto).
+# iniciar.bat de WinPE queda fuera a proposito: no se toca.
+/Iniciar_Diagnostic_Scanner.bat text eol=crlf
+/iniciar_demo_local.bat text eol=crlf
