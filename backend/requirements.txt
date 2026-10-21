@@ -20,3 +20,8 @@ wmi>=1.5.1
 # (backend/native/lhm/) para leer voltajes reales, ya que WMI no expone
 # ninguna clase estándar confiable para eso.
 pythonnet>=3.0.5
+
+# app.py importa pythoncom (COM por hilo para WMI en cada request de Flask).
+# Ya llegaba de forma transitiva por wmi; se declara explícito para no
+# depender de ello.
+pywin32>=306

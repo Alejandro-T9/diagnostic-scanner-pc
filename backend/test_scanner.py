@@ -22,6 +22,7 @@ devuelvan lo que se espera en una laptop concreta.
 
 import socket
 
+import app
 import scanner
 import utils
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
@@ -298,6 +299,45 @@ def test_utils_entorno():
         ocupado.close()
 
 
+def test_app_rutas():
+    """Rutas de app.py: host seguro, /api/status ampliado y errores en JSON."""
+    # (a) Decisión 27: el servidor solo escucha en loopback.
+    assert app.HOST == "127.0.0.1", app.HOST
+
+    cliente = app.app.test_client()
+    escaneo_original = scanner.ejecutar_escaneo_completo
+    reporte_original = utils.generar_reporte_texto
+    app._ultimo_escaneo = None
+    try:
+        # (b) /api/status agrega entorno (str) y administrador (bool).
+        respuesta = cliente.get("/api/status")
+        assert respuesta.status_code == 200, respuesta.status_code
+        datos = respuesta.get_json()
+        assert isinstance(datos["entorno"], str), datos
+        assert isinstance(datos["administrador"], bool), datos
+        assert "timestamp" in datos and "espacio_disco" in datos, datos
+
+        # (c) Resultado no serializable: 500 y NO se guarda el escaneo.
+        scanner.ejecutar_escaneo_completo = lambda: {"x": object()}
+        respuesta = cliente.get("/api/scan")
+        assert respuesta.status_code == 500, respuesta.status_code
+        assert app._ultimo_escaneo is None, app._ultimo_escaneo
+
+        # (d) Falla al armar el reporte: 500 con JSON, no página HTML.
+        def _reporte_roto(*args, **kwargs):
+            raise RuntimeError("fallo simulado")
+
+        utils.generar_reporte_texto = _reporte_roto
+        respuesta = cliente.get("/api/reporte")
+        assert respuesta.status_code == 500, respuesta.status_code
+        assert respuesta.mimetype == "application/json", respuesta.mimetype
+        assert respuesta.get_json()["estado"] == "error", respuesta.get_json()
+    finally:
+        scanner.ejecutar_escaneo_completo = escaneo_original
+        utils.generar_reporte_texto = reporte_original
+        app._ultimo_escaneo = None
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -313,4 +353,5 @@ if __name__ == "__main__":
     test_prioridad_veredicto()
     test_cobertura()
     test_utils_entorno()
+    test_app_rutas()
     print("test_scanner.py: todos los casos OK")

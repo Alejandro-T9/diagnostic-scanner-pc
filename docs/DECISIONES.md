@@ -963,9 +963,9 @@ autoarranque **no funcionó** (decisión 26 y respuestas del equipo del
 2026-10-21) — hubo que abrir `iniciar.bat` a mano y escribir la URL de
 localhost en el navegador.
 
-**Pendiente abierto (reemplaza el "decisión 27 pendiente" sobre
-autoarranque confirmado):** el autoarranque del modo rescate no
-funcionó en el USB de 16 GB y queda como **deuda abierta**, a investigar
+**Pendiente abierto (reemplaza el *Pendiente* del final de la
+decisión 26, sobre autoarranque confirmado):** el autoarranque del modo
+rescate no funcionó en el USB de 16 GB y queda como **deuda abierta**, a investigar
 en una tarea posterior (F1). El lanzador portable, en cambio, debe abrir
 el navegador solo, sin que nadie escriba la URL.
 

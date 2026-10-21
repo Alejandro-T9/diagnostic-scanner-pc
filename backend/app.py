@@ -5,6 +5,11 @@ Expone el dashboard (HTML) y la API REST (JSON) que el frontend consulta
 por polling cada 2 segundos. Este archivo es solo la capa de enrutamiento:
 la lógica de diagnóstico vive en scanner.py y las funciones de apoyo
 (ejecutar comandos, leer estado del sistema) en utils.py.
+
+SEGURIDAD (decisión 27 en docs/DECISIONES.md): el servidor escucha SOLO en
+127.0.0.1 (HOST). Con 0.0.0.0 el escáner quedaría expuesto a toda la red
+en un Windows normal conectado. El puerto por defecto es 5000 y se puede
+cambiar con la variable de entorno DSPC_PORT.
 """
 
 import os
@@ -23,6 +28,9 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 
 import scanner
 import utils
+
+# Solo loopback: ver la nota de seguridad del docstring del módulo.
+HOST = "127.0.0.1"
 
 FRONTEND_DIR = os.path.join(BASE_DIR, "..", "frontend")
 CONFIG_DIR = os.path.join(BASE_DIR, "..", "config")
@@ -64,12 +72,15 @@ def index():
 
 @app.route("/api/status")
 def api_status():
-    """Devuelve timestamp, herramientas de diagnóstico disponibles y espacio en disco."""
+    """Devuelve timestamp, herramientas disponibles, espacio en disco, entorno
+    (winpe/windows) y si el proceso corre como administrador."""
     try:
         return jsonify({
             "timestamp": utils.obtener_timestamp(),
             "herramientas_disponibles": utils.verificar_herramientas(),
             "espacio_disco": utils.obtener_espacio_disco(),
+            "entorno": utils.detectar_entorno(),
+            "administrador": utils.es_administrador(),
         })
     except Exception as error:
         return jsonify({
@@ -90,8 +101,11 @@ def api_scan():
     global _ultimo_escaneo
     try:
         resultado = scanner.ejecutar_escaneo_completo()
+        # Se serializa ANTES de guardar: si jsonify falla, _ultimo_escaneo
+        # conserva el valor anterior y /api/reporte no queda con datos rotos.
+        respuesta = jsonify(resultado)
         _ultimo_escaneo = resultado
-        return jsonify(resultado)
+        return respuesta
     except Exception as error:
         return jsonify({
             "estado": "error",
@@ -103,13 +117,19 @@ def api_scan():
 def api_reporte():
     """Exporta el último escaneo como texto plano descargable. No persiste
     nada en disco: se arma al vuelo a partir de _ultimo_escaneo en memoria."""
-    veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
-    texto = utils.generar_reporte_texto(_ultimo_escaneo, veredicto)
-    return Response(
-        texto,
-        mimetype="text/plain",
-        headers={"Content-Disposition": "attachment; filename=reporte_diagnostico.txt"},
-    )
+    try:
+        veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
+        texto = utils.generar_reporte_texto(_ultimo_escaneo, veredicto)
+        return Response(
+            texto,
+            mimetype="text/plain",
+            headers={"Content-Disposition": "attachment; filename=reporte_diagnostico.txt"},
+        )
+    except Exception as error:
+        return jsonify({
+            "estado": "error",
+            "mensaje": f"No se pudo generar el reporte: {error}",
+        }), 500
 
 
 _PLANTILLA_ERROR_HTML = """<!DOCTYPE html>
@@ -194,4 +214,4 @@ def error_500(error):
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host=HOST, port=int(os.environ.get("DSPC_PORT", 5000)), debug=False, threaded=True)
