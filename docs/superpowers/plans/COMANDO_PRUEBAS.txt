@@ -1,0 +1,3 @@
+Comando de pruebas (línea base verificada 2026-10-21; Python 3.14.7 del sistema con flask, wmi, psutil, pythoncom, clr):
+cd "C:\Users\Ale\Documents\copia de seguridad para proyecto\diagnostic_scanner_pc\backend" && python test_scanner.py   -> imprime "test_scanner.py: todos los casos OK"
+Si se usa el Python embeddable del USB (ignora el directorio del script): python-portable\python.exe -c "import sys; sys.path.insert(0, r'<backend>'); exec(open(r'<backend>\test_scanner.py', encoding='utf-8').read())"

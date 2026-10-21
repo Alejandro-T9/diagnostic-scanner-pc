@@ -921,3 +921,111 @@ sueltos ya copiados a la USB de 16GB.
 
 **Pendiente:** confirmar en hardware real del colegio que el
 autoarranque vía `HBCD_PE.ini` dispara sin intervención manual esta vez.
+
+## 27. Pivote a app portable sobre Windows; la ISO de Hiren's pasa a modo rescate
+
+**Fecha:** 2026-10-21
+
+Tras la sustentación del 16-oct-2026 (87,5/100), el jurado SENA señaló que
+la app es clara para un técnico pero confunde a quien no sabe de
+mantenimiento, y el equipo pidió un giro de 360°: la herramienta deja de
+ser "un USB que arranca Hiren's Boot" y pasa a ser **una app portable**
+que se abre desde el USB sobre el Windows que el PC ya tiene, pensada
+para todo tipo de persona (quien no sabe, quien quiere llevar evidencia
+al técnico, y el técnico mismo). Spec completo:
+`docs/superpowers/specs/2026-10-21-version-portable-no-tecnicos-design.md`
+(secciones 4 y 10).
+
+**Decisión:**
+
+- La app principal es portable sobre Windows 10 (1809+) y Windows 11, 64
+  bits. El mismo código sigue funcionando en WinPE; los módulos que
+  necesiten un Windows instalado devuelven `no_determinado` allí
+  (degradación elegante, decisión 8).
+- La ISO de Hiren's **no se borra**: queda en el USB como **modo
+  rescate** para PCs que no arrancan. Ya no es el camino principal.
+- El navegador es **Edge en modo app** (`msedge --app=http://127.0.0.1:PUERTO`),
+  que ya trae Windows 10/11. Si no hay Edge se prueba Chrome y luego el
+  navegador predeterminado. Se descarta el Chromium portable (~800 MB),
+  lo que libera espacio en el USB.
+- Se mantiene Python embeddable + Flask, con un lanzador
+  `Iniciar_Diagnostic_Scanner.bat` que pide permisos de administrador
+  (necesarios para sensores y S.M.A.R.T.).
+- El servidor escucha **solo en `127.0.0.1`**, con puerto libre
+  automático. Antes arrancaba con `host="0.0.0.0"`: en WinPE sin red no
+  importaba, pero en un Windows normal conectado a una red expone el
+  escáner a toda la red. Es un riesgo de seguridad real.
+
+**Motivo:** responder literalmente la retroalimentación del jurado y
+ampliar el público de la herramienta. Además, la última prueba real del
+modo rescate lo confirma como camino frágil: en el USB de 16 GB el
+autoarranque **no funcionó** (decisión 26 y respuestas del equipo del
+2026-10-21) — hubo que abrir `iniciar.bat` a mano y escribir la URL de
+localhost en el navegador.
+
+**Pendiente abierto (reemplaza el "decisión 27 pendiente" sobre
+autoarranque confirmado):** el autoarranque del modo rescate no
+funcionó en el USB de 16 GB y queda como **deuda abierta**, a investigar
+en una tarea posterior (F1). El lanzador portable, en cambio, debe abrir
+el navegador solo, sin que nadie escriba la URL.
+
+## 28. Capa de lenguaje claro aditiva: el contrato de 5 llaves no cambia
+
+**Fecha:** 2026-10-21
+
+El jurado pidió que el resultado diga, junto al semáforo, qué significa,
+cuál es el error y cómo solucionarlo. Hoy los textos de `mensaje` y
+`recomendacion` son técnicos y cortos ("Salud reducida (Windows Storage
+Health) en 1 disco"), y el contrato fijo de los módulos (decisión 6:
+`componente, estado, mensaje, datos, recomendacion`, validado por
+`scanner._cumple_contrato`) está cubierto por pruebas.
+
+**Decisión:** la capa de lenguaje claro es **aditiva**; el contrato de 5
+llaves **no cambia**.
+
+- Cada módulo puede agregar un `codigo` de hallazgo (opcional).
+- Un nuevo `explicador.py` traduce ese código a
+  `guia = {que_pasa, que_hacer[], quien, urgencia}`, y `scanner` pega la
+  guía al resultado.
+- Toda la información visible tiene dos niveles: *Modo simple* (por
+  defecto) y *Modo técnico* (lo que existe hoy más los datos nuevos),
+  con un interruptor para alternarlos.
+- Tono de los textos: tuteo ("Selecciona", "tu PC"), frases cortas, sin
+  jerga; la jerga va al modo técnico.
+- Una prueba verifica que todo par (componente, estado) posible tiene
+  guía, para que nunca quede un "Crítico" sin explicación.
+
+**Motivo:** mejorar la lectura sin romper nada de lo ya probado, y que
+cada afirmación del modo simple se pueda rastrear a un dato medido
+(sin textos vagos ni alarmistas). Implementación en F2.
+
+## 29. Registro de equipos opt-in en SQLite (enmienda a la decisión 4)
+
+**Fecha:** 2026-10-21
+
+La decisión 4 fijó la app como **stateless**: no se guarda nada entre
+ejecuciones. El equipo ahora pidió una base de datos para registrar PCs
+(por ejemplo, una empresa que lleva su inventario e informes), lo que
+choca con esa decisión.
+
+**Decisión:** se enmienda la decisión 4 de forma acotada. El registro es
+**opt-in**: por defecto la app sigue sin guardar nada; solo se persiste
+algo si el usuario pulsa "Guardar en el registro".
+
+- Almacenamiento en **SQLite** (`sqlite3` ya viene con Python: cero
+  dependencias nuevas), en un archivo local en el USB o en una carpeta
+  elegida por el usuario.
+- Cada guardado es una foto del escaneo (JSON completo) con fecha, lo que
+  da historial por equipo y tendencias (por ejemplo, la salud de la
+  batería bajando).
+- La identidad de un PC se toma del UUID de `Win32_ComputerSystemProduct`
+  más el serial de BIOS y de placa; si son genéricos (tipo "To be filled
+  by O.E.M.") se avisa y se usa el nombre elegido por el usuario.
+- Exportación: CSV del inventario e informe HTML imprimible por equipo.
+- Riesgo asumido: si se pierde el USB (ya pasó, decisión 26), se pierde
+  también el registro. Mitigación: ruta del registro configurable y botón
+  de copia de respaldo. No hay cifrado en la v1; queda documentado.
+
+**Motivo:** cubrir el inventario sin dependencias nuevas y sin perder la
+ventaja de la decisión 4 para quien no quiere guardar nada. Implementación
+en F5.
