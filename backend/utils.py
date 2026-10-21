@@ -10,7 +10,12 @@ backend/modules/almacenamiento.py (fase posterior).
 
 from datetime import datetime, timezone
 
+import ctypes
 import json
+import os
+import socket
+import winreg
+
 import psutil
 import wmi
 
@@ -137,3 +142,53 @@ def generar_reporte_texto(resultado, veredicto):
     lineas.extend(_LIMITACIONES_CONOCIDAS)
     lineas.append("")
     return "\n".join(lineas)
+
+
+def puerto_libre(preferido=5000):
+    """Devuelve `preferido` si se puede enlazar en 127.0.0.1; si no, otro libre.
+
+    Solo prueba el loopback (el backend no se expone a la red). Si el
+    puerto preferido está ocupado, deja que el sistema asigne uno libre.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonda:
+            sonda.bind(("127.0.0.1", preferido))
+            return preferido
+    except OSError:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sonda:
+            sonda.bind(("127.0.0.1", 0))
+            return sonda.getsockname()[1]
+
+
+def es_winpe(minint_existe, unidad_sistema):
+    """Decide si el entorno es WinPE a partir de dos señales ya leídas.
+
+    Pura (sin I/O) para poder probarla: WinPE crea la clave MiniNT y
+    arranca desde una unidad X:.
+    """
+    return bool(minint_existe) or unidad_sistema.upper().startswith("X:")
+
+
+def detectar_entorno():
+    """Devuelve "winpe" o "windows" según la clave MiniNT y SystemDrive."""
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\MiniNT",
+        ):
+            minint_existe = True
+    except OSError:
+        minint_existe = False
+    unidad_sistema = os.environ.get("SystemDrive", "C:")
+    return "winpe" if es_winpe(minint_existe, unidad_sistema) else "windows"
+
+
+def es_administrador():
+    """True si el proceso corre con privilegios de administrador.
+
+    Cualquier fallo (API ausente, sistema no Windows) cuenta como False.
+    """
+    try:
+        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        return False

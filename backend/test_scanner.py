@@ -20,7 +20,10 @@ prueba la LÓGICA de clasificación, no que WMI/LibreHardwareMonitor
 devuelvan lo que se espera en una laptop concreta.
 """
 
+import socket
+
 import scanner
+import utils
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
@@ -267,6 +270,34 @@ def test_cobertura():
     assert cobertura == {"porcentaje": 86, "completos": 6, "parciales": 1}, cobertura
 
 
+def test_utils_entorno():
+    assert utils.es_winpe(True, "C:") is True
+    assert utils.es_winpe(False, "x:") is True
+    assert utils.es_winpe(False, "C:") is False
+    assert utils.detectar_entorno() in {"winpe", "windows"}
+    assert isinstance(utils.es_administrador(), bool)
+
+    # Puerto libre: si el preferido está libre, se devuelve el mismo.
+    sonda = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sonda.bind(("127.0.0.1", 0))
+        puerto_libre_prueba = sonda.getsockname()[1]
+    finally:
+        sonda.close()
+    assert utils.puerto_libre(puerto_libre_prueba) == puerto_libre_prueba
+
+    # Si el preferido está ocupado (enlazado y escuchando), devuelve otro.
+    ocupado = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        ocupado.bind(("127.0.0.1", 0))
+        ocupado.listen(1)
+        puerto_ocupado = ocupado.getsockname()[1]
+        alternativo = utils.puerto_libre(puerto_ocupado)
+        assert alternativo != puerto_ocupado and alternativo > 0, alternativo
+    finally:
+        ocupado.close()
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -281,4 +312,5 @@ if __name__ == "__main__":
     test_consistencia_scanner()
     test_prioridad_veredicto()
     test_cobertura()
+    test_utils_entorno()
     print("test_scanner.py: todos los casos OK")
