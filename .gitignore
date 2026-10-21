@@ -1,0 +1,14 @@
+# Binarios grandes que se regeneran o viven en el USB (ver README, "Generar el USB booteable")
+build/python-portable/
+build/chromium/
+build/chromium-extracted/
+*.iso
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+
+# Archivos de trabajo de las herramientas de IA (las skills guardan aquí su progreso)
+.superpowers/
+.claude/settings.local.json

@@ -1,0 +1,487 @@
+/* frontend/static/css/style.css — Hoja de estilos principal del dashboard.
+   Los colores viven en config/palette.css (importado abajo); acá solo va
+   layout, tipografía y estados visuales. */
+
+@import url("/config/palette.css");
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--color-fondo);
+    color: var(--color-texto);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 24px;
+}
+
+/* Datos técnicos (temperaturas, voltajes, capacidades) en monoespaciada
+   para que las cifras se alineen y se lean como en una terminal. */
+.dato-tecnico {
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+/* --- Cabecera --- */
+.cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.cabecera h1 {
+    margin: 0;
+    font-size: 24px;
+}
+
+.timestamp {
+    color: var(--color-texto-secundario);
+    font-size: 14px;
+}
+
+/* --- Panel de diagnóstico: sello de veredicto + mapa físico + ficha --- */
+.panel-diagnostico {
+    background-color: var(--color-tarjeta);
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.panel-diagnostico-cabecera {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.sello {
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    padding: 6px 16px;
+    border: 2px solid var(--color-verde);
+    color: var(--color-verde);
+    border-radius: 4px;
+    transition: var(--transicion-color);
+}
+
+.sello.ADVERTENCIA { border-color: var(--color-amarillo); color: var(--color-amarillo); }
+.sello.SOSPECHA { border-color: var(--color-naranja); color: var(--color-naranja); }
+.sello.CRITICO { border-color: var(--color-rojo); color: var(--color-rojo); }
+.sello.NO_DETERMINADO { border-color: var(--color-texto-secundario); color: var(--color-texto-secundario); }
+
+.resumen-texto {
+    color: var(--color-texto-secundario);
+    font-size: 13px;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+}
+
+/* Cobertura del escaneo: cuánto se pudo medir, no cuán sano está el
+   equipo (ver decisión 22 en docs/DECISIONES.md) — por eso vive aparte
+   del resumen de estados, no mezclado con él. Vacío en modo demo o
+   antes del primer escaneo real: no tiene sentido mostrar cobertura de
+   datos que no vinieron de una lectura real. */
+.cobertura-texto {
+    color: var(--color-texto-secundario);
+    font-size: 12px;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    opacity: 0.8;
+}
+
+.panel-diagnostico-cuerpo {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+}
+
+/* --- Mapa físico: silueta de laptop con un punto por componente,
+   ubicado en su posición real aproximada (ver POSICIONES_MAPA en app.js) --- */
+.mapa-svg-wrap {
+    /* Líneas de grilla al 6% de --color-acento (#58A6FF), estilo plano
+       técnico. Valor fijo en vez de color-mix() por compatibilidad con el
+       Chromium que traiga el WinPE de destino. */
+    background-image:
+        linear-gradient(rgba(88, 166, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88, 166, 255, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-color: var(--color-fondo);
+    border-radius: 4px;
+    border: 1px solid var(--color-borde);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+}
+
+.mapa-silueta {
+    fill: none;
+    stroke: var(--color-borde);
+    stroke-width: 1.5;
+}
+
+.punto {
+    cursor: pointer;
+    transition: transform 0.15s;
+    transform-origin: center;
+}
+
+.punto:hover, .punto.resaltado, .punto.seleccionado {
+    transform: scale(1.25);
+}
+
+.punto circle.halo {
+    opacity: 0.22;
+    transition: opacity 0.15s;
+}
+
+.punto:hover circle.halo, .punto.resaltado circle.halo, .punto.seleccionado circle.halo {
+    opacity: 0.42;
+}
+
+.punto.seleccionado circle.nucleo {
+    stroke: var(--color-texto);
+    stroke-width: 2;
+}
+
+.punto.normal circle.nucleo, .punto.normal circle.halo { fill: var(--color-verde); }
+.punto.advertencia circle.nucleo, .punto.advertencia circle.halo { fill: var(--color-amarillo); }
+.punto.sospecha circle.nucleo, .punto.sospecha circle.halo { fill: var(--color-naranja); }
+.punto.critico circle.nucleo, .punto.critico circle.halo { fill: var(--color-rojo); }
+.punto.no_determinado circle.nucleo, .punto.no_determinado circle.halo { fill: var(--color-texto-secundario); }
+
+.punto-etiqueta {
+    fill: var(--color-texto-secundario);
+    font-size: 10px;
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    pointer-events: none;
+}
+
+/* --- Ficha: una fila por componente, franja de severidad a la izquierda --- */
+.filas {
+    display: flex;
+    flex-direction: column;
+}
+
+.fila {
+    display: grid;
+    grid-template-columns: 4px 24px 1fr 90px;
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.fila.resaltado {
+    background-color: rgba(88, 166, 255, 0.06);
+}
+
+.fila.seleccionado {
+    background-color: rgba(88, 166, 255, 0.1);
+    box-shadow: inset 2px 0 0 var(--color-acento);
+}
+
+.franja {
+    height: 22px;
+    border-radius: 2px;
+    transition: var(--transicion-color);
+}
+
+.franja.normal { background-color: var(--color-verde); }
+.franja.advertencia { background-color: var(--color-amarillo); }
+.franja.sospecha { background-color: var(--color-naranja); }
+.franja.critico { background-color: var(--color-rojo); }
+.franja.no_determinado { background-color: var(--color-texto-secundario); }
+
+.fila-icono {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-texto-secundario);
+}
+
+.fila-info .nombre {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.fila-info .detalle {
+    font-size: 12px;
+    color: var(--color-texto-secundario);
+    margin-top: 2px;
+}
+
+.fila-chip {
+    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 3px 0;
+    border-radius: 3px;
+    font-weight: bold;
+}
+
+.fila-chip.normal { color: var(--color-verde); border: 1px solid var(--color-verde); }
+.fila-chip.advertencia { color: var(--color-amarillo); border: 1px solid var(--color-amarillo); }
+.fila-chip.sospecha { color: var(--color-naranja); border: 1px solid var(--color-naranja); }
+.fila-chip.critico { color: var(--color-rojo); border: 1px solid var(--color-rojo); }
+.fila-chip.no_determinado { color: var(--color-texto-secundario); border: 1px solid var(--color-texto-secundario); }
+
+/* --- Panel de detalle: se llena al hacer clic en un punto del mapa o
+   una fila de la ficha, con TODO lo que "datos" trae del módulo --- */
+.detalle-panel {
+    background-color: var(--color-tarjeta);
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.detalle-vacio {
+    color: var(--color-texto-secundario);
+    font-size: 14px;
+    text-align: center;
+    margin: 8px 0;
+}
+
+.detalle-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.detalle-cabecera h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.detalle-cabecera .fila-chip {
+    padding: 4px 10px;
+}
+
+.detalle-mensaje {
+    color: var(--color-texto-secundario);
+    font-size: 13px;
+    margin: 4px 0 16px 0;
+}
+
+.detalle-sin-datos {
+    color: var(--color-texto-secundario);
+    font-size: 13px;
+    margin: 0;
+}
+
+/* Recomendación accionable por estado — la respuesta a "¿y ahora qué
+   hago?", se destaca del resto del detalle técnico. */
+.detalle-recomendacion {
+    background-color: var(--color-fondo);
+    border-left: 3px solid var(--color-acento);
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--color-texto);
+}
+
+.detalle-recomendacion strong {
+    color: var(--color-acento);
+}
+
+.detalle-fila {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-borde);
+    font-size: 13px;
+}
+
+.detalle-fila:last-child {
+    border-bottom: none;
+}
+
+.detalle-fila span:first-child {
+    color: var(--color-texto-secundario);
+}
+
+.detalle-grupo {
+    margin-top: 12px;
+}
+
+.detalle-grupo h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-texto-secundario);
+    margin: 0 0 8px 0;
+}
+
+.detalle-subitem {
+    background-color: var(--color-fondo);
+    border: 1px solid var(--color-borde);
+    border-radius: 4px;
+    padding: 4px 12px;
+    margin-bottom: 8px;
+}
+
+.detalle-subitem .detalle-fila {
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.detalle-subitem .detalle-fila:last-child {
+    border-bottom: none;
+}
+
+/* --- Botones de acción --- */
+.acciones {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.boton-escanear {
+    background-color: var(--color-acento);
+    color: var(--color-fondo);
+    border: none;
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.boton-escanear:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Botón de reporte: variante outline, mismo tamaño, para no competir
+   visualmente con la acción principal (escanear). Es un <a>, no un
+   <button>: la descarga la resuelve el navegador solo, vía el header
+   Content-Disposition que ya manda /api/reporte. */
+.boton-reporte {
+    display: inline-flex;
+    align-items: center;
+    background-color: transparent;
+    color: var(--color-acento);
+    border: 1px solid var(--color-acento);
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Botón de modo demo: mismo tamaño que los otros dos, pero con el color
+   neutral (--color-texto-secundario) en vez del acento — es la acción
+   menos importante de las tres, para preparar una sustentación, no para
+   el uso real del técnico. */
+.boton-demo {
+    background-color: transparent;
+    color: var(--color-texto-secundario);
+    border: 1px solid var(--color-borde);
+    border-radius: 6px;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* --- Barra de progreso --- */
+.barra-progreso-contenedor {
+    display: none;
+    height: 6px;
+    background-color: var(--color-tarjeta);
+    border-radius: 3px;
+    margin-top: 16px;
+    overflow: hidden;
+}
+
+.barra-progreso-contenedor.activa {
+    display: block;
+}
+
+.barra-progreso {
+    height: 100%;
+    width: 40%;
+    background-color: var(--color-acento);
+    animation: avanzar 1s linear infinite;
+}
+
+@keyframes avanzar {
+    0% { margin-left: -40%; }
+    100% { margin-left: 100%; }
+}
+
+/* --- Estado de error general (backend no responde) --- */
+.aviso-error {
+    display: none;
+    background-color: var(--color-tarjeta);
+    border-left: 4px solid var(--color-rojo);
+    border-radius: var(--radio-borde);
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    color: var(--color-texto);
+}
+
+.aviso-error.activo {
+    display: block;
+}
+
+/* --- Aviso de modo demo (datos simulados) --- */
+.aviso-demo {
+    display: none;
+    background-color: var(--color-tarjeta);
+    border-left: 4px solid var(--color-naranja);
+    border-radius: var(--radio-borde);
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    color: var(--color-naranja);
+    font-weight: bold;
+}
+
+.aviso-demo.activo {
+    display: block;
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+    .panel-diagnostico-cuerpo {
+        grid-template-columns: 1fr;
+    }
+
+    .fila {
+        grid-template-columns: 4px 20px 1fr;
+    }
+
+    .fila-chip {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        padding: 16px;
+    }
+
+    .cabecera {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .boton-escanear {
+        width: 100%;
+    }
+}

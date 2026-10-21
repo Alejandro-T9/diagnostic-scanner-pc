@@ -1,0 +1,29 @@
+/* config/palette.css — Paleta de colores única de Diagnostic Scanner PC.
+   Fuente de verdad de todos los colores del proyecto. Se importa desde
+   frontend/static/css/style.css: cambiar un color acá lo cambia en toda
+   la interfaz sin tocar el resto de las hojas de estilo. */
+
+:root {
+    /* Colores base */
+    --color-fondo: #0D1117;
+    --color-tarjeta: #161B22;
+    --color-texto: #E6EDF3;
+    --color-texto-secundario: #8B949E;
+
+    /* Colores de estado (mismos nombres que backend/scanner.py ESTADOS_VALIDOS).
+       --color-naranja se agregó para "sospecha" (ver decisión en
+       docs/DECISIONES.md) — sistema de 5 niveles en vez de 3. "no_determinado"
+       reusa --color-texto-secundario (gris = neutral/desconocido, no hace
+       falta un color nuevo para eso). */
+    --color-verde: #3FB950;
+    --color-amarillo: #D29922;
+    --color-naranja: #DB6D28;
+    --color-rojo: #F85149;
+    --color-acento: #58A6FF;
+
+    /* Bordes, sombras y transiciones */
+    --color-borde: #30363D;
+    --radio-borde: 8px;
+    --sombra-tarjeta: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --transicion-color: background-color 0.2s ease, border-color 0.2s ease;
+}

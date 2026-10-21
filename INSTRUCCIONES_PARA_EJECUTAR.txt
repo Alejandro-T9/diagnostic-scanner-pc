@@ -1,0 +1,55 @@
+Diagnostic Scanner PC — Instrucciones para ejecutar
+=====================================================
+
+Este es el código completo del proyecto (backend + frontend). El
+programa completo, en su forma final, arranca desde un USB especial
+preparado por el equipo — pero también se puede ejecutar directamente
+en cualquier PC con Windows, para revisarlo sin necesidad de ese USB.
+
+QUÉ NECESITA TENER INSTALADO
+-----------------------------
+- Windows (usa una tecnología llamada WMI, que solo existe en Windows).
+- Python 3.10 o más nuevo. Se descarga gratis de https://python.org
+  (al instalar, marcar la casilla "Add python.exe to PATH").
+
+PASOS PARA EJECUTARLO
+-----------------------
+1. Descomprimir esta carpeta en cualquier lugar.
+2. Abrir una terminal (símbolo del sistema / PowerShell) dentro de la
+   carpeta "backend" que viene adentro de este paquete.
+3. Escribir este comando y presionar Enter (instala lo que hace falta,
+   solo se hace una vez):
+
+     pip install -r requirements.txt
+
+4. Escribir este comando y presionar Enter:
+
+     python app.py
+
+   ESTE es el archivo que ejecuta el programa: backend/app.py
+
+5. Cuando aparezca un mensaje que dice algo como
+   "Running on http://127.0.0.1:5000", abrir el navegador (Chrome,
+   Firefox, Edge, el que sea) y entrar a esta dirección:
+
+     http://127.0.0.1:5000
+
+6. Ahí va a aparecer el panel del programa. El botón "Escanear Sistema"
+   corre el diagnóstico real sobre la PC donde se está ejecutando en
+   ese momento (no sobre el USB ni sobre otra máquina).
+
+SI ALGO NO FUNCIONA PERFECTO
+------------------------------
+Es esperable que, en una PC distinta a las laptops para las que se
+diseñó el proyecto, algunos componentes salgan marcados como
+"NO_DETERMINADO" (sin datos) — esa PC simplemente no expone ese
+sensor en particular. No es un error del programa: el sistema está
+hecho a propósito para avisar honestamente cuando no puede leer un
+dato, en vez de inventar un resultado. El resto del panel debería
+funcionar con normalidad.
+
+MÁS DETALLE TÉCNICO
+---------------------
+Ver README.md (en esta misma carpeta) para la arquitectura completa,
+y la carpeta docs/ para el registro de decisiones técnicas del
+proyecto con fecha y motivo de cada una.

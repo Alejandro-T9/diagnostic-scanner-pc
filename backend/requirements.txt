@@ -1,0 +1,22 @@
+# backend/requirements.txt — Dependencias mínimas de Diagnostic Scanner PC
+#
+# Únicamente dos dependencias externas. El resto de necesidades del
+# proyecto se resuelven con librería estándar de Python.
+
+# Framework web. >=3.0.0 es la primera versión de la rama 3.x: estable
+# y con soporte completo para Python 3.10+.
+Flask>=3.0.0
+
+# Métricas de sistema (CPU, RAM, disco). >=5.9.0 es la primera versión
+# de psutil con soporte formal para Python 3.10.
+psutil>=5.9.0
+
+# Acceso a WMI (Windows Management Instrumentation) — pivote de Debian
+# Live a WinPE/Hiren's Boot PE, ver docs/DECISIONES.md. Reemplaza a
+# dmidecode/lscpu/sensors/smartctl/ip/ethtool en los 7 módulos.
+wmi>=1.5.1
+
+# Interop con .NET — fuente_poder.py carga LibreHardwareMonitorLib.dll
+# (backend/native/lhm/) para leer voltajes reales, ya que WMI no expone
+# ninguna clase estándar confiable para eso.
+pythonnet>=3.0.5
