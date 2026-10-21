@@ -97,6 +97,21 @@ def debe_apagar(
     return ahora - ultimo_latido > tolerancia_s
 
 
+def latido_tras_pausa(
+    ahora: float,
+    anterior: float,
+    ultimo_latido: float | None,
+    umbral_s: float = 10.0,
+) -> float | None:
+    """Nuevo valor del último latido tras una posible suspensión del equipo.
+
+    time.monotonic() sigue contando mientras el PC duerme; si el bucle de
+    vigilancia estuvo parado más de `umbral_s` (el bucle duerme 1 s), el equipo
+    estuvo suspendido y se da margen al navegador: el latido pasa a `ahora`.
+    """
+    return ahora if ahora - anterior > umbral_s else ultimo_latido
+
+
 def abrir_ventana(exe: str, url: str, perfil: str, popen=subprocess.Popen, abrir_web=webbrowser.open) -> None:
     """Lanza la ventana --app; si el exe no se puede ejecutar, usa el navegador por defecto."""
     try:
@@ -161,11 +176,18 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 webbrowser.open(url)
 
+        anterior = inicio
         while hilo.is_alive():
             time.sleep(1)
-            if debe_apagar(time.monotonic(), ultimo_latido[0], inicio):
+            ahora = time.monotonic()
+            ultimo_latido[0] = latido_tras_pausa(ahora, anterior, ultimo_latido[0])
+            anterior = ahora
+            if debe_apagar(ahora, ultimo_latido[0], inicio):
                 print("Ventana cerrada: apagando.", flush=True)
                 break
+        else:
+            print("Error: el servidor se detuvo inesperadamente.", file=sys.stderr)
+            return 1
     except KeyboardInterrupt:
         pass
     finally:

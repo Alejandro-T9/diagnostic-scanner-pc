@@ -417,6 +417,86 @@ def test_lanzador():
     assert lanzados == [lanzador.comando_app("C:\\e.exe", url, "C:\\tmp\\p")], lanzados
     assert abiertas == [], abiertas
 
+    # (e) latido_tras_pausa: si el propio bucle de vigilancia se detuvo (equipo
+    # suspendido), el latido se renueva para dar margen al navegador.
+    assert lanzador.latido_tras_pausa(101.0, 100.0, 90.0) == 90.0       # sin pausa: igual
+    assert lanzador.latido_tras_pausa(101.0, 100.0, None) is None        # sin pausa, sin latido: igual
+    assert lanzador.latido_tras_pausa(400.0, 200.0, 50.0) == 400.0       # pausa de 200 s, latido viejo
+    assert lanzador.latido_tras_pausa(400.0, 200.0, None) == 400.0       # pausa sin latido previo
+    assert lanzador.latido_tras_pausa(110.0, 100.0, 5.0) == 5.0          # justo en el umbral (10 s): no es pausa
+
+
+class _FakeSensor:
+    def __init__(self, tipo, nombre, valor):
+        self.SensorType, self.Name, self.Value = tipo, nombre, valor
+
+
+class _FakeHardware:
+    """Imita un IHardware de LibreHardwareMonitor (solo lo que lee _lhm)."""
+
+    def __init__(self, tipo, nombre, sensores=(), sub=(), falla=False):
+        self.HardwareType, self.Name = tipo, nombre
+        self.Sensors = [_FakeSensor(*s) for s in sensores]
+        self.SubHardware = list(sub)
+        self._falla = falla
+
+    def Update(self):
+        if self._falla:
+            raise RuntimeError("Update() falló")
+
+
+def test_lhm_recoger_aislamiento():
+    # Un hardware (p. ej. la GPU) que falla en Update() no debe descartar los
+    # sensores del resto, ni los de un sub-hardware sano del mismo equipo.
+    cpu_sano = _FakeHardware("Cpu", "CPU X", [("Temperature", "CPU Package", 60.0)])
+    gpu_roto = _FakeHardware("GpuNvidia", "GPU X", [("Temperature", "GPU Core", 50.0)], falla=True)
+    placa = _FakeHardware(
+        "Motherboard", "Placa X", [("Fan", "Fan #1", 1500.0)],
+        sub=[
+            _FakeHardware("Motherboard", "SuperIO roto", [("Fan", "Fan #9", 1.0)], falla=True),
+            _FakeHardware("Motherboard", "SuperIO", [("Voltage", "Vcore", 1.1)]),
+        ],
+    )
+    sensores = _lhm._recoger_sensores([cpu_sano, gpu_roto, placa])
+    nombres = [s["nombre"] for s in sensores]
+    assert nombres == ["CPU Package", "Fan #1", "Vcore"], nombres
+    assert sensores[2]["tipo_hardware"] == "Motherboard" and sensores[2]["hardware"] == "SuperIO", sensores[2]
+
+
+def test_lhm_consumidores():
+    # Pegamento entre _lhm y sus consumidores: cpu (ventiladores) y gpu
+    # (telemetría) leen la misma caché y respetan la forma de salida.
+    _lhm.invalidar()
+    try:
+        _lhm.leer_sensores(lector=lambda: [
+            _sensor("Motherboard", "Fan", "Fan #1", 1234.6),
+            _sensor("GpuNvidia", "Fan", "GPU Fan", 900.2),
+            _sensor("Motherboard", "Fan", "Fan #2", None),
+            _sensor("GpuNvidia", "Temperature", "GPU Core", 55.0),
+            _sensor("Cpu", "Temperature", "CPU Package", 70.0),
+            _sensor("GpuNvidia", "Load", "GPU Core", 42.0),
+            _sensor("Cpu", "Load", "CPU Total", 90.0),
+        ])
+        assert cpu._obtener_ventiladores() == [
+            {"nombre": "Fan #1", "rpm": 1235},
+            {"nombre": "GPU Fan", "rpm": 900},
+        ], cpu._obtener_ventiladores()
+        assert gpu._telemetria() == (55.0, 42.0), gpu._telemetria()
+    finally:
+        _lhm.invalidar()
+
+    # El escaneo completo arranca invalidando la caché de sensores.
+    invalidaciones = []
+    invalidar_orig, componentes_orig = _lhm.invalidar, scanner.COMPONENTES
+    try:
+        _lhm.invalidar = lambda: invalidaciones.append(1)
+        scanner.COMPONENTES = []
+        scanner.ejecutar_escaneo_completo()
+        assert invalidaciones == [1], invalidaciones
+    finally:
+        _lhm.invalidar, scanner.COMPONENTES = invalidar_orig, componentes_orig
+        _lhm.invalidar()
+
 
 if __name__ == "__main__":
     test_ram()
@@ -428,6 +508,8 @@ if __name__ == "__main__":
     test_gpu_sensores()
     test_gpu_aislamiento()
     test_lhm()
+    test_lhm_recoger_aislamiento()
+    test_lhm_consumidores()
     test_fuente_poder_sin_sensores()
     test_consistencia_scanner()
     test_prioridad_veredicto()

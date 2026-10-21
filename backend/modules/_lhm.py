@@ -94,17 +94,34 @@ def _leer_hardware() -> list:
     computer.IsMotherboardEnabled = True
     computer.Open()
     try:
-        sensores = []
-        for hardware in computer.Hardware:
-            tipo_hardware = str(hardware.HardwareType)
-            hardware.Update()
-            sensores.extend(_aplanar(hardware, tipo_hardware))
-            for sub in hardware.SubHardware:
-                sub.Update()
-                sensores.extend(_aplanar(sub, tipo_hardware))
-        return sensores
+        return _recoger_sensores(computer.Hardware)
     finally:
         computer.Close()
+
+
+def _recoger_sensores(lista_hardware) -> list:
+    """Aplana los sensores de cada hardware y sub-hardware. Un componente
+    que falla (p. ej. Update() de la GPU) se omite solo a él: no descarta
+    los sensores de CPU/placa ya leídos ni los que faltan."""
+    sensores = []
+    for hardware in lista_hardware:
+        tipo_hardware = str(hardware.HardwareType)
+        sensores.extend(_leer_uno(hardware, tipo_hardware))
+        try:
+            subs = list(hardware.SubHardware)
+        except Exception:
+            continue
+        for sub in subs:
+            sensores.extend(_leer_uno(sub, tipo_hardware))
+    return sensores
+
+
+def _leer_uno(hardware, tipo_hardware: str) -> list:
+    try:
+        hardware.Update()
+        return _aplanar(hardware, tipo_hardware)
+    except Exception:
+        return []
 
 
 def _aplanar(hardware, tipo_hardware: str) -> list:

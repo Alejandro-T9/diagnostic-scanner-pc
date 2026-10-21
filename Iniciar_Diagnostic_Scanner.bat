@@ -47,7 +47,11 @@ echo Se pedira permiso de administrador para poder leer los sensores.
 echo Si lo rechazas, la aplicacion abre igual pero con lecturas reducidas.
 rem Un apostrofo en la ruta romperia el comando de PowerShell: se duplica.
 set "ESTE_BAT_PS=%ESTE_BAT:'=''%"
-powershell -NoProfile -Command "Start-Process -FilePath '%ESTE_BAT_PS%' -ArgumentList 'elevado' -Verb RunAs -ErrorAction Stop" >nul 2>&1
+rem Se lanza cmd.exe con /s /c y comillas dobles explicitas ([char]34): si se
+rem ejecutara el .bat directo, Windows lo corre como cmd /C "ruta" y su manejo
+rem de comillas falla con carpetas que llevan &, @ o parentesis sin espacios.
+rem Linea final: cmd.exe /s /c ""ruta\este.bat" elevado"
+powershell -NoProfile -Command "Start-Process cmd.exe -ArgumentList ('/s /c '+[char]34+[char]34+'%ESTE_BAT_PS%'+[char]34+' elevado'+[char]34) -Verb RunAs -ErrorAction Stop" >nul 2>&1
 if errorlevel 1 goto sin_admin
 rem Se abrio la ventana con administrador: esta ya no hace falta.
 exit /b 0
