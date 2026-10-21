@@ -946,8 +946,10 @@ al técnico, y el técnico mismo). Spec completo:
   rescate** para PCs que no arrancan. Ya no es el camino principal.
 - El navegador es **Edge en modo app** (`msedge --app=http://127.0.0.1:PUERTO`),
   que ya trae Windows 10/11. Si no hay Edge se prueba Chrome y luego el
-  navegador predeterminado. Se descarta el Chromium portable (~800 MB),
-  lo que libera espacio en el USB.
+  navegador predeterminado. El Chromium portable (~800 MB) de `chromium\`
+  se queda en el USB y NO debe borrarse mientras exista el modo rescate
+  (`build/overlay-winpe/iniciar.bat` usa `%USB%chromium\chrome.exe`); el
+  modo portable simplemente no lo usa.
 - Se mantiene Python embeddable + Flask, con un lanzador
   `Iniciar_Diagnostic_Scanner.bat` que pide permisos de administrador
   (necesarios para sensores y S.M.A.R.T.).
@@ -1029,3 +1031,43 @@ algo si el usuario pulsa "Guardar en el registro".
 **Motivo:** cubrir el inventario sin dependencias nuevas y sin perder la
 ventaja de la decisión 4 para quien no quiere guardar nada. Implementación
 en F5.
+
+## 30. Apagado automático por latido y ventana propia del navegador
+
+**Fecha:** 2026-10-21
+
+El lanzador portable (`backend/lanzador.py`) debe cerrarse solo cuando el
+usuario cierra la ventana de la app, sin dejar un servidor huérfano en
+segundo plano ni pedirle nada al usuario.
+
+**Decisión:**
+
+- **Latido:** el frontend ya consulta `/api/status` cada 2 s; el servidor
+  anota la hora de cada consulta (`after_request`) y usa eso como latido.
+  Sin latido nuevo, el lanzador apaga el servidor.
+- **Gracia inicial de 60 s**, contada desde que se lanza el navegador (no
+  desde el arranque del servidor), para que Edge tenga tiempo de abrir.
+- **Tolerancia de 150 s** de silencio: Chromium frena los temporizadores
+  de una ventana minimizada u oculta a ~1 por minuto, así que un latido
+  cada 2 s no es fiable con la ventana en segundo plano.
+- **Suspensión/hibernación:** `time.monotonic()` sigue contando mientras
+  el equipo duerme, por lo que al despertar parecían haber pasado >150 s
+  sin latido y el programa se cerraba antes de que la página pudiera
+  consultar de nuevo. Si el propio bucle de vigilancia estuvo parado más
+  de 10 s (`latido_tras_pausa`), se renueva el latido para dar margen al
+  navegador.
+- **Perfil temporal** con `--user-data-dir`: sin él, Edge delega en un
+  proceso ya abierto y el proceso lanzado termina al instante. El perfil
+  se borra al salir.
+- **`--sin-navegador`:** no abre ventana; sirve para pruebas de humo
+  (servidor + `/api/status`) sin interfaz.
+- **El sondeo de arranque ignora los proxies del sistema** (`ProxyHandler({})`):
+  un proxy configurado en Windows puede tragarse las peticiones a 127.0.0.1.
+- **`abrir_ventana` cae al navegador predeterminado** si el `.exe` de
+  Edge/Chrome no se puede ejecutar (`OSError`).
+- Si el hilo del servidor muere por su cuenta, `main()` devuelve 1 con un
+  mensaje de error corto, en vez de salir como si todo hubiera ido bien.
+
+**Motivo:** cerrar la ventana debe bastar para terminar el programa, y
+las medidas de la prueba real en el USB (tareas 9 y 10 del plan) se
+registrarán en decisiones posteriores (31 y 32).

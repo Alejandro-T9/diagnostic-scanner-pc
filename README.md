@@ -96,7 +96,8 @@ Funciona en cualquier PC con **Windows 10 u 11**, sin instalar nada:
    igual pero con lecturas reducidas y un aviso naranja en la parte
    superior (algunos componentes saldrán `NO_DETERMINADO`).
 4. Se abre una ventana propia con el panel; al cerrarla, el programa se
-   apaga solo.
+   apaga solo en unos 2-3 minutos (la consola negra puede seguir abierta
+   hasta entonces: no está trabada).
 
 La ISO de WinPE (ver "Generar el USB booteable") queda como **modo de
 rescate**, para equipos que ya no arrancan Windows.
