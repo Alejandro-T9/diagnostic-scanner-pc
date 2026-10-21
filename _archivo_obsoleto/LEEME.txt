@@ -1,0 +1,1 @@
+Código de las bases Alpine/Debian descartadas (decisiones 11–15). No se usa.
