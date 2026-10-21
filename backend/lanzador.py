@@ -97,12 +97,23 @@ def debe_apagar(
     return ahora - ultimo_latido > tolerancia_s
 
 
+def abrir_ventana(exe: str, url: str, perfil: str, popen=subprocess.Popen, abrir_web=webbrowser.open) -> None:
+    """Lanza la ventana --app; si el exe no se puede ejecutar, usa el navegador por defecto."""
+    try:
+        popen(comando_app(exe, url, perfil))
+    except OSError:
+        print("No se pudo abrir la ventana de aplicación: usando el navegador por defecto.", flush=True)
+        abrir_web(url)
+
+
 def _esperar_servidor(url: str, timeout_s: float = ESPERA_SERVIDOR_S) -> bool:
     """Sondea /api/status cada 0.3 s hasta que responda; False si se agota."""
+    # Sin proxy: uno configurado en Windows puede tragarse las peticiones a 127.0.0.1.
+    abridor = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     limite = time.monotonic() + timeout_s
     while time.monotonic() < limite:
         try:
-            with urllib.request.urlopen(url + "/api/status", timeout=2) as respuesta:
+            with abridor.open(url + "/api/status", timeout=2) as respuesta:
                 if respuesta.status == 200:
                     return True
         except OSError:
@@ -137,12 +148,16 @@ def main(argv: list[str] | None = None) -> int:
             print("Error: el servidor no respondió a tiempo.", file=sys.stderr)
             return 1
         print(f"Diagnostic Scanner PC en {url}", flush=True)
+        # El sondeo de arranque marcó un latido: se descarta para que la gracia
+        # inicial (60 s) cuente desde que se lanza el navegador.
+        ultimo_latido[0] = None
+        inicio = time.monotonic()
 
         if not sin_navegador:
             exe = elegir_navegador(os.environ)
             if exe:
                 perfil = tempfile.mkdtemp(prefix="dspc_perfil_")
-                subprocess.Popen(comando_app(exe, url, perfil))
+                abrir_ventana(exe, url, perfil)
             else:
                 webbrowser.open(url)
 

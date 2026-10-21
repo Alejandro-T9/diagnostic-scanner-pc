@@ -12,3 +12,4 @@ __pycache__/
 # Archivos de trabajo de las herramientas de IA (las skills guardan aquí su progreso)
 .superpowers/
 .claude/settings.local.json
+_archivo_obsoleto/.claude/

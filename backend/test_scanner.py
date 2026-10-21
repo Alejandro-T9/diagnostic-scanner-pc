@@ -20,7 +20,10 @@ prueba la LÓGICA de clasificación, no que WMI/LibreHardwareMonitor
 devuelvan lo que se espera en una laptop concreta.
 """
 
+import contextlib
+import io
 import socket
+import threading
 
 import app
 import lanzador
@@ -300,16 +303,39 @@ def test_utils_entorno():
         ocupado.close()
 
 
+def _en_hilo(funcion):
+    """Corre `funcion` en un hilo aparte y re-lanza su excepción en el principal.
+
+    El servidor real atiende en hilos; usar test_client() en el hilo principal
+    deja un par CoInitialize/CoUninitialize de COM que al salir imprime
+    "Win32 exception occurred releasing IUnknown" (inofensivo, solo de test).
+    """
+    error = []
+
+    def _correr():
+        try:
+            funcion()
+        except BaseException as excepcion:
+            error.append(excepcion)
+
+    hilo = threading.Thread(target=_correr)
+    hilo.start()
+    hilo.join()
+    if error:
+        raise error[0]
+
+
 def test_app_rutas():
     """Rutas de app.py: host seguro, /api/status ampliado y errores en JSON."""
     # (a) Decisión 27: el servidor solo escucha en loopback.
     assert app.HOST == "127.0.0.1", app.HOST
 
-    cliente = app.app.test_client()
     escaneo_original = scanner.ejecutar_escaneo_completo
     reporte_original = utils.generar_reporte_texto
     app._ultimo_escaneo = None
-    try:
+
+    def _peticiones():
+        cliente = app.app.test_client()
         # (b) /api/status agrega entorno (str) y administrador (bool).
         respuesta = cliente.get("/api/status")
         assert respuesta.status_code == 200, respuesta.status_code
@@ -333,6 +359,9 @@ def test_app_rutas():
         assert respuesta.status_code == 500, respuesta.status_code
         assert respuesta.mimetype == "application/json", respuesta.mimetype
         assert respuesta.get_json()["estado"] == "error", respuesta.get_json()
+
+    try:
+        _en_hilo(_peticiones)
     finally:
         scanner.ejecutar_escaneo_completo = escaneo_original
         utils.generar_reporte_texto = reporte_original
@@ -370,6 +399,23 @@ def test_lanzador():
     assert lanzador.debe_apagar(161.0, None, 100.0) is True     # 61 s sin latido
     assert lanzador.debe_apagar(200.0, 100.0, 0.0) is False     # latido hace 100 s
     assert lanzador.debe_apagar(251.0, 100.0, 0.0) is True      # latido hace 151 s
+
+    # (d) abrir_ventana: si no se puede lanzar el exe (OSError), cae al navegador por defecto.
+    url = "http://127.0.0.1:5000"
+    abiertas = []
+
+    def _popen_roto(*args, **kwargs):
+        raise OSError("exe desaparecido")
+
+    with contextlib.redirect_stdout(io.StringIO()):  # silencia el aviso impreso
+        lanzador.abrir_ventana("C:\\e.exe", url, "C:\\tmp\\p", popen=_popen_roto, abrir_web=abiertas.append)
+    assert abiertas == [url], abiertas
+
+    lanzados = []
+    abiertas.clear()
+    lanzador.abrir_ventana("C:\\e.exe", url, "C:\\tmp\\p", popen=lanzados.append, abrir_web=abiertas.append)
+    assert lanzados == [lanzador.comando_app("C:\\e.exe", url, "C:\\tmp\\p")], lanzados
+    assert abiertas == [], abiertas
 
 
 if __name__ == "__main__":
