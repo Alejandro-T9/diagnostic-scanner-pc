@@ -286,6 +286,10 @@ async function actualizarStatus() {
         const datos = await respuesta.json();
         document.getElementById("timestamp").textContent =
             `Última actualización: ${new Date(datos.timestamp).toLocaleTimeString()}`;
+        // Aviso de falta de administrador: solo tiene sentido en Windows
+        // normal (WinPE ya corre con todos los permisos).
+        const sinAdmin = datos.administrador === false && datos.entorno === "windows";
+        document.getElementById("aviso-admin").classList.toggle("activo", sinAdmin);
         ocultarError();
     } catch (error) {
         mostrarError("No se pudo conectar con el backend. Verifica que el servidor esté corriendo.");

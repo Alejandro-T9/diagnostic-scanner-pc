@@ -85,6 +85,22 @@ severidad para el veredicto global:
 - ⚪ **NO_DETERMINADO** — no se pudo leer el dato. No es lo mismo que "está mal".
 - 🟢 **NORMAL** — se leyó bien y está dentro de rango esperado.
 
+## Modo portable (recomendado)
+
+Funciona en cualquier PC con **Windows 10 u 11**, sin instalar nada:
+
+1. Conectar el USB (o abrir la carpeta del proyecto).
+2. Doble clic en **`Iniciar_Diagnostic_Scanner.bat`**.
+3. Windows pedirá permiso de administrador: **aceptarlo**, así se pueden leer
+   temperaturas, voltajes y S.M.A.R.T. Si se rechaza, la aplicación abre
+   igual pero con lecturas reducidas y un aviso naranja en la parte
+   superior (algunos componentes saldrán `NO_DETERMINADO`).
+4. Se abre una ventana propia con el panel; al cerrarla, el programa se
+   apaga solo.
+
+La ISO de WinPE (ver "Generar el USB booteable") queda como **modo de
+rescate**, para equipos que ya no arrancan Windows.
+
 ## Cómo ejecutarlo en una PC normal (fuera del USB)
 
 Sirve para desarrollo, revisión o mostrarlo sin arrancar desde el USB.
