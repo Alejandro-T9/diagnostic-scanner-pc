@@ -49,8 +49,16 @@ def obtener_datos() -> dict:
     """Nunca lanza: cualquier fallo se degrada a valores None. Esto es
     telemetría auxiliar de cpu.py, no debe poder tumbar el diagnóstico
     del Procesador."""
-    nombre, driver = _identidad()
-    temperatura_c, porcentaje_uso = _telemetria()
+    # Cada fuente se aísla por separado: si falla la identidad (WMI) la
+    # telemetría igual se reporta, y al revés.
+    try:
+        nombre, driver = _identidad()
+    except Exception:
+        nombre, driver = None, None
+    try:
+        temperatura_c, porcentaje_uso = _telemetria()
+    except Exception:
+        temperatura_c, porcentaje_uso = None, None
     return {
         "nombre": nombre,
         "driver": driver,

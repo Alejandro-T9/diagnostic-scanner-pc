@@ -109,6 +109,27 @@ def test_gpu_sensores():
     assert gpu._elegir_uso([("D3D 3D", 20)]) is None, "sin GPU Core no debe caer a un motor individual"
 
 
+def test_gpu_aislamiento():
+    # gpu.obtener_datos() es auxiliar de cpu.py y promete no lanzar nunca:
+    # si falla identidad o telemetría, solo ese lado se degrada a None.
+    def _boom():
+        raise RuntimeError("boom")
+
+    identidad_orig, telemetria_orig = gpu._identidad, gpu._telemetria
+    try:
+        gpu._identidad = _boom
+        gpu._telemetria = lambda: (55.0, 12.0)
+        datos = gpu.obtener_datos()
+        assert datos == {"nombre": None, "driver": None, "temperatura_c": 55.0, "porcentaje_uso": 12.0}, datos
+
+        gpu._identidad = lambda: ("GPU X", "1.2.3")
+        gpu._telemetria = _boom
+        datos = gpu.obtener_datos()
+        assert datos == {"nombre": "GPU X", "driver": "1.2.3", "temperatura_c": None, "porcentaje_uso": None}, datos
+    finally:
+        gpu._identidad, gpu._telemetria = identidad_orig, telemetria_orig
+
+
 def test_consistencia_scanner():
     # ESTADOS_VALIDOS y _SEVERIDAD deben listar exactamente los mismos 5
     # nombres — si alguien agrega un estado nuevo en uno y se olvida del
@@ -166,6 +187,7 @@ if __name__ == "__main__":
     test_mainboard()
     test_red()
     test_gpu_sensores()
+    test_gpu_aislamiento()
     test_consistencia_scanner()
     test_prioridad_veredicto()
     test_cobertura()
