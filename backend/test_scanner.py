@@ -23,6 +23,7 @@ devuelvan lo que se espera en una laptop concreta.
 import socket
 
 import app
+import lanzador
 import scanner
 import utils
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
@@ -338,6 +339,39 @@ def test_app_rutas():
         app._ultimo_escaneo = None
 
 
+def test_lanzador():
+    """Funciones puras de lanzador.py: elegir navegador, comando y latido."""
+    # (a) elegir_navegador con existencia simulada (sin tocar el disco).
+    variables = {
+        "ProgramFiles(x86)": "C:\\PF86",
+        "ProgramFiles": "C:\\PF",
+        "LocalAppData": "C:\\Local",
+    }
+    edge86 = "C:\\PF86\\Microsoft\\Edge\\Application\\msedge.exe"
+    chrome_local = "C:\\Local\\Google\\Chrome\\Application\\chrome.exe"
+    chrome_pf = "C:\\PF\\Google\\Chrome\\Application\\chrome.exe"
+
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta == edge86) == edge86
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta == chrome_local) == chrome_local
+    assert lanzador.elegir_navegador(variables, lambda ruta: False) is None
+    # Edge y Chrome presentes: gana Edge.
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta in (edge86, chrome_pf)) == edge86
+    # Variables de entorno ausentes: se saltan, sin romper.
+    assert lanzador.elegir_navegador({}, lambda ruta: True) is None
+
+    # (b) comando_app: ventana tipo aplicación con perfil propio.
+    comando = lanzador.comando_app("C:\\e.exe", "http://127.0.0.1:5000", "C:\\tmp\\p")
+    assert comando[0] == "C:\\e.exe", comando
+    assert "--app=http://127.0.0.1:5000" in comando, comando
+    assert "--user-data-dir=C:\\tmp\\p" in comando, comando
+
+    # (c) debe_apagar: gracia inicial y tolerancia de latido.
+    assert lanzador.debe_apagar(110.0, None, 100.0) is False   # 10 s sin latido
+    assert lanzador.debe_apagar(161.0, None, 100.0) is True     # 61 s sin latido
+    assert lanzador.debe_apagar(200.0, 100.0, 0.0) is False     # latido hace 100 s
+    assert lanzador.debe_apagar(251.0, 100.0, 0.0) is True      # latido hace 151 s
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -354,4 +388,5 @@ if __name__ == "__main__":
     test_cobertura()
     test_utils_entorno()
     test_app_rutas()
+    test_lanzador()
     print("test_scanner.py: todos los casos OK")
