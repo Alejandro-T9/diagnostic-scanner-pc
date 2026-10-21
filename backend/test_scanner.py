@@ -26,6 +26,7 @@ import socket
 import threading
 
 import app
+import explicador
 import lanzador
 import scanner
 import utils
@@ -498,6 +499,50 @@ def test_lhm_consumidores():
         _lhm.invalidar()
 
 
+def test_explicador():
+    llaves = {"que_significa", "que_hacer", "quien", "urgencia", "pregunta_tecnico"}
+    prohibidas = ("peligro", "infectad", "limpio", "garantiza")
+    # (a) cobertura + (b) forma + (c) reglas por estado + (d) palabras prohibidas
+    for c in scanner.COMPONENTES:
+        for e in scanner.ESTADOS_VALIDOS:
+            g = explicador.GUIAS[c][e]
+            assert set(g) == llaves, (c, e, set(g))
+            assert g["que_significa"].strip(), (c, e)
+            assert isinstance(g["que_hacer"], list) and g["que_hacer"], (c, e)
+            assert all(isinstance(p, str) and p.strip() for p in g["que_hacer"]), (c, e)
+            assert g["quien"] in explicador.QUIEN_VALIDOS, (c, e, g["quien"])
+            assert g["urgencia"] in explicador.URGENCIAS_VALIDAS, (c, e, g["urgencia"])
+            if e == "normal":
+                assert g["urgencia"] == "ninguna" and g["quien"] == "nadie", (c, e)
+                assert g["pregunta_tecnico"] == "", (c, e)
+            else:
+                assert g["pregunta_tecnico"].strip(), (c, e)
+            if e == "critico":
+                assert g["urgencia"] == "alta", (c, e)
+            if e == "sospecha":
+                assert g["urgencia"] == "media", (c, e)
+            texto = " ".join([g["que_significa"], g["pregunta_tecnico"], *g["que_hacer"]]).lower()
+            for palabra in prohibidas:
+                assert palabra not in texto, (c, e, palabra)
+    # (e) par desconocido: guía genérica, sin lanzar
+    for par in (("inexistente", "normal"), ("cpu", "estado_raro")):
+        g = explicador.guia_para(*par)
+        assert set(g) == llaves, (par, set(g))
+        assert g["quien"] == "tecnico" and g["urgencia"] == "baja", (par, g)
+    # (f) guia_para devuelve copia
+    g = explicador.guia_para("cpu", "normal")
+    g["que_hacer"].append("mutado")
+    assert "mutado" not in explicador.GUIAS["cpu"]["normal"]["que_hacer"]
+    assert "mutado" not in explicador.guia_para("cpu", "normal")["que_hacer"]
+    # (g') frases del veredicto: exactamente las 5 severidades en mayúsculas
+    assert set(explicador.FRASES_VEREDICTO) == {s.upper() for s in scanner._SEVERIDAD}, explicador.FRASES_VEREDICTO
+    assert all(v.strip() for v in explicador.FRASES_VEREDICTO.values())
+    # (g) sin permisos de administrador el CPU no puede leer sensores
+    g = explicador.GUIAS["cpu"]["no_determinado"]
+    assert "administrador" in " ".join([g["que_significa"], *g["que_hacer"]]).lower()
+    assert g["quien"] == "tu_mismo"
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -517,4 +562,5 @@ if __name__ == "__main__":
     test_utils_entorno()
     test_app_rutas()
     test_lanzador()
+    test_explicador()
     print("test_scanner.py: todos los casos OK")

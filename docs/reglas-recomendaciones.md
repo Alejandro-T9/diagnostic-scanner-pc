@@ -1,5 +1,10 @@
 # Reglas de clasificación y recomendación
 
+> **Textos en lenguaje simple:** las explicaciones para personas sin
+> conocimientos técnicos (qué significa, qué hacer, quién, urgencia y qué
+> preguntarle al técnico) viven en `backend/explicador.py`, no en este
+> documento. Si cambia un umbral aquí, revisa también esos textos.
+
 Este documento describe, en forma de tabla, la regla real que usa cada
 módulo de `backend/modules/` para pasar de un dato medido a un estado y
 una recomendación. No es una especificación que el código lea en tiempo
