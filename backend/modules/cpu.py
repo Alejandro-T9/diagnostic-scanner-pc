@@ -6,8 +6,8 @@ Temperatura de CPU vía MSAcpi_ThermalZoneTemperature (WMI) — sigue como
 antes, con el mismo límite ya documentado (no todos los laptops la
 exponen).
 
-Velocidad de ventiladores vía LibreHardwareMonitorLib (mismas DLLs que
-fuente_poder.py, en backend/native/lhm/) — cumple la promesa de
+Velocidad de ventiladores vía LibreHardwareMonitorLib, leída a través del
+lector compartido modules/_lhm.py (DLLs en backend/native/lhm/) — cumple la promesa de
 "telemetría de ventiladores" del documento institucional del Semillero
 (Fase II de objetivos específicos). Es opcional: no todo laptop expone
 sensores de RPM — su ausencia se refleja como lista vacía, no como error
@@ -25,17 +25,10 @@ como "normal" — exactamente el error que ese sistema existe para evitar
 almacenamiento.py esta misma sesión.
 """
 
-import os
-import sys
-
 import psutil
 import wmi
 
-from . import gpu
-
-_LIB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "native", "lhm")
-if _LIB_DIR not in sys.path:
-    sys.path.append(_LIB_DIR)
+from . import _lhm, gpu
 
 UMBRAL_ADVERTENCIA_C = 70
 UMBRAL_CRITICO_C = 85
@@ -94,36 +87,11 @@ def _obtener_ventiladores() -> list:
     ventilador de GPU dedicada suele reportarse bajo el hardware de la
     GPU, no el de la placa). No es garantía en todo laptop — se degrada a
     lista vacía sin tumbar el resto del diagnóstico de CPU."""
-    try:
-        import clr
-
-        clr.AddReference("LibreHardwareMonitorLib")
-        from LibreHardwareMonitor.Hardware import Computer, SensorType
-    except Exception:
-        return []
-
-    try:
-        computer = Computer()
-        computer.IsGpuEnabled = True
-        computer.IsMotherboardEnabled = True
-        computer.Open()
-        try:
-            ventiladores = []
-            for hardware in computer.Hardware:
-                hardware.Update()
-                for sensor in hardware.Sensors:
-                    if sensor.Value is not None and sensor.SensorType == SensorType.Fan:
-                        ventiladores.append({"nombre": str(sensor.Name), "rpm": round(float(sensor.Value))})
-                for sub in hardware.SubHardware:
-                    sub.Update()
-                    for sensor in sub.Sensors:
-                        if sensor.Value is not None and sensor.SensorType == SensorType.Fan:
-                            ventiladores.append({"nombre": str(sensor.Name), "rpm": round(float(sensor.Value))})
-            return ventiladores
-        finally:
-            computer.Close()
-    except Exception:
-        return []
+    return [
+        {"nombre": sensor["nombre"], "rpm": round(sensor["valor"])}
+        for sensor in _lhm.filtrar(_lhm.leer_sensores(), "Fan")
+        if sensor["valor"] is not None
+    ]
 
 
 def _armar_datos(procesador, temperatura, ventiladores, porcentaje_uso, datos_gpu) -> dict:

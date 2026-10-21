@@ -14,6 +14,7 @@ import importlib
 import time
 
 import utils
+from modules import _lhm
 
 # Los 7 componentes del alcance del proyecto (mismo orden y nombres que
 # backend/modules/__init__.py).
@@ -62,6 +63,9 @@ def ejecutar_escaneo_completo() -> dict:
     calcula "cobertura": qué tan completo fue el escaneo, un eje distinto
     de qué tan sano está el equipo (ver _calcular_cobertura).
     """
+    # Los sensores de LibreHardwareMonitor se leen una sola vez por escaneo
+    # y se comparten entre cpu/gpu/fuente_poder; cada escaneo parte de cero.
+    _lhm.invalidar()
     tiempos = {}
     inicio_total = time.perf_counter()
     componentes = {}

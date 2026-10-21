@@ -27,12 +27,7 @@ valores absurdos), no un veredicto de "está bien" contra un ideal fijo
 que no existe para estos sensores.
 """
 
-import os
-import sys
-
-_LIB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "native", "lhm")
-if _LIB_DIR not in sys.path:
-    sys.path.append(_LIB_DIR)
+from . import _lhm
 
 _VOLTAJE_MINIMO_FISICO = 0
 _VOLTAJE_MAXIMO_FISICO = 20
@@ -46,20 +41,14 @@ _RECOMENDACIONES = {
 
 
 def diagnosticar() -> dict:
-    try:
-        import clr
-
-        clr.AddReference("LibreHardwareMonitorLib")
-        from LibreHardwareMonitor.Hardware import Computer, SensorType
-    except Exception as error:
-        return _resultado_error(f"No se pudo cargar LibreHardwareMonitorLib: {error}")
-
-    try:
-        rieles = _leer_voltajes(Computer, SensorType)
-    except Exception as error:
-        return _resultado_error(f"Fallo al leer sensores de hardware: {error}")
+    rieles = _leer_voltajes()
 
     if not rieles:
+        # "No se pudo cargar/leer la librería" y "la placa no expone
+        # sensores" son situaciones distintas: no se deben confundir.
+        error = _lhm.error_carga()
+        if error is not None:
+            return _resultado_error(f"No se pudo cargar LibreHardwareMonitorLib: {error}")
         return _resultado_error("No se encontró ningún sensor de voltaje en esta placa/procesador.")
 
     estado, mensaje = _clasificar(rieles)
@@ -69,33 +58,16 @@ def diagnosticar() -> dict:
     }
 
 
-def _leer_voltajes(Computer, SensorType) -> list:
-    """No habilita IsMemoryEnabled: esa vía requiere RAMSPDToolkit-NDD, una
-    dependencia extra de LibreHardwareMonitorLib no relacionada con
-    voltajes que no está empaquetada acá (fuente_poder no necesita datos
-    de RAM, eso ya lo cubre ram.py)."""
-    computer = Computer()
-    computer.IsMotherboardEnabled = True
-    computer.IsCpuEnabled = True
-    computer.Open()
-    try:
-        rieles = []
-        for hardware in computer.Hardware:
-            hardware.Update()
-            rieles.extend(_sensores_voltaje(hardware, SensorType))
-            for sub in hardware.SubHardware:
-                sub.Update()
-                rieles.extend(_sensores_voltaje(sub, SensorType))
-        return rieles
-    finally:
-        computer.Close()
-
-
-def _sensores_voltaje(hardware, SensorType) -> list:
+def _leer_voltajes() -> list:
+    """Los sensores de voltaje (placa + CPU) salen del lector compartido
+    _lhm, que ya evita IsMemoryEnabled (ver el comentario en _lhm.py).
+    Se descarta la GPU: _lhm la lee también (la necesitan cpu.py/gpu.py),
+    pero su voltaje de núcleo en reposo (~0 V) no es telemetría de la
+    fuente de poder y caería como "fuera de rango" sin serlo."""
     return [
-        {"origen": str(hardware.Name), "sensor": str(sensor.Name), "voltios": round(float(sensor.Value), 3)}
-        for sensor in hardware.Sensors
-        if sensor.SensorType == SensorType.Voltage and sensor.Value is not None
+        {"origen": sensor["hardware"], "sensor": sensor["nombre"], "voltios": round(sensor["valor"], 3)}
+        for sensor in _lhm.filtrar(_lhm.leer_sensores(), "Voltage")
+        if sensor["valor"] is not None and "Gpu" not in sensor["tipo_hardware"]
     ]
 
 

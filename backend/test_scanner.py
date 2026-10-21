@@ -21,7 +21,7 @@ devuelvan lo que se espera en una laptop concreta.
 """
 
 import scanner
-from modules import almacenamiento, bateria, cpu, gpu, mainboard, ram, red
+from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
 def _assert_estado(nombre_caso, obtenido, esperado):
@@ -130,6 +130,94 @@ def test_gpu_aislamiento():
         gpu._identidad, gpu._telemetria = identidad_orig, telemetria_orig
 
 
+def _sensor(tipo_hardware, tipo, nombre, valor):
+    return {"tipo_hardware": tipo_hardware, "hardware": f"{tipo_hardware} X", "tipo": tipo, "nombre": nombre, "valor": valor}
+
+
+def test_lhm():
+    # (a) Caché: el lector real se invoca una sola vez por escaneo, no una
+    # vez por módulo — esa es la razón de ser de _lhm.
+    llamadas = []
+
+    def _lector():
+        llamadas.append(1)
+        return [_sensor("Cpu", "Voltage", "Core #1 VID", 1.1)]
+
+    _lhm.invalidar()
+    try:
+        _lhm.leer_sensores(lector=_lector)
+        _lhm.leer_sensores(lector=_lector)
+        assert len(llamadas) == 1, f"el lector debía invocarse 1 vez, se invocó {len(llamadas)}"
+        _lhm.invalidar()
+        _lhm.leer_sensores(lector=_lector)
+        assert len(llamadas) == 2, f"tras invalidar() debía releerse (2 en total), hubo {len(llamadas)}"
+
+        # (b) filtrar: por tipo exacto y, opcionalmente, por tipo de hardware.
+        sensores = [
+            _sensor("Motherboard", "Fan", "Fan #1", 1800),
+            _sensor("GpuNvidia", "Fan", "GPU Fan", 900),
+            _sensor("GpuNvidia", "Temperature", "GPU Core", 50),
+            _sensor("Cpu", "Voltage", "Core #1 VID", 1.1),
+        ]
+        ventiladores = _lhm.filtrar(sensores, "Fan")
+        assert [s["nombre"] for s in ventiladores] == ["Fan #1", "GPU Fan"], ventiladores
+        ventiladores_gpu = _lhm.filtrar(sensores, "Fan", hardware_contiene="Gpu")
+        assert [s["nombre"] for s in ventiladores_gpu] == ["GPU Fan"], ventiladores_gpu
+        assert _lhm.filtrar(sensores, "Load") == []
+
+        # (c) Un fallo del lector nunca se propaga: lista vacía + mensaje.
+        def _lector_roto():
+            raise RuntimeError("driver bloqueado")
+
+        _lhm.invalidar()
+        assert _lhm.leer_sensores(lector=_lector_roto) == []
+        assert "driver bloqueado" in (_lhm.error_carga() or ""), _lhm.error_carga()
+        _lhm.invalidar()
+        assert _lhm.error_carga() is None
+    finally:
+        _lhm.invalidar()
+
+
+def test_fuente_poder_sin_sensores():
+    # Review Focus 4: "no se pudo cargar la librería" (error real, p. ej.
+    # driver bloqueado) no debe confundirse con "la placa no tiene sensores".
+    def _lector_roto():
+        raise RuntimeError("driver bloqueado")
+
+    _lhm.invalidar()
+    try:
+        _lhm.leer_sensores(lector=_lector_roto)  # deja el fallo en la caché
+        resultado = fuente_poder.diagnosticar()
+        _assert_estado("Fuente sin sensores por fallo de carga", resultado["estado"], "no_determinado")
+        assert "driver bloqueado" in resultado["mensaje"], resultado["mensaje"]
+
+        _lhm.invalidar()
+        _lhm.leer_sensores(lector=lambda: [])  # sin error, simplemente no hay sensores
+        resultado = fuente_poder.diagnosticar()
+        _assert_estado("Fuente sin sensores y sin error", resultado["estado"], "no_determinado")
+        assert "ningún sensor de voltaje" in resultado["mensaje"], resultado["mensaje"]
+
+        _lhm.invalidar()
+        _lhm.leer_sensores(lector=lambda: [_sensor("Cpu", "Voltage", "Core #1 VID", 1.1)])
+        resultado = fuente_poder.diagnosticar()
+        _assert_estado("Fuente con un sensor de voltaje válido", resultado["estado"], "normal")
+        assert resultado["datos"]["rieles"] == [{"origen": "Cpu X", "sensor": "Core #1 VID", "voltios": 1.1}], resultado["datos"]
+
+        # La lectura compartida también trae la GPU (la necesitan cpu/gpu),
+        # pero fuente_poder solo reporta placa + CPU: el voltaje de núcleo
+        # de una GPU en reposo (~0 V) no debe disparar "sospecha".
+        _lhm.invalidar()
+        _lhm.leer_sensores(lector=lambda: [
+            _sensor("Cpu", "Voltage", "Core #1 VID", 1.1),
+            _sensor("GpuAmd", "Voltage", "GPU Core", 0.0),
+        ])
+        resultado = fuente_poder.diagnosticar()
+        _assert_estado("Voltaje de GPU en reposo no cuenta", resultado["estado"], "normal")
+        assert [r["sensor"] for r in resultado["datos"]["rieles"]] == ["Core #1 VID"], resultado["datos"]
+    finally:
+        _lhm.invalidar()
+
+
 def test_consistencia_scanner():
     # ESTADOS_VALIDOS y _SEVERIDAD deben listar exactamente los mismos 5
     # nombres — si alguien agrega un estado nuevo en uno y se olvida del
@@ -188,6 +276,8 @@ if __name__ == "__main__":
     test_red()
     test_gpu_sensores()
     test_gpu_aislamiento()
+    test_lhm()
+    test_fuente_poder_sin_sensores()
     test_consistencia_scanner()
     test_prioridad_veredicto()
     test_cobertura()

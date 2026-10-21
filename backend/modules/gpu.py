@@ -16,8 +16,9 @@ es un campo con un bug documentado de Microsoft en drivers WDDM
 modernos (subreporta o desborda en tarjetas con más de 4GB) — mostrar
 ese número sería mostrar un dato que ya sabemos que puede estar mal.
 
-Temperatura y uso vía LibreHardwareMonitorLib (misma librería que ya usa
-cpu.py y fuente_poder.py, sin dependencia nueva) — sin umbrales propios
+Temperatura y uso vía LibreHardwareMonitorLib, leída a través del lector
+compartido modules/_lhm.py (el mismo que usan cpu.py y fuente_poder.py,
+sin dependencia nueva) — sin umbrales propios
 de crítico/advertencia: no hay base técnica para asumir que los límites
 térmicos de un CPU aplican a su GPU integrada, y menos con presupuesto
 térmico compartido entre ambos. Este módulo solo reporta el dato; quien
@@ -25,21 +26,18 @@ decide si el Procesador está bien o no es cpu.py, a partir de SU PROPIA
 temperatura — nunca de la de la GPU. Sensor ausente = dato en None, no
 "normal" ni ningún otro estado inventado.
 
-_telemetria() solo habla con LibreHardwareMonitor y junta lecturas
-crudas; _elegir_temperatura()/_elegir_uso() deciden en cuál confiar —
+_telemetria() solo pide los sensores a _lhm y junta lecturas crudas; _elegir_temperatura()/_elegir_uso() deciden en cuál confiar —
 separado a propósito para poder probar la selección con datos simples,
 sin necesitar hardware real ni mockear objetos .NET (ver _demo() al
 final del archivo).
 """
 
-import os
-import sys
-
 import wmi
 
-_LIB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "native", "lhm")
-if _LIB_DIR not in sys.path:
-    sys.path.append(_LIB_DIR)
+try:
+    from . import _lhm
+except ImportError:  # `python modules/gpu.py` (el _demo()) corre sin paquete
+    import _lhm
 
 _TEMPERATURA_MIN_C = 0
 _TEMPERATURA_MAX_C = 110
@@ -111,37 +109,14 @@ def _elegir_uso(sensores_load: list):
 
 
 def _telemetria() -> tuple:
-    try:
-        import clr
-
-        clr.AddReference("LibreHardwareMonitorLib")
-        from LibreHardwareMonitor.Hardware import Computer, SensorType
-    except Exception:
-        return None, None
-
-    try:
-        computer = Computer()
-        computer.IsGpuEnabled = True
-        computer.Open()
-        try:
-            sensores_temp = []
-            sensores_load = []
-            for hardware in computer.Hardware:
-                if "Gpu" not in str(hardware.HardwareType):
-                    continue
-                hardware.Update()
-                for sensor in hardware.Sensors:
-                    if sensor.Value is None:
-                        continue
-                    if sensor.SensorType == SensorType.Temperature:
-                        sensores_temp.append(float(sensor.Value))
-                    if sensor.SensorType == SensorType.Load:
-                        sensores_load.append((str(sensor.Name), float(sensor.Value)))
-            return _elegir_temperatura(sensores_temp), _elegir_uso(sensores_load)
-        finally:
-            computer.Close()
-    except Exception:
-        return None, None
+    sensores = _lhm.leer_sensores()
+    sensores_temp = [
+        s["valor"] for s in _lhm.filtrar(sensores, "Temperature", "Gpu") if s["valor"] is not None
+    ]
+    sensores_load = [
+        (s["nombre"], s["valor"]) for s in _lhm.filtrar(sensores, "Load", "Gpu") if s["valor"] is not None
+    ]
+    return _elegir_temperatura(sensores_temp), _elegir_uso(sensores_load)
 
 
 def _demo():
