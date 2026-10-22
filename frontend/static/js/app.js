@@ -23,7 +23,11 @@ function renderizarDiagnostico(resultado) {
     ultimoResultado = resultado;
     dibujarResumen(resultado, document.getElementById("resumen-vista"));
     redibujarComponentes();
-    renderizarRecomendaciones(recomendaciones);
+    // Recomendaciones solo de un escaneo real: en la demostración la pestaña invita a revisar (nunca se inventan).
+    const vistaRecs = document.getElementById("recomendaciones-vista");
+    if (document.body.classList.contains("demo")) dibujarInvitacionRecomendaciones(vistaRecs);
+    else dibujarRecomendaciones(recomendaciones, vistaRecs);
+    if (escaneando) marcarOcupado(true); // los botones de invitación acaban de recrearse
     actualizarPestanas();
 }
 
@@ -38,51 +42,10 @@ function seleccionarComponente(id) {
     redibujarComponentes();
 }
 
-// Recomendaciones del equipo (F3): solo de escaneos reales que las traigan; sin lista, el bloque no existe.
-function renderizarRecomendaciones(recomendaciones) {
-    const bloque = document.getElementById("recomendaciones");
-    bloque.replaceChildren();
-    const lista = Array.isArray(recomendaciones) ? recomendaciones.filter((r) => r && typeof r === "object") : [];
-    bloque.hidden = !lista.length;
-    if (!lista.length) return;
-    bloque.append(crear("h2", "", "Recomendaciones para tu equipo"),
-        crear("p", "recomendaciones-nota", "Son sugerencias basadas en lo que se pudo medir en este equipo."));
-    const texto = (v) => (typeof v === "string" ? v : "");
-    lista.forEach((rec) => {
-        const tarjeta = crear("div", "tarjeta-simple recomendacion");
-        tarjeta.append(crear("h3", "", texto(rec.titulo)));
-        if (texto(rec.detalle)) tarjeta.append(crear("p", "", rec.detalle));
-        if (Array.isArray(rec.basado_en) && rec.basado_en.some((b) => typeof b === "string")) {
-            tarjeta.append(crear("p", "", "Basado en:"));
-            const ul = crear("ul", "tarjeta-simple-pasos");
-            rec.basado_en.filter((b) => typeof b === "string").forEach((b) => ul.append(crear("li", "", b)));
-            tarjeta.append(ul);
-        }
-        if (Array.isArray(rec.opciones)) {
-            rec.opciones.filter((o) => o && typeof o.nombre === "string").forEach((o) => {
-                const det = crear("details", "recomendacion-opcion");
-                det.append(crear("summary", "", o.nombre));
-                if (texto(o.motivo)) det.append(crear("p", "", o.motivo));
-                if (texto(o.nota)) det.append(crear("p", "", o.nota));
-                tarjeta.append(det);
-            });
-        }
-        const etiquetas = crear("div", "tarjeta-simple-etiquetas");
-        if (["baja", "media", "alta"].includes(rec.prioridad)) {
-            etiquetas.append(crear("span", `etiqueta-urgencia ${rec.prioridad}`, `Prioridad: ${rec.prioridad}`));
-        }
-        if (rec.quien === "tu_mismo" || rec.quien === "tecnico") {
-            etiquetas.append(crear("span", `etiqueta-quien ${rec.quien}`, QUIEN_TEXTO[rec.quien]));
-        }
-        if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
-        bloque.append(tarjeta);
-    });
-}
-
 // Estado inicial (y tras cambiar de modo sin escaneo): sin datos inventados.
 function pintarVacio() {
     document.body.classList.add("sin-escaneo");
-    renderizarRecomendaciones(null);
+    dibujarInvitacionRecomendaciones(document.getElementById("recomendaciones-vista"));
     dibujarResumen(null, document.getElementById("resumen-vista"));
     dibujarComponentes(null, modo, null, document.getElementById("componentes-vista"));
     if (escaneando) marcarOcupado(true); // los botones del estado vacío acaban de recrearse

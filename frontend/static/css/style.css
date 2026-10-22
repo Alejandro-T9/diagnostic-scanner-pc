@@ -268,15 +268,6 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
     cursor: not-allowed;
 }
 
-.panel-vacio {
-    display: none;
-    color: var(--color-texto-secundario);
-    text-align: center;
-    padding: var(--espacio-6) 0;
-}
-
-#recomendaciones[hidden] + .panel-vacio { display: block; }
-
 .pie {
     display: flex;
     flex-wrap: wrap;
@@ -680,8 +671,7 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
 }
 
 /* --- Recomendaciones del equipo (F3): reusa .tarjeta-simple y las etiquetas --- */
-.recomendaciones { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
-.recomendaciones[hidden] { display: none; }
+.recomendaciones { display: flex; flex-direction: column; gap: 12px; }
 .recomendaciones h2 { margin: 0; font-size: 20px; }
 .recomendaciones-nota { margin: 0; color: var(--color-texto-secundario); font-size: 14px; }
 .recomendacion { border-left-color: var(--color-acento); }

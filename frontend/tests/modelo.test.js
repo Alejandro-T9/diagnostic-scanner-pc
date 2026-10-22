@@ -2,7 +2,7 @@
 // Las llama también backend/test_scanner.py::test_frontend_node cuando hay node.
 const assert = require("assert");
 const { iconoEstado, iconoComponente, iconoUi } = require("../static/js/iconos.js");
-const { CHIP_TEXTO } = require("../static/js/estado.js");
+const { CHIP_TEXTO, ANALISIS_DISPONIBLE } = require("../static/js/estado.js");
 const { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
     calcularVeredicto, normalizarEstado, nombreComp, seleccionValida, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
 
@@ -79,6 +79,11 @@ assert.strictEqual(modoValido("tecnico"), "tecnico");
 assert.deepStrictEqual(habilitadasSegun(false, true), ["resumen"]);
 assert.deepStrictEqual(habilitadasSegun(true, false), TRES);
 assert.deepStrictEqual(habilitadasSegun(true, true), PESTANAS);
+
+// Análisis de Windows llega en F4a: hasta entonces la constante es false (la fase la cambia a true)
+assert.strictEqual(ANALISIS_DISPONIBLE, false);
+assert(!habilitadasSegun(true, ANALISIS_DISPONIBLE).includes("analisis"));
+assert(/^const ANALISIS_DISPONIBLE = false;$/m.test(require("fs").readFileSync(require("path").join(__dirname, "../static/js/estado.js"), "utf8")));
 
 // --- modelo.js: resumen (veredicto, línea, medida clave, datos del equipo, lo primero) ---
 const comp = (id, estado, extra = {}) => ({ componente: id, estado, mensaje: `mensaje ${id}`, datos: null, ...extra });

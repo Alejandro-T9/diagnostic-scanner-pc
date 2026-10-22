@@ -391,3 +391,63 @@ function dibujarComponentes(resultado, modo, seleccionado, contenedor) {
     contenedor.replaceChildren(raiz);
     if (destino) _aVista(destino); // sin efecto si la pestaña no se ve (panel oculto)
 }
+
+// --- Recomendaciones del equipo (F3): solo de escaneos reales que las traigan ---
+
+// Pestaña sin escaneo real (estado vacío o demostración): nunca recomendaciones inventadas, solo la invitación a revisar.
+function dibujarInvitacionRecomendaciones(contenedor) {
+    const vacio = crear("div", "simple-vacio");
+    const boton = crear("button", "boton-primario boton-grande boton-revisar-vacio", "Revisar mi PC");
+    boton.type = "button";
+    boton.addEventListener("click", () => escanearSistema());
+    vacio.append(
+        crear("p", "simple-vacio-titulo", "Todavía no hay recomendaciones para mostrar."),
+        boton,
+        crear("p", "simple-vacio-nota", "Aparecen después de una revisión real de este equipo."),
+    );
+    contenedor.replaceChildren(vacio);
+}
+
+// recomendaciones = lista de un escaneo REAL (puede venir vacía o null: "Por ahora no hay recomendaciones").
+function dibujarRecomendaciones(recomendaciones, contenedor) {
+    const lista = Array.isArray(recomendaciones) ? recomendaciones.filter((r) => r && typeof r === "object") : [];
+    const bloque = crear("div", "recomendaciones");
+    bloque.append(crear("h2", "", "Recomendaciones para tu equipo"));
+    if (!lista.length) {
+        bloque.append(crear("p", "recomendaciones-nota", "Por ahora no hay recomendaciones para este equipo."));
+        contenedor.replaceChildren(bloque);
+        return;
+    }
+    bloque.append(crear("p", "recomendaciones-nota", "Son sugerencias basadas en lo que se pudo medir en este equipo."));
+    const texto = (v) => (typeof v === "string" ? v : "");
+    lista.forEach((rec) => {
+        const tarjeta = crear("div", "tarjeta-simple recomendacion");
+        tarjeta.append(crear("h3", "", texto(rec.titulo)));
+        if (texto(rec.detalle)) tarjeta.append(crear("p", "", rec.detalle));
+        if (Array.isArray(rec.basado_en) && rec.basado_en.some((b) => typeof b === "string")) {
+            tarjeta.append(crear("p", "", "Basado en:"));
+            const ul = crear("ul", "tarjeta-simple-pasos");
+            rec.basado_en.filter((b) => typeof b === "string").forEach((b) => ul.append(crear("li", "", b)));
+            tarjeta.append(ul);
+        }
+        if (Array.isArray(rec.opciones)) {
+            rec.opciones.filter((o) => o && typeof o.nombre === "string").forEach((o) => {
+                const det = crear("details", "recomendacion-opcion");
+                det.append(crear("summary", "", o.nombre));
+                if (texto(o.motivo)) det.append(crear("p", "", o.motivo));
+                if (texto(o.nota)) det.append(crear("p", "", o.nota));
+                tarjeta.append(det);
+            });
+        }
+        const etiquetas = crear("div", "tarjeta-simple-etiquetas");
+        if (["baja", "media", "alta"].includes(rec.prioridad)) {
+            etiquetas.append(crear("span", `etiqueta-urgencia ${rec.prioridad}`, `Prioridad: ${rec.prioridad}`));
+        }
+        if (rec.quien === "tu_mismo" || rec.quien === "tecnico") {
+            etiquetas.append(crear("span", `etiqueta-quien ${rec.quien}`, QUIEN_TEXTO[rec.quien]));
+        }
+        if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
+        bloque.append(tarjeta);
+    });
+    contenedor.replaceChildren(bloque);
+}

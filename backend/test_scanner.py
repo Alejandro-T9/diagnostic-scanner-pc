@@ -1373,6 +1373,18 @@ def test_indice_estructura():
     _en_hilo(_peticiones)
 
 
+def test_indice_recomendaciones():
+    """Las pestañas Recomendaciones y Análisis de Windows existen en la página; la de Análisis arranca oculta (hasta F4a)."""
+    def _peticion():
+        html = app.app.test_client().get("/").get_data(as_text=True)
+        assert 'id="panel-recomendaciones"' in html
+        assert re.search(r'<section[^>]*id="panel-analisis"[^>]*\bhidden\b', html), "panel-analisis debe llevar hidden"
+        assert re.search(r'<button[^>]*id="tab-analisis"[^>]*\bhidden\b', html), "tab-analisis debe llevar hidden"
+        assert 'id="recomendaciones-vista"' in html
+
+    _en_hilo(_peticion)
+
+
 _RESTOS_DEL_MAPA = ("mapa-svg", "POSICIONES_MAPA", "mapa-silueta", "resaltarComponente", "punto-etiqueta")
 
 
@@ -1401,6 +1413,7 @@ if __name__ == "__main__":
     test_frontend_node()
     test_frontend_sin_innerhtml_inseguro()
     test_indice_estructura()
+    test_indice_recomendaciones()
     test_sin_codigo_del_mapa()
     test_ram()
     test_bateria()
