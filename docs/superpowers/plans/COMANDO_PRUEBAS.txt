@@ -5,3 +5,5 @@ Git Bash / bash:
 cd "C:/Users/Ale/Documents/copia de seguridad para proyecto/diagnostic_scanner_pc/backend" && python test_scanner.py
 Si se usa el Python embeddable del USB (ignora el directorio del script): python-portable\python.exe -c "import sys; sys.path.insert(0, r'<backend>'); exec(open(r'<backend>\test_scanner.py', encoding='utf-8').read())"
   (NOTA: esta línea del Python embeddable aún NO se ha ejecutado en el USB; está sin verificar.)
+Pruebas del frontend (lógica pura, Node; se corren desde la raíz del proyecto; imprime "modelo.test.js: OK"; test_scanner.py también las llama si hay node):
+node frontend/tests/modelo.test.js

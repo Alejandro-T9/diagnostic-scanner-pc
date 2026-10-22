@@ -1232,3 +1232,84 @@ el SO actual, no lo que el firmware admite).
 - Decisiones abiertas del equipo: (1) si MiniOS10 se queda en la lista;
   (2) si "Arranque seguro desactivado" debe seguir excluyendo a Windows 11
   (Microsoft exige que el equipo sea "capaz", no que esté "activado").
+
+## 39. Rediseño de la interfaz: armazón con pestañas, fichas de componente y paleta clara/oscura
+
+**Fecha:** 2026-10-22
+
+**Motivo:**
+
+- Comentarios del equipo tras probar la app y del jurado del SENA: no gustó cómo
+  se organizan los botones ni la estructura general, el PC con círculos por
+  componente "parece una formación de fútbol" y se pidió una estética más
+  profesional (y que se analizara la paleta). La interfaz había crecido por capas
+  (mapa físico, decisión 18; lista; panel de detalle; modo simple; recomendaciones)
+  hasta ser una sola página larga con tres botones de peso parecido al final, y
+  F4–F6 iban a agregar más secciones.
+- Análisis de la paleta anterior (oscura, tipo "GitHub oscuro"), medido, no a ojo
+  (detalle en `docs/superpowers/specs/2026-10-22-rediseno-interfaz-design.md` §2):
+  - El texto sí cumple: 14,6:1 (texto), 5,6:1 (secundario) y 5,1–6,9:1 (colores de
+    estado) sobre la tarjeta. La legibilidad no era el problema.
+  - Con protanopia/deuteranopia los colores de estado casi colapsan: verde↔amarillo
+    1,1–1,2:1, naranja↔rojo 1,06–1,12:1, amarillo↔naranja 1,3–1,5:1 (para
+    distinguir elementos hace falta ≥ 3:1). El estado no puede depender solo del color.
+  - Amarillo y naranja son vecinos (tonos 41° y 23°): en chips pequeños se leen casi igual.
+  - El borde medía 1,42:1 contra la tarjeta (las tarjetas se "pegaban" al fondo).
+  - Tema oscuro único: se ve "técnico/gamer", se imprime mal y no coincide con el
+    informe imprimible (blanco).
+
+**Decisión:**
+
+- Estructura (enfoque B del spec): una sola página con **barra superior** (marca,
+  acción principal "Revisar mi PC", interruptor Simple/Técnico, tema y menú "Más"
+  con informe, reporte y demostración) y **pestañas** Resumen, Componentes,
+  Recomendaciones y Análisis de Windows (hash en la URL, teclado con flechas).
+  Sin escaneo solo Resumen es accionable, con la invitación a revisar.
+- **Se retira el mapa de puntos** del PC: lo reemplazan las fichas de componente del
+  Resumen (ícono, nombre, estado, una medida clave). **Esto reemplaza la parte del
+  mapa físico de la decisión 18**; la ficha de inspección y el panel de detalle de
+  esa decisión siguen en pie, ahora como la tabla técnica con fila expandible de la
+  pestaña Componentes. Las tarjetas simples con guía se conservan en el modo simple.
+- Paleta: **tema claro por defecto** y **oscuro opcional** (botón en la barra,
+  recordado en `localStorage` dentro de `try/catch`; `prefers-color-scheme` no se
+  sigue a propósito para que la app se vea igual en todos los equipos del colegio).
+  La fuente única de tokens (colores, espaciado, radios, sombras, tipografía) sigue
+  siendo `config/palette.css`, con los mismos nombres en ambos temas.
+- **Cinco formas de estado** (SVG en línea propios, trazo de 1,75 px, `currentColor`):
+  círculo con visto (normal), triángulo con exclamación (advertencia), rombo con
+  exclamación (sospecha), octógono con cruz (crítico) y círculo discontinuo con
+  interrogación (sin datos). Siempre van junto a la palabra del estado y al color.
+  El informe imprimible usa las mismas cinco siluetas, así se distinguen también en
+  blanco y negro.
+- **Prueba automática de contraste** (`test_paleta`): en ambos temas, texto ≥ 4,5:1,
+  colores de estado y acento ≥ 4,5:1 sobre tarjeta y fondo, bordes de controles ≥ 3:1,
+  chips y franjas de aviso ≥ 4,5:1, mismos nombres de token en los dos temas y toda
+  `var(--x)` de la hoja definida.
+- El `app.js` único se divide en `estado.js` (constantes), `iconos.js`, `dom.js`
+  (utilidades de DOM y chip), `modelo.js` (lógica **pura**, probada con Node:
+  veredicto, medida clave, datos del equipo, "lo primero", pestañas, tema),
+  `vistas.js` (dibuja cada pestaña) y `app.js` (armazón y eventos), cargados con
+  `<script>` en ese orden, sin empaquetador. Todo texto del escaneo entra por
+  `textContent`; la única inserción de HTML son los íconos constantes de `dom.js`.
+- Pestaña **Análisis de Windows** oculta (`hidden`) hasta la fase F4a: la constante
+  `ANALISIS_DISPONIBLE = false` de `estado.js` la controla (F4a la cambia a `true` y
+  llena `#panel-analisis`).
+- Se conservan las garantías previas: nunca datos de ejemplo mostrados como reales
+  (en la demostración la pestaña Recomendaciones solo invita a revisar), escape de
+  todo texto, estado vacío, aviso de datos simulados y modo recordado.
+
+**Consecuencias:**
+
+- Pruebas nuevas: `frontend/tests/modelo.test.js` (se corre con
+  `node frontend/tests/modelo.test.js` y también desde `test_frontend_node`), contraste
+  y tokens en `test_paleta`, `test_frontend_sin_innerhtml_inseguro`,
+  `test_indice_estructura`, `test_indice_recomendaciones`, `test_sin_codigo_del_mapa`
+  y `test_informe_estados_con_forma` (que además compara el informe con la paleta clara).
+- Backend sin cambios de contrato; solo `informe.py` cambió su CSS y sus íconos.
+- Límites conocidos: la verificación visual con capturas es manual, no automática.
+  Lista que debe repetirse al tocar la interfaz: recorrido de las cuatro pestañas en
+  tema claro y oscuro a 1280×720 y a unos 700 px sin desplazamiento horizontal;
+  veredicto visible sin desplazarse; estado vacío, demostración y escaneo real;
+  informe en pantalla y en vista de impresión; captura en escala de grises con los
+  cinco estados distinguibles.
+- `prefers-color-scheme` intencionalmente no se sigue (ver arriba).
