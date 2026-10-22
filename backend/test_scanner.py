@@ -2132,6 +2132,60 @@ def test_analisis_f4b():
         assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
 
 
+def test_evidencia():
+    import datetime
+    import os
+    import re
+    import sqlite3
+    import tempfile
+    import evidencia
+    import registro
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["DSPC_REGISTRO"] = os.path.join(tmp, "registro.db")
+        try:
+            assert evidencia.acta_html(1) is None and evidencia.comparacion_html(1) is None
+            assert "No hay equipos" in evidencia.jornada_html(None)
+            antes = _escaneo_falso("critico")
+            despues = _escaneo_falso("normal")
+            despues["componentes"]["red"] = {"componente": "red", "estado": "advertencia", "mensaje": "m", "datos": {}, "recomendacion": "r"}
+            a = registro.guardar(antes, None, "CRITICO", "pc-1", "Ana <b>", "Nota <script>x</script>")
+            assert evidencia.comparacion_html(a) is not None and "no tiene una revisión anterior" in evidencia.comparacion_html(a)
+            b = registro.guardar(despues, {"analisis": {"seguridad": {"estado": "advertencia"}}}, "ADVERTENCIA", "PC-1", "", "", {"acta": "Equipo: <i>x</i>", "marcadas": ["respaldo"]})
+            otro = registro.guardar(despues, None, "NORMAL", "PC-2")
+            fb, fa = registro.obtener_fila(b), registro.obtener_fila(a)
+            assert registro.anterior(fb)["id"] == a and registro.anterior(fa) is None and registro.anterior(registro.obtener_fila(otro)) is None
+            c = {x["nombre"]: x["tipo"] for x in evidencia.comparar(fb, fa)}
+            assert c["Procesador"] == "mejoro" and c["Red"] == "nuevo" and c["Seguridad básica"] == "nuevo" and "Tarjeta Madre" not in c, c
+            assert {x["tipo"] for x in evidencia.comparar(fa, fb)} >= {"empeoro", "ya_no_esta"}
+            # acta: escapada, con firma, comparación y un código de integridad que cambia si se altera el registro
+            h = evidencia.acta_html(b)
+            assert "&lt;i&gt;x&lt;/i&gt;" in h and "<i>x</i>" not in h and "Comparación con la revisión" in h and "Mejoró" in h and "Responsable del equipo" in h
+            codigo = re.search(r'class="codigo">([0-9a-f]{64})<', h).group(1)
+            assert codigo == registro.huella(fb)
+            ha = evidencia.acta_html(a)
+            assert "Ana &lt;b&gt;" in ha and "&lt;script&gt;x&lt;/script&gt;" in ha and "<script>x" not in ha
+            con = sqlite3.connect(os.environ["DSPC_REGISTRO"])
+            con.execute("UPDATE equipos SET notas='alterada' WHERE id=?", (b,))
+            con.commit()
+            con.close()
+            assert registro.huella(registro.obtener_fila(b)) != codigo
+            # jornada
+            hoy = datetime.date.today().isoformat()
+            j = evidencia.jornada_html(hoy)
+            assert "Equipos revisados: <strong>3</strong>" in j and "PC-2" in j and "Advertencia: 1" in j, j[-500:]
+            assert "Equipos revisados: <strong>3</strong>" in evidencia.jornada_html("no-es-fecha")  # fecha inválida = hoy
+            assert "No hay equipos" in evidencia.jornada_html("2020-01-01")
+            def _peticion():
+                cl = app.app.test_client()
+                assert "Acta de revisión" in cl.get(f"/api/registro/{a}/acta").get_data(as_text=True)
+                assert cl.get("/api/registro/999/acta").status_code == 404 and cl.get("/api/registro/999/comparar").status_code == 404
+                assert "Mejoró" in cl.get(f"/api/registro/{b}/comparar").get_data(as_text=True)
+                assert "Informe de la jornada" in cl.get("/api/registro/jornada").get_data(as_text=True)
+            _en_hilo(_peticion)
+        finally:
+            os.environ.pop("DSPC_REGISTRO", None)
+
+
 def test_instalador():
     import hashlib
     import json
@@ -2438,6 +2492,7 @@ def test_registro_y_postinstalacion():
 
 
 if __name__ == "__main__":
+    test_evidencia()
     test_instalador()
     test_mantenimiento_y_nota()
     test_registro_y_postinstalacion()

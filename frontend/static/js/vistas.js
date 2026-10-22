@@ -540,7 +540,11 @@ function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, 
         const acciones = crear("p", "recomendaciones-nota");
         const csv = crear("a", "", "Exportar a Excel (CSV)");
         csv.href = "/api/registro/csv";
-        acciones.append(`${equipos.length} equipo(s) guardados. `, csv);
+        const jornada = crear("a", "", "Informe de la jornada de hoy");
+        jornada.href = "/api/registro/jornada";
+        jornada.target = "_blank";
+        jornada.rel = "noopener";
+        acciones.append(`${equipos.length} equipo(s) guardados. `, csv, " · ", jornada);
         bloque.append(acciones);
         const envoltura = crear("div", "tabla-comp-envoltura");
         const tabla = crear("table", "tabla-comp");
@@ -557,14 +561,18 @@ function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, 
             resultado.append(crearChipEstado(String(e.veredicto || "").toLowerCase()));
             fila.append(resultado);
             const celda = crear("td");
-            const informe = crear("a", "", "Ver informe");
-            informe.href = `/api/registro/${encodeURIComponent(e.id)}/informe`;
-            informe.target = "_blank";
-            informe.rel = "noopener";
+            const enlaces = [["Ver informe", "informe"], ["Acta", "acta"], ["Comparar", "comparar"]].map(([texto, ruta]) => {
+                const a = crear("a", "", texto);
+                a.href = `/api/registro/${encodeURIComponent(e.id)}/${ruta}`;
+                a.target = "_blank";
+                a.rel = "noopener";
+                return a;
+            });
             const borrar = crear("button", "boton-mas", "Borrar");
             borrar.type = "button";
             borrar.addEventListener("click", () => { if (alBorrar) alBorrar(e); });
-            celda.append(informe, " ", borrar);
+            enlaces.forEach((a) => celda.append(a, " · "));
+            celda.append(borrar);
             fila.append(celda);
             cuerpo.append(fila);
         });

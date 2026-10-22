@@ -29,6 +29,7 @@ import pythoncom
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 import explicador
+import evidencia
 import informe
 import instalador
 import mantenimiento
@@ -286,6 +287,33 @@ def api_mantenimiento_ejecutar(accion):
 def api_mantenimiento_trabajo(tid):
     t = mantenimiento.estado_trabajo(tid)
     return jsonify(t) if t else _error_json("Esa tarea no existe.", 404)
+
+
+@app.route("/api/registro/jornada")
+def api_registro_jornada():
+    """Informe imprimible de los equipos guardados en una fecha (?fecha=AAAA-MM-DD; por defecto hoy)."""
+    try:
+        return Response(evidencia.jornada_html(request.args.get("fecha")), mimetype="text/html")
+    except Exception as error:
+        return _error_json(f"No se pudo generar el informe de la jornada: {error}", 500)
+
+
+@app.route("/api/registro/<int:id_equipo>/acta")
+def api_registro_acta(id_equipo):
+    try:
+        html = evidencia.acta_html(id_equipo)
+        return Response(html, mimetype="text/html") if html else _error_json("Ese equipo no está en el registro.", 404)
+    except Exception as error:
+        return _error_json(f"No se pudo generar el acta: {error}", 500)
+
+
+@app.route("/api/registro/<int:id_equipo>/comparar")
+def api_registro_comparar(id_equipo):
+    try:
+        html = evidencia.comparacion_html(id_equipo)
+        return Response(html, mimetype="text/html") if html else _error_json("Ese equipo no está en el registro.", 404)
+    except Exception as error:
+        return _error_json(f"No se pudo comparar: {error}", 500)
 
 
 @app.route("/api/registro/csv")

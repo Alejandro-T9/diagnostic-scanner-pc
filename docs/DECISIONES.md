@@ -1395,3 +1395,14 @@ Nueva pestaña «Mantenimiento» y módulo `backend/mantenimiento.py` con una **
 **Política:** la herramienta no descarga nada, no incluye activadores ni versiones modificadas, y el contenido de ejemplo son programas gratuitos y legales (7-Zip, LibreOffice, Firefox, Foxit). La herramienta no puede garantizar qué archivo pone el equipo en la carpeta: la huella solo prueba que no cambió desde que se anotó.
 
 **Consecuencias:** sin carpeta o manifiesto la sección solo explica cómo crearlos. `instaladores/` está en `.gitignore` (archivos grandes). Probado con instaladores simulados; no se ejecutó ninguna instalación real.
+
+
+## 46. Evidencia: acta con código de integridad, comparación e informe de jornada (F7c)
+
+**Fecha:** 2026-10-22
+
+`backend/evidencia.py` genera, a partir del registro de equipos: un **acta imprimible** por equipo (`/api/registro/<id>/acta`) con datos, notas, estado de cada componente y del análisis de Windows, la revisión de post-instalación, la comparación con la revisión anterior, líneas de firma y un **código de integridad SHA-256**; una **comparación** con la revisión anterior del mismo equipo (misma etiqueta sin distinguir mayúsculas) marcando qué mejoró, empeoró, es nuevo o ya no se revisó (`/comparar`); y un **informe de la jornada** con los equipos guardados en una fecha (`/api/registro/jornada?fecha=AAAA-MM-DD`, por defecto hoy). La pestaña Equipos enlaza las tres cosas.
+
+**Límite honesto:** el código de integridad prueba que una copia impresa coincide con lo guardado, pero no es una firma: quien pueda escribir en el archivo del registro puede cambiarlo y el código se recalcularía. Para evidencia fuerte frente a terceros haría falta firmar o guardar el código en otro lugar (por ejemplo, anotarlo en la hoja de SOPORTE TÉCNICO el mismo día).
+
+**Consecuencias:** todo texto del usuario o del sistema se escapa; solo lectura sobre el registro; probado con registros simulados (incluida la alteración del registro, que cambia el código).

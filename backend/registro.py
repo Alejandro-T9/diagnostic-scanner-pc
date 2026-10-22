@@ -8,6 +8,7 @@ con borrar el archivo. Sin sqlite3 externo: solo la biblioteca estándar.
 """
 
 import csv
+import hashlib
 import io
 import json
 import os
@@ -151,3 +152,39 @@ def nota_automatica(escaneo, analisis=None, items_post=None, hechas=None) -> str
     if hechas:
         lineas.append("Mantenimiento hecho: " + "; ".join(str(h)[:70] for h in hechas[:6]) + ".")
     return "\n".join(lineas)[:_MAX_TEXTO["notas"]]
+
+
+def obtener_fila(id_equipo: int):
+    """Fila completa de un equipo (con el detalle ya leído) o None."""
+    with _conectar() as con:
+        f = con.execute("SELECT * FROM equipos WHERE id=?", (int(id_equipo),)).fetchone()
+    if not f:
+        return None
+    fila = dict(f)
+    fila["estados"] = json.loads(fila["estados"])
+    fila["detalle_texto"] = fila.pop("detalle")
+    fila["detalle"] = json.loads(fila["detalle_texto"])
+    return fila
+
+
+def huella(fila: dict) -> str:
+    """Código SHA-256 de lo guardado de un equipo: sirve para comprobar que una copia impresa coincide con el registro."""
+    partes = [str(fila["id"]), fila["fecha"], fila["etiqueta"], fila["responsable"], fila["notas"], fila["veredicto"],
+              json.dumps(fila["estados"], sort_keys=True), fila["detalle_texto"]]
+    return hashlib.sha256("\n".join(partes).encode("utf-8")).hexdigest()
+
+
+def anterior(fila: dict):
+    """La revisión previa del mismo equipo (misma etiqueta sin distinguir mayúsculas) o None."""
+    with _conectar() as con:
+        f = con.execute("SELECT id FROM equipos WHERE lower(etiqueta)=lower(?) AND id<? ORDER BY id DESC LIMIT 1",
+                        (fila["etiqueta"], fila["id"])).fetchone()
+    return obtener_fila(f["id"]) if f else None
+
+
+def del_dia(fecha: str) -> list:
+    """Equipos guardados en una fecha (AAAA-MM-DD), del más antiguo al más reciente."""
+    with _conectar() as con:
+        filas = con.execute("SELECT id, fecha, etiqueta, responsable, veredicto, equipo, sistema, estados FROM equipos"
+                            " WHERE substr(fecha,1,10)=? ORDER BY id", (fecha,)).fetchall()
+    return [{**dict(f), "estados": json.loads(f["estados"])} for f in filas]
