@@ -474,6 +474,13 @@ body {
     cursor: pointer;
 }
 
+.interruptor-modo button:focus-visible {
+    outline: 2px solid var(--color-texto);
+    outline-offset: -3px;
+}
+
+body.demo #boton-informe { display: none; }
+
 .interruptor-modo button[aria-pressed="true"] {
     background-color: var(--color-acento);
     color: var(--color-fondo);

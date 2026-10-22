@@ -99,6 +99,8 @@ let componenteSeleccionado = null;
 let ultimoResultado = null; // {componentes, cobertura} del último render, para repintar al cambiar de modo
 let tablaGuias = null;      // respuesta de /api/guias (guías por componente/estado + _veredictos)
 let modo = "simple";
+let escaneando = false;     // hay un /api/scan en curso
+let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
 
 // Todo texto que venga del escaneo (mensaje, nombres de dispositivos, guía)
 // pasa por acá antes de entrar a un innerHTML.
@@ -159,7 +161,7 @@ function renderizarResumen(componentes, cobertura) {
         .map((nivel) => `${conteo[nivel]} ${CHIP_TEXTO[nivel].toLowerCase()}`);
     document.getElementById("resumen-texto").textContent = partes.join(" · ");
 
-    // Sin cobertura (mock inicial, modo demo): se limpia en vez de mostrar
+    // Sin cobertura (modo demo): se limpia en vez de mostrar
     // un dato que no vino de un escaneo real.
     document.getElementById("cobertura-texto").textContent = cobertura
         ? `Cobertura: ${cobertura.porcentaje}% (${cobertura.completos}/${cobertura.completos + cobertura.parciales} evaluados por completo)`
@@ -168,6 +170,11 @@ function renderizarResumen(componentes, cobertura) {
 
 function renderizarDiagnostico(componentes, cobertura) {
     document.body.classList.remove("sin-escaneo");
+    // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
+    // así ninguna clase CSS ni texto sale de un valor no previsto.
+    for (const info of Object.values(componentes)) {
+        if (!Object.hasOwn(CHIP_TEXTO, info.estado)) info.estado = "no_determinado";
+    }
     const svg = document.getElementById("mapa-svg");
     svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
 
@@ -201,7 +208,7 @@ function renderizarDiagnostico(componentes, cobertura) {
         fila.className = "fila";
         fila.dataset.id = id;
         fila.innerHTML = `
-            <div class="franja ${info.estado}"></div>
+            <div class="franja ${escapar(info.estado)}"></div>
             <div class="fila-icono">${iconoSvg(id)}</div>
             <div class="fila-info">
                 <div class="nombre">${escapar(nombreComp(id))}</div>
@@ -440,6 +447,7 @@ async function escanearSistema() {
     const boton = document.getElementById("boton-escanear");
     const botonRevisar = document.getElementById("boton-revisar");
     const barra = document.getElementById("barra-progreso-contenedor");
+    escaneando = true;
     boton.disabled = true;
     botonRevisar.disabled = true;
     barra.classList.add("activa");
@@ -448,6 +456,7 @@ async function escanearSistema() {
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
         const resultado = await respuesta.json();
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
+        escaneosReales++;
         renderizarDiagnostico(resultado.componentes, resultado.cobertura);
         // Si había un componente abierto, se refresca con el dato nuevo en
         // vez de perder la selección en cada escaneo.
@@ -458,6 +467,7 @@ async function escanearSistema() {
     } catch (error) {
         mostrarError("No se pudo completar el escaneo. Verifica que el servidor esté corriendo.");
     } finally {
+        escaneando = false;
         boton.disabled = false;
         botonRevisar.disabled = false;
         barra.classList.remove("activa");
@@ -466,19 +476,26 @@ async function escanearSistema() {
 
 // Modo demo: para preparar la sustentación sin depender de que la laptop
 // de turno tenga justo algo mal en ese momento. Reusa DATOS_MOCK (ya
-// ejercita los 5 estados a la vez) — nunca pasa por el backend, así que
-// no puede confundirse con un escaneo real mientras el aviso esté visible.
+// ejercita los 5 estados a la vez) — no usa /api/scan (solo pide la tabla de
+// guías), y el aviso de datos simulados se muestra junto con los datos falsos.
+// La clase "demo" en <body> oculta el botón del informe (no hay escaneo real).
 function mostrarDemo() {
     document.getElementById("aviso-demo").classList.add("activo");
+    document.body.classList.add("demo");
 }
 
 function ocultarDemo() {
     document.getElementById("aviso-demo").classList.remove("activo");
+    document.body.classList.remove("demo");
 }
 
 async function verModoDemo() {
-    mostrarDemo();
+    if (escaneando) return; // un escaneo real en curso manda sobre la demo
+    const antes = escaneosReales;
     const tabla = await cargarGuias();
+    // Si un escaneo real empezó o terminó mientras esperábamos, no se pinta la demo encima.
+    if (escaneando || escaneosReales !== antes) return;
+    mostrarDemo();
     for (const info of Object.values(DATOS_MOCK.componentes)) {
         const guia = tabla && tabla[info.componente] && tabla[info.componente][info.estado];
         if (guia) info.guia = guia; else delete info.guia;
@@ -505,7 +522,8 @@ let modoGuardado = null;
 try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* almacenamiento bloqueado: se usa el modo simple */ }
 aplicarModo(modoGuardado, false);
 
-// Los datos de DATOS_MOCK solo se muestran con "Ver Modo Demostración".
+// Arranque: sin datos hasta el primer escaneo (DATOS_MOCK solo sale con "Ver Modo Demostración").
+
 // Frases de veredicto para el sello; al llegar se repinta (si falla, queda el texto de siempre).
 cargarGuias().then((t) => { if (t) repintar(); });
 actualizarStatus();
