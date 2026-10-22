@@ -493,7 +493,7 @@ function dibujarAnalisis(vista, analisis, contenedor, { alAnalizar, ocupado } = 
 
 
 // Pestaña "Equipos" (F5, opt-in): formulario para guardar el último escaneo + inventario. datos = {equipos, archivo} o null.
-function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, mensaje, hayPost } = {}) {
+function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, alNota, mensaje, hayPost } = {}) {
     const bloque = crear("div", "analisis");
     bloque.append(crear("h2", "", "Equipos revisados"));
     bloque.append(crear("p", "recomendaciones-nota", "Es opcional: solo se guarda lo que tú pides, en un archivo de tu USB. No se envía nada por internet."));
@@ -507,6 +507,13 @@ function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, 
             if (id === "etiqueta") entrada.required = true;
             campo.append(entrada);
             form.append(campo);
+            if (id === "notas") {
+                const auto = crear("button", "boton-mas", "Generar nota automática");
+                auto.type = "button";
+                auto.addEventListener("click", () => alNota && alNota(entrada, true));
+                form.append(auto);
+                if (alNota) alNota(entrada, false); // al abrir, rellena solo si está vacío
+            }
         });
         if (hayPost) {
             const incluir = crear("label", "campo-registro-marca");
@@ -620,6 +627,136 @@ function dibujarPostinstalacion(datos, ocupado, contenedor, { alRevisar, marcada
             });
             bloque.append(area, copiar);
         }
+    }
+    contenedor.replaceChildren(bloque);
+}
+
+
+// Pestaña "Mantenimiento" (F7a). datos = respuesta de /api/mantenimiento o null. est = {previas, resultados, trabajos, seleccion, ocupado}:
+// cada acción muestra primero qué haría y solo ejecuta tras confirmar. Todo texto del sistema entra con textContent.
+function dibujarMantenimiento(datos, est, contenedor, { alPrevisualizar, alEjecutar, alMedir, alSeleccionar } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Mantenimiento seguro"));
+    bloque.append(crear("p", "recomendaciones-nota", "Cada acción muestra primero qué haría y pide tu confirmación. Nunca apaga el antivirus, el firewall ni Windows Update."));
+    if (!datos || !Array.isArray(datos.acciones)) {
+        bloque.append(crear("p", "", "Cargando…"));
+        contenedor.replaceChildren(bloque);
+        return;
+    }
+    if (!datos.administrador) {
+        bloque.append(crear("p", "aviso-mant", "Sin permisos de administrador solo funcionan la limpieza, los programas de inicio y el plan de energía. Para lo demás, cierra y abre de nuevo la aplicación aceptando el aviso de Windows."));
+    }
+    // Antes y ahora
+    const m = datos.medidas;
+    if (_esDict(m) && _esDict(m.antes) && _esDict(m.ahora)) {
+        const caja = crear("div", "tarjeta-comp");
+        caja.append(crear("h3", "", "Antes y ahora"));
+        const filas = [["Espacio libre en el disco", (x) => (Number.isFinite(x.libre_gb) ? `${x.libre_gb} GB (${x.libre_pct} %)` : "—")],
+                       ["Programas que arrancan solos", (x) => (Number.isFinite(x.inicio_activos) ? String(x.inicio_activos) : "—")]];
+        const ul = crear("ul", "tarjeta-simple-pasos");
+        filas.forEach(([t, f]) => ul.append(crear("li", "", `${t}: antes ${f(m.antes)}, ahora ${f(m.ahora)}`)));
+        caja.append(ul);
+        const medir = crear("button", "boton-mas", "Medir de nuevo");
+        medir.type = "button";
+        medir.addEventListener("click", () => alMedir && alMedir(false));
+        const reiniciar = crear("button", "boton-mas", "Tomar lo de ahora como «antes»");
+        reiniciar.type = "button";
+        reiniciar.addEventListener("click", () => alMedir && alMedir(true));
+        caja.append(medir, " ", reiniciar);
+        bloque.append(caja);
+    }
+    const lista = crear("div", "analisis-tarjetas");
+    datos.acciones.filter(_esDict).forEach((a) => {
+        const id = String(a.id);
+        const tarjeta = crear("article", "tarjeta-comp");
+        const cab = crear("div", "tarjeta-comp-cabecera");
+        cab.append(crear("h3", "", a.titulo), crear("span", `etiqueta-urgencia ${a.riesgo === "medio" ? "media" : "baja"}`, `Riesgo ${a.riesgo} · ${a.tarda}`));
+        tarjeta.append(cab, crear("p", "tarjeta-comp-significa", a.descripcion));
+        const ocupada = est.ocupado === id;
+        if (!a.disponible) {
+            tarjeta.append(crear("p", "", "Necesita permisos de administrador."));
+            lista.append(tarjeta);
+            return;
+        }
+        let kb = null;
+        if (id === "quitar_parche") {
+            const campo = crear("label", "campo-registro", "Número de la actualización (por ejemplo KB5120998)");
+            kb = crear("input");
+            kb.maxLength = 12;
+            campo.append(kb);
+            tarjeta.append(campo);
+        }
+        const params = () => (kb ? { kb: kb.value } : {});
+        const previa = est.previas[id];
+        const ver = crear("button", "boton-mas", ocupada ? "Trabajando…" : "Ver qué haría");
+        ver.type = "button";
+        ver.disabled = !!est.ocupado;
+        ver.addEventListener("click", () => alPrevisualizar && alPrevisualizar(id, params()));
+        tarjeta.append(ver);
+        if (_esDict(previa)) {
+            tarjeta.append(crear("p", "tarjeta-comp-mensaje", previa.mensaje));
+            let ids = null;
+            if (id === "inicio" && Array.isArray(previa.detalle)) {
+                ids = est.seleccion[id] || (est.seleccion[id] = new Set());
+                const ul = crear("ul", "lista-marcas");
+                previa.detalle.filter(_esDict).forEach((e) => {
+                    const li = crear("li");
+                    const et = crear("label");
+                    const marca = crear("input");
+                    marca.type = "checkbox";
+                    marca.checked = ids.has(e.id);
+                    marca.addEventListener("change", () => { if (marca.checked) ids.add(e.id); else ids.delete(e.id); if (alSeleccionar) alSeleccionar(); });
+                    et.append(marca, ` ${e.nombre}`);
+                    li.append(et);
+                    ul.append(li);
+                });
+                tarjeta.append(ul);
+            } else if (id === "temporales" && Array.isArray(previa.detalle)) {
+                const ul = crear("ul", "tarjeta-simple-pasos");
+                previa.detalle.forEach((c) => ul.append(crear("li", "", String(c))));
+                tarjeta.append(ul);
+            }
+            if (previa.estado === "ok") {
+                const hacer = crear("button", "boton-primario", `Ejecutar: ${a.titulo}`);
+                hacer.type = "button";
+                hacer.disabled = !!est.ocupado || (ids !== null && ids.size === 0);
+                hacer.addEventListener("click", () => {
+                    if (!window.confirm(`${a.titulo}\n\n${a.descripcion}\n\n¿Continuar?`)) return;
+                    if (alEjecutar) alEjecutar(id, ids ? { ids: [...ids] } : params());
+                });
+                tarjeta.append(hacer);
+            }
+        }
+        const r = est.resultados[id];
+        if (_esDict(r)) {
+            tarjeta.append(crear("p", r.estado === "error" ? "aviso-mant" : "tarjeta-comp-mensaje", r.mensaje));
+            const deshacer = crear("button", "boton-mas", "");
+            deshacer.type = "button";
+            if (id === "energia" && r.estado === "ok" && typeof r.anterior === "string") {
+                deshacer.textContent = "Volver al plan anterior";
+                deshacer.addEventListener("click", () => alEjecutar && alEjecutar("energia", { volver_a: r.anterior }));
+                tarjeta.append(deshacer);
+            } else if (id === "inicio" && _esDict(r.detalle) && Array.isArray(r.detalle.hechos) && r.detalle.hechos.length) {
+                deshacer.textContent = "Volver a activarlos";
+                deshacer.addEventListener("click", () => alEjecutar && alEjecutar("inicio", { ids: r.detalle.hechos, accion: "reactivar" }));
+                tarjeta.append(deshacer);
+            }
+        }
+        const t = est.trabajos[id];
+        if (_esDict(t)) {
+            const texto = { corriendo: "En curso… no cierres la aplicación.", terminado: "Terminó sin problemas.", con_avisos: "Terminó con avisos: muéstrale el resultado a un técnico.", error: "No se pudo ejecutar." }[t.estado] || "";
+            tarjeta.append(crear("p", t.estado === "terminado" ? "tarjeta-comp-mensaje" : "aviso-mant", texto));
+            if (Array.isArray(t.salida) && t.salida.length) tarjeta.append(crear("pre", "salida-mant", t.salida.slice(-12).join("\n")));
+        }
+        lista.append(tarjeta);
+    });
+    bloque.append(lista);
+    const hist = Array.isArray(datos.historial) ? datos.historial.filter(_esDict) : [];
+    if (hist.length) {
+        bloque.append(crear("h3", "", "Lo que se hizo"));
+        const ul = crear("ul", "tarjeta-simple-pasos");
+        hist.slice(0, 15).forEach((h) => ul.append(crear("li", "", `${String(h.fecha || "").replace("T", " ")} — ${h.accion}: ${h.mensaje}`)));
+        bloque.append(ul);
     }
     contenedor.replaceChildren(bloque);
 }

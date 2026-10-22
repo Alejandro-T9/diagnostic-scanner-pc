@@ -396,8 +396,17 @@ function puedeGuardarEquipo() {
 
 function dibujarPanelEquipos() {
     dibujarEquipos(datosRegistro, puedeGuardarEquipo(), document.getElementById("equipos-vista"), {
-        alGuardar: guardarEquipo, alBorrar: borrarEquipo, mensaje: mensajeRegistro, hayPost: !!datosPostinstalacion,
+        alGuardar: guardarEquipo, alBorrar: borrarEquipo, alNota: rellenarNota, mensaje: mensajeRegistro, hayPost: !!datosPostinstalacion,
     });
+}
+
+// Nota automática (hallazgos, pendientes de instalación y mantenimiento de hoy). Sin forzar, no pisa lo que el usuario ya escribió.
+async function rellenarNota(campo, forzar) {
+    if (!forzar && campo.value.trim()) return;
+    try {
+        const cuerpo = await _postJson("/api/registro/nota", { items: datosPostinstalacion ? datosPostinstalacion.items : [] });
+        if (typeof cuerpo.nota === "string" && cuerpo.nota && (forzar || !campo.value.trim())) campo.value = cuerpo.nota;
+    } catch (error) { /* sin nota automática: el usuario escribe la suya */ }
 }
 
 async function cargarRegistro() {
@@ -469,6 +478,83 @@ async function revisarPostinstalacion() {
 
 dibujarPanelPostinstalacion();
 cargarRegistro();
+
+
+// --- Mantenimiento seguro (F7a) ---
+const mant = { datos: null, previas: {}, resultados: {}, trabajos: {}, seleccion: {}, ocupado: null };
+let sondeoTrabajo = null;
+
+const _postJson = (url, cuerpo) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo || {}) }).then((r) => r.json());
+
+function dibujarPanelMantenimiento() {
+    dibujarMantenimiento(mant.datos, mant, document.getElementById("mantenimiento-vista"), {
+        alPrevisualizar: previsualizarMant, alEjecutar: ejecutarMant, alMedir: medirMant, alSeleccionar: dibujarPanelMantenimiento,
+    });
+}
+
+async function cargarMantenimiento(reiniciar) {
+    try {
+        const respuesta = await fetch(`/api/mantenimiento${reiniciar ? "?reiniciar=1" : ""}`);
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        mant.datos = await respuesta.json();
+    } catch (error) {
+        mostrarError("No se pudo leer el mantenimiento.", "escaneo");
+    }
+    dibujarPanelMantenimiento();
+}
+
+const medirMant = (reiniciar) => cargarMantenimiento(reiniciar);
+
+async function previsualizarMant(id, params) {
+    mant.ocupado = id;
+    dibujarPanelMantenimiento();
+    try {
+        mant.previas[id] = await _postJson(`/api/mantenimiento/${encodeURIComponent(id)}/previsualizar`, params);
+        if (id === "inicio") mant.seleccion.inicio = new Set();
+    } catch (error) {
+        mant.previas[id] = { estado: "error", mensaje: "No se pudo preparar la vista previa.", detalle: [] };
+    }
+    mant.ocupado = null;
+    dibujarPanelMantenimiento();
+}
+
+async function ejecutarMant(id, params) {
+    mant.ocupado = id;
+    delete mant.resultados[id];
+    dibujarPanelMantenimiento();
+    try {
+        const r = await _postJson(`/api/mantenimiento/${encodeURIComponent(id)}/ejecutar`, params);
+        mant.resultados[id] = r;
+        anunciar(r.mensaje);
+        if (r.estado === "trabajo") sondearTrabajo(id, r.trabajo);
+    } catch (error) {
+        mant.resultados[id] = { estado: "error", mensaje: "No se pudo ejecutar la acción.", detalle: [] };
+    }
+    mant.ocupado = null;
+    await cargarMantenimiento(false); // refresca historial y medidas
+}
+
+function sondearTrabajo(id, tid) {
+    clearInterval(sondeoTrabajo);
+    sondeoTrabajo = setInterval(async () => {
+        try {
+            const respuesta = await fetch(`/api/mantenimiento/trabajo/${encodeURIComponent(tid)}`);
+            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+            mant.trabajos[id] = await respuesta.json();
+        } catch (error) {
+            mant.trabajos[id] = { estado: "error", salida: [] };
+        }
+        dibujarPanelMantenimiento();
+        if (mant.trabajos[id].estado !== "corriendo") {
+            clearInterval(sondeoTrabajo);
+            anunciar("La tarea de mantenimiento terminó.");
+            cargarMantenimiento(false);
+        }
+    }, 2000);
+}
+
+dibujarPanelMantenimiento();
+cargarMantenimiento(false);
 
 desdeHash();
 

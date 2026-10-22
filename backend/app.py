@@ -12,6 +12,7 @@ en un Windows normal conectado. El puerto por defecto es 5000 y se puede
 cambiar con la variable de entorno DSPC_PORT.
 """
 
+import datetime
 import os
 import sys
 from html import escape
@@ -29,6 +30,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 
 import explicador
 import informe
+import mantenimiento
 import postinstalacion
 import registro
 import scanner
@@ -64,6 +66,16 @@ def _inicializar_com():
     (no se ve en pruebas directas de un script porque esas sí corren en
     el hilo principal)."""
     pythoncom.CoInitialize()
+
+
+@app.before_request
+def _proteger_local():
+    """Defensa contra otras páginas web: Host solo local (anti DNS-rebinding) y los POST exigen JSON, algo que un
+    formulario de otro sitio no puede enviar sin permiso del navegador. Protege registro y mantenimiento."""
+    if request.host.rsplit(":", 1)[0].strip("[]").lower() not in ("127.0.0.1", "localhost", "::1"):
+        return jsonify({"estado": "error", "mensaje": "Host no permitido"}), 400
+    if request.method == "POST" and not request.is_json:
+        return jsonify({"estado": "error", "mensaje": "Se esperaba JSON"}), 400
 
 
 @app.teardown_request
@@ -209,6 +221,48 @@ def api_registro():
         return _error_json(str(error), 400)
     except Exception as error:
         return _error_json(f"No se pudo usar el registro de equipos: {error}", 500)
+
+
+@app.route("/api/registro/nota", methods=["POST"])
+def api_registro_nota():
+    """Nota automática para el campo «Notas»: hallazgos del escaneo y del análisis, pendientes de la instalación y mantenimiento de hoy."""
+    datos = request.get_json(silent=True)
+    items = datos.get("items") if isinstance(datos, dict) else None
+    hoy = datetime.date.today().isoformat()
+    hechas = [f"{h.get('accion')}: {h.get('mensaje')}" for h in mantenimiento.historial(30)
+              if isinstance(h, dict) and h.get("estado") == "ok" and str(h.get("fecha", "")).startswith(hoy)]
+    return jsonify({"nota": registro.nota_automatica(_ultimo_escaneo, _ultimo_analisis, items, hechas[::-1])})
+
+
+def _cuerpo_json():
+    datos = request.get_json(silent=True)
+    return datos if isinstance(datos, dict) else {}
+
+
+@app.route("/api/mantenimiento")
+def api_mantenimiento():
+    """Acciones de mantenimiento (lista cerrada), si hay permisos de administrador y las medidas de antes y ahora."""
+    try:
+        return jsonify({"acciones": mantenimiento.listar(), "administrador": utils.es_administrador(),
+                        "medidas": mantenimiento.comparar(request.args.get("reiniciar") == "1"), "historial": mantenimiento.historial(20)})
+    except Exception as error:
+        return _error_json(f"No se pudo leer el mantenimiento: {error}", 500)
+
+
+@app.route("/api/mantenimiento/<accion>/previsualizar", methods=["POST"])
+def api_mantenimiento_previsualizar(accion):
+    return jsonify(mantenimiento.previsualizar(accion, _cuerpo_json()))
+
+
+@app.route("/api/mantenimiento/<accion>/ejecutar", methods=["POST"])
+def api_mantenimiento_ejecutar(accion):
+    return jsonify(mantenimiento.ejecutar(accion, _cuerpo_json()))
+
+
+@app.route("/api/mantenimiento/trabajo/<tid>")
+def api_mantenimiento_trabajo(tid):
+    t = mantenimiento.estado_trabajo(tid)
+    return jsonify(t) if t else _error_json("Esa tarea no existe.", 404)
 
 
 @app.route("/api/registro/csv")

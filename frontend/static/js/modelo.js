@@ -1,8 +1,8 @@
 // frontend/static/js/modelo.js — Lógica pura (pestañas, tema, modo y datos del Resumen). Sin DOM ni window:
 // se prueba con Node (frontend/tests/modelo.test.js). Script clásico: las funciones quedan globales.
 
-const PESTANAS = ["resumen", "componentes", "recomendaciones", "analisis", "equipos", "postinstalacion"];
-const SIEMPRE = ["resumen", "equipos", "postinstalacion"]; // no dependen de un escaneo de hardware
+const PESTANAS = ["resumen", "componentes", "recomendaciones", "analisis", "equipos", "postinstalacion", "mantenimiento"];
+const SIEMPRE = ["resumen", "equipos", "postinstalacion", "mantenimiento"]; // no dependen de un escaneo de hardware
 
 function _lista(habilitadas) {
     return Array.isArray(habilitadas) ? habilitadas.filter((p) => PESTANAS.includes(p)) : [];

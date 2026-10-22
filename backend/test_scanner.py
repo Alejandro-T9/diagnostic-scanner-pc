@@ -2132,6 +2132,135 @@ def test_analisis_f4b():
         assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
 
 
+def test_mantenimiento_y_nota():
+    import os
+    import tempfile
+    import threading
+    import time
+    import mantenimiento as m
+    import registro
+    originales = (m._correr, m._carpetas_temp, m._entradas_inicio, m._fijar_inicio, utils.es_administrador)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["DSPC_REGISTRO"] = os.path.join(tmp, "reg", "registro.db")
+        try:
+            # lista cerrada, permisos y acciones desconocidas
+            assert set(m.ACCIONES) >= {"temporales", "inicio", "energia", "reparar_sistema", "quitar_parche"}
+            assert all(a["descripcion"] and a["riesgo"] in ("bajo", "medio") for a in m.ACCIONES.values())
+            utils.es_administrador = lambda: False
+            assert {a["id"]: a["disponible"] for a in m.listar()}["reparar_sistema"] is False
+            assert m.ejecutar("reparar_sistema", {})["estado"] == "error" and "administrador" in m.ejecutar("reparar_sistema", {})["mensaje"]
+            assert m.ejecutar("formatear_todo", {})["estado"] == "error" and m.previsualizar("formatear_todo", {})["estado"] == "error"
+            utils.es_administrador = lambda: True
+            assert {a["id"]: a["disponible"] for a in m.listar()}["reparar_sistema"] is True
+
+            # temporales: la vista previa no borra; borra solo lo de más de un día y las carpetas que quedan vacías
+            temp = os.path.join(tmp, "Temp")
+            os.makedirs(os.path.join(temp, "sub"))
+            viejo, nuevo, anidado = os.path.join(temp, "viejo.tmp"), os.path.join(temp, "nuevo.tmp"), os.path.join(temp, "sub", "viejo2.tmp")
+            for ruta in (viejo, nuevo, anidado):
+                with open(ruta, "wb") as f:
+                    f.write(b"x" * 1000)
+            hace_3_dias = time.time() - 3 * 86400
+            os.utime(viejo, (hace_3_dias, hace_3_dias))
+            os.utime(anidado, (hace_3_dias, hace_3_dias))
+            m._carpetas_temp = lambda: [temp]
+            p = m.previsualizar("temporales", {})
+            assert p["estado"] == "ok" and os.path.exists(viejo) and os.path.exists(anidado), p
+            r = m.ejecutar("temporales", {})
+            assert r["estado"] == "ok" and not os.path.exists(viejo) and not os.path.exists(anidado) and os.path.exists(nuevo), r
+            assert not os.path.exists(os.path.join(temp, "sub")), "la carpeta vacía debía borrarse"
+
+            # inicio: nunca se ofrece ni se desactiva lo protegido o lo que no existe
+            lista = [{"id": "HKCU|Run|Spotify", "nombre": "Spotify", "comando": "x", "habilitado": True, "protegido": False},
+                     {"id": "HKCU|Run|Defender", "nombre": "Windows Defender", "comando": "x", "habilitado": True, "protegido": True},
+                     {"id": "HKCU|Run|Apagado", "nombre": "Apagado", "comando": "x", "habilitado": False, "protegido": False}]
+            m._entradas_inicio = lambda: lista
+            hechos = []
+            m._fijar_inicio = lambda i, h: hechos.append((i, h))
+            assert [e["nombre"] for e in m.previsualizar("inicio", {})["detalle"]] == ["Spotify"]
+            r = m.ejecutar("inicio", {"ids": ["HKCU|Run|Spotify", "HKCU|Run|Defender", "HKCU|Run|Inventado", 7]})
+            assert hechos == [("HKCU|Run|Spotify", False)] and len(r["detalle"]["fallos"]) == 3, (hechos, r)
+            assert m.ejecutar("inicio", {"ids": []})["estado"] == "error"
+            assert m.ejecutar("inicio", {"ids": ["HKCU|Run|Spotify"], "accion": "reactivar"})["estado"] == "ok" and hechos[-1] == ("HKCU|Run|Spotify", True)
+            assert all(m._PROTEGIDOS.search(n) for n in ("Windows Defender", "Realtek HD Audio", "NVIDIA Control", "Faronics Deep Freeze"))
+            assert not m._PROTEGIDOS.search("Spotify") and not m._PROTEGIDOS.search("Discord")
+
+            # energía y parches: solo comandos de la lista, con datos validados
+            llamadas = []
+
+            def falso(cmd, timeout=120):
+                llamadas.append(cmd)
+                if cmd[:2] == ["powercfg", "/getactivescheme"]:
+                    return 0, "Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Equilibrado)"
+                return (3010, "") if cmd[0] == "wusa" else (0, "")
+            m._correr = falso
+            r = m.ejecutar("energia", {})
+            assert r["estado"] == "ok" and r["anterior"] == "381b4222-f694-41f0-9685-ff5bb260df2e", r
+            assert ["powercfg", "/setactive", m._ALTO_RENDIMIENTO] in llamadas
+            assert m.ejecutar("energia", {"volver_a": "no-es-guid; calc"})["estado"] == "error"
+            assert m.ejecutar("energia", {"volver_a": r["anterior"]})["estado"] == "ok"
+            assert m.previsualizar("energia", {})["anterior"] == r["anterior"]
+            for malo in ("", "abc", "KB12", "5120998; calc", "KB1234567890"):
+                assert m.ejecutar("quitar_parche", {"kb": malo})["estado"] == "error", malo
+            r = m.ejecutar("quitar_parche", {"kb": "kb5120998"})
+            assert r["estado"] == "ok" and "Reinicia" in r["mensaje"] and ["wusa", "/uninstall", "/kb:5120998", "/quiet", "/norestart"] in llamadas
+
+            # tareas largas: corren en segundo plano, solo una a la vez y quedan anotadas
+            suelta = threading.Event()
+            m._correr = lambda cmd, timeout=120: (suelta.wait(5), (0, "todo bien"))[1]
+            r = m.ejecutar("disco", {})
+            assert r["estado"] == "trabajo" and m.estado_trabajo(r["trabajo"])["estado"] == "corriendo"
+            assert m.ejecutar("reparar_sistema", {})["estado"] == "error"  # ya hay una en curso
+            suelta.set()
+            for _ in range(50):
+                if m.estado_trabajo(r["trabajo"])["estado"] != "corriendo":
+                    break
+                time.sleep(0.1)
+            t = m.estado_trabajo(r["trabajo"])
+            assert t["estado"] == "terminado" and t["codigos"] == [0] and t["salida"] == ["todo bien"], t
+            assert m.estado_trabajo("no-existe") is None
+            assert any(h["accion"] == "disco" for h in m.historial()) and any(h["accion"] == "temporales" for h in m.historial())
+            m._correr = lambda cmd, timeout=120: (1, "avisos")
+            r = m.ejecutar("velocidad_disco", {})
+            for _ in range(50):
+                if m.estado_trabajo(r["trabajo"])["estado"] != "corriendo":
+                    break
+                time.sleep(0.1)
+            assert m.estado_trabajo(r["trabajo"])["estado"] == "con_avisos"
+            c = m.comparar(True)
+            assert set(c) == {"antes", "ahora"} and 0 <= c["ahora"]["libre_pct"] <= 100, c
+
+            # nota automática
+            esc = _escaneo_falso()
+            n = registro.nota_automatica(esc, {"analisis": {"seguridad": {"estado": "advertencia", "mensaje": "Aparece desactivado: el firewall."}}},
+                                         [{"titulo": "Nombre del equipo", "estado": "advertencia"}, {"titulo": "A mano", "estado": "advertencia", "manual": True}],
+                                         ["temporales: Se liberaron 300 MB"])
+            assert "Procesador (crítico)" in n and "Seguridad básica (advertencia)" in n and "Pendiente al instalar: Nombre del equipo." in n, n
+            assert "A mano" not in n and "Mantenimiento hecho: temporales" in n and len(n) <= 1000
+            assert registro.nota_automatica(None) == "" and registro.nota_automatica({"componentes": {}}) == ""
+            assert "sin hallazgos" in registro.nota_automatica({"componentes": {"cpu": {"estado": "normal", "mensaje": "ok"}}})
+            assert len(registro.nota_automatica({"componentes": {f"c{i}": {"estado": "critico", "mensaje": "m" * 200} for i in range(40)}})) <= 1000
+
+            # protección web: otras páginas no pueden disparar acciones
+            def _peticion():
+                cl = app.app.test_client()
+                assert cl.post("/api/mantenimiento/temporales/ejecutar").status_code == 400  # sin JSON (formulario de otro sitio)
+                assert cl.post("/api/mantenimiento/temporales/ejecutar", data="x", content_type="text/plain").status_code == 400
+                assert cl.get("/api/registro", headers={"Host": "evil.example.com"}).status_code == 400
+                assert cl.get("/api/mantenimiento").status_code == 200 and cl.get("/api/mantenimiento").get_json()["acciones"]
+                assert cl.post("/api/mantenimiento/temporales/previsualizar", json={}).get_json()["estado"] == "ok"
+                assert cl.get("/api/mantenimiento/trabajo/xx").status_code == 404
+                app._ultimo_escaneo = esc
+                assert "Procesador (crítico)" in cl.post("/api/registro/nota", json={"items": []}).get_json()["nota"]
+            try:
+                _en_hilo(_peticion)
+            finally:
+                app._ultimo_escaneo = None
+        finally:
+            m._correr, m._carpetas_temp, m._entradas_inicio, m._fijar_inicio, utils.es_administrador = originales
+            os.environ.pop("DSPC_REGISTRO", None)
+
+
 def test_registro_y_postinstalacion():
     import os
     import tempfile
@@ -2239,6 +2368,7 @@ def test_registro_y_postinstalacion():
 
 
 if __name__ == "__main__":
+    test_mantenimiento_y_nota()
     test_registro_y_postinstalacion()
     test_analisis_f4b()
     test_paleta()

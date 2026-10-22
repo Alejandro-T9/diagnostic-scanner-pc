@@ -116,3 +116,38 @@ def csv_texto() -> str:
     for f in listar(100000):
         w.writerow([seguro(f[c]) for c in _COLUMNAS_CSV])
     return "﻿" + salida.getvalue()
+
+
+_GRAVEDAD = ("critico", "sospecha", "advertencia", "no_determinado")
+
+
+def _hallazgos(componentes, nombres: dict) -> list:
+    """['Nombre (estado): mensaje corto', ...] de lo que no está normal, lo más grave primero."""
+    if not isinstance(componentes, dict):
+        return []
+    etiquetas = {"critico": "crítico", "sospecha": "sospecha", "advertencia": "advertencia", "no_determinado": "sin datos"}
+    filas = [(c.get("estado"), nombres.get(n, n), " ".join(str(c.get("mensaje", "")).split())[:80])
+             for n, c in componentes.items() if isinstance(c, dict) and c.get("estado") in _GRAVEDAD]
+    filas.sort(key=lambda f: _GRAVEDAD.index(f[0]))
+    return [f"{nombre} ({etiquetas[estado]}): {mensaje}" for estado, nombre, mensaje in filas]
+
+
+def nota_automatica(escaneo, analisis=None, items_post=None, hechas=None) -> str:
+    """Nota para el campo «Notas»: qué se encontró, qué falta al instalar y qué mantenimiento se hizo. '' si no hay escaneo real."""
+    import informe  # import tardío: informe importa scanner, que no hace falta para guardar/leer el registro
+    if not isinstance(escaneo, dict) or not escaneo.get("componentes"):
+        return ""
+    nombres = informe.NOMBRES
+    lineas = [f"Revisión del {datetime.now().strftime('%d/%m/%Y')}."]
+    hw = _hallazgos(escaneo["componentes"], nombres)
+    lineas.append("Hardware: " + ("; ".join(hw) if hw else "sin hallazgos."))
+    if isinstance(analisis, dict):
+        win = _hallazgos(analisis.get("analisis"), nombres)
+        lineas.append("Windows: " + ("; ".join(win) if win else "sin hallazgos."))
+    pend = [" ".join(str(i.get("titulo", "")).split())[:50] for i in (items_post if isinstance(items_post, list) else [])
+            if isinstance(i, dict) and not i.get("manual") and i.get("estado") in ("advertencia", "sospecha", "critico")]
+    if pend:
+        lineas.append("Pendiente al instalar: " + ", ".join(pend) + ".")
+    if hechas:
+        lineas.append("Mantenimiento hecho: " + "; ".join(str(h)[:70] for h in hechas[:6]) + ".")
+    return "\n".join(lineas)[:_MAX_TEXTO["notas"]]

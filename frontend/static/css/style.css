@@ -1081,3 +1081,6 @@ body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin e
 .acta-texto { display: block; width: 100%; max-width: 760px; margin: var(--espacio-3) 0; font-family: Consolas, monospace; font-size: var(--texto-s); }
 .campo-registro-marca { display: flex; align-items: center; gap: var(--espacio-2); font-size: var(--texto-s); }
 .analisis > .boton-primario { margin-top: var(--espacio-3); }
+.aviso-mant { color: var(--color-naranja); font-size: var(--texto-s); font-weight: 600; }
+.lista-marcas { list-style: none; margin: var(--espacio-2) 0; padding: 0; display: grid; gap: var(--espacio-1); font-size: var(--texto-s); }
+.salida-mant { max-height: 220px; overflow: auto; margin: var(--espacio-2) 0 0; padding: var(--espacio-3); border: 1px solid var(--color-borde); border-radius: var(--radio-2); background-color: var(--color-fondo); font-size: var(--texto-xs); white-space: pre-wrap; overflow-wrap: anywhere; }

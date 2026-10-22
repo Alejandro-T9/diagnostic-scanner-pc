@@ -1369,3 +1369,18 @@ Nueva pestaña «Post-instalación» y módulo `backend/postinstalacion.py`: lis
 **Ampliación (2026-10-22):** F6 suma la ficha del equipo en el texto del acta (modelo, serial, sistema y MAC, solo lo que se lee), la fecha de la última actualización instalada (advertencia pasados 60 días; es el historial de parches de Windows, no una búsqueda en internet), el aviso de reinicio pendiente y un **perfil opcional** `perfil.json` (ver `perfil.ejemplo.json`) con prefijo del nombre, zona horaria, idioma y carpeta `instaladores/` del USB. Sin perfil esas comprobaciones no aparecen. Siguen sin instalarse programas (decisión pendiente).
 
 **Ampliación 2 (2026-10-22):** al guardar un equipo en «Equipos» se puede incluir (casilla activada por defecto, solo aparece si ya se hizo la revisión) el texto del acta y las tareas a mano marcadas de Post-instalación. Se guardan en el detalle del registro y el informe del equipo guardado las muestra al final (todo escapado). Las marcas viven en memoria hasta guardar; una nueva revisión las borra. Instalar programas faltantes se deja fuera a propósito: solo se hará si el equipo de trabajo lo aprueba, desde `instaladores/` del USB y con confirmación en cada programa.
+
+
+## 44. Mantenimiento seguro, nota automática y protección de la API local (F7a)
+
+**Fecha:** 2026-10-22
+
+Nueva pestaña «Mantenimiento» y módulo `backend/mantenimiento.py` con una **lista cerrada** de acciones, cada una con vista previa y ejecución solo tras confirmar: punto de restauración, limpiar temporales (solo archivos de más de un día, sin seguir enlaces), vaciar la papelera, programas de inicio (StartupApproved, reversible; nunca ofrece seguridad, controladores ni Deep Freeze), plan de energía (con «volver al anterior»), reparar Windows (sfc + DISM), revisar disco (`chkdsk /scan`), velocidad del disco (winsat), prueba de memoria y herramienta de software malintencionado de Microsoft (abren sus propias ventanas) y desinstalar una actualización por número de KB (validado). Las tareas largas corren en un hilo, de una en una, y se consultan por `/api/mantenimiento/trabajo/<id>`. Lo hecho queda en `registros/mantenimiento.log`. «Antes y ahora» compara espacio libre y programas de inicio.
+
+**Nota automática** en «Equipos revisados»: `registro.nota_automatica` arma el texto de «Notas» con los hallazgos del hardware y de Windows, lo pendiente de Post-instalación y el mantenimiento hecho hoy (máx. 1000 caracteres); se rellena sola al abrir el formulario si está vacío y hay un botón para regenerarla. Nunca pisa lo que el usuario escribió.
+
+**Protección de la API local:** `before_request` rechaza un `Host` que no sea local (anti DNS-rebinding) y exige JSON en todos los POST (una página de otro sitio no puede enviarlo sin permiso del navegador), para que ninguna web pueda disparar acciones de mantenimiento.
+
+**Política que se mantiene (pedida expresamente por el equipo y rechazada):** la aplicación **no incluye ni automatiza activadores, cracks ni versiones pirata** de Windows, Office, WinRAR u otros, aunque lo pidan en el colegio, y tampoco apaga el antivirus ni Windows Update. La alternativa incluida en el plan es el instalador offline con programas gratuitos y legales (7-Zip, LibreOffice).
+
+**Consecuencias:** las acciones marcadas como administrador solo funcionan con permisos elevados (el módulo lo comprueba y lo explica). Vaciar la papelera, borrar temporales y quitar parches no se pueden deshacer. Probado con comandos simulados; en esta PC solo se ejecutaron las vistas previas, no las acciones.
