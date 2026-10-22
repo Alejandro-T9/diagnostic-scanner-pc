@@ -609,6 +609,7 @@ def _escaneo_falso(estado_cpu="critico"):
 
 def test_informe():
     import informe
+    from html import escape as escape_html
     # (a) todo texto del escaneo se escapa
     html = informe.generar_informe_html(_escaneo_falso(), "CRITICO")
     assert "<script>alert(1)</script>" not in html and "<b>ok</b>" not in html and "<i>1" not in html, html
@@ -630,6 +631,25 @@ def test_informe():
     # (d) estilos de impresión y sin recursos externos
     assert "@media print" in html
     assert "<script" not in html.replace("&lt;script", "") and "http://" not in html and "https://" not in html
+
+    # (d2) endurecimiento: cadenas hostiles en estado/guía, sin recursos externos
+    assert "&amp; Co" in html and "<link" not in html and "src=" not in html
+    assert "print-color-adjust" in html and "Según lo que el programa pudo medir." in html
+    hostil = _escaneo_falso()
+    hostil["componentes"]["cpu"]["estado"] = "<u>x</u>"
+    hostil["componentes"]["cpu"]["guia"] = {"que_significa": "<em>sig</em>", "que_hacer": None,
+                                            "quien": "tecnico", "pregunta_tecnico": "<q>preg</q>"}
+    hostil["componentes"]["mainboard"]["datos"] = "no es dict"
+    h = informe.generar_informe_html(hostil, "CRITICO")
+    for crudo in ("<u>x</u>", "<em>sig</em>", "<q>preg</q>"):
+        assert crudo not in h and escape_html(crudo) in h, crudo
+    # componente no normal sin guía: sin líneas de guía ni "todo está normal"
+    sin_guia = _escaneo_falso()
+    sin_guia["componentes"]["cpu"].pop("guia")
+    h = informe.generar_informe_html(sin_guia, "CRITICO")
+    assert "todo está normal" not in h and "No hay preguntas sugeridas" in h, h
+    assert h.count("Qué significa:") == 1 and h.count("Quién lo hace:") == 1, h  # solo la tarjeta normal
+    assert "Quién lo hace: No hace falta" in h.replace("</strong> ", " ").replace("<strong>", "")
 
     # (e) ruta: sin escaneo responde 200 text/html; con excepción, JSON 500
     original, generar = app._ultimo_escaneo, informe.generar_informe_html

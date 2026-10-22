@@ -35,11 +35,11 @@ h1 { margin: 0 0 4px 0; } h2 { margin: 28px 0 8px 0; border-bottom: 1px solid #D
 .tarjeta { border: 1px solid #D0D7DE; border-left-width: 6px; border-radius: 6px;
            padding: 10px 14px; margin: 12px 0; page-break-inside: avoid; }
 .tarjeta h3 { margin: 0 0 6px 0; font-size: 17px; }
-.chip { display: inline-block; color: #FFFFFF; border-radius: 12px; padding: 1px 10px;
-        font-size: 13px; margin-left: 8px; vertical-align: middle; }
+.chip { display: inline-block; color: #1F2328; background: #FFFFFF; border: 2px solid; border-radius: 12px;
+        padding: 0 10px; font-size: 13px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
 .tarjeta p { margin: 4px 0; } .tarjeta ul { margin: 4px 0 4px 20px; padding: 0; }
 .limites { margin-top: 28px; font-size: 14px; color: #57606A; }
-@media print { body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
+@media print { .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
 """
 
 
@@ -52,17 +52,24 @@ def _pagina(cuerpo):
 
 def _tarjeta(nombre, comp):
     etiqueta, color = ESTADOS.get(comp.get("estado"), (str(comp.get("estado")), "#8B949E"))
-    guia = comp.get("guia") or {}
-    pasos = "".join(f"<li>{escape(str(p))}</li>" for p in guia.get("que_hacer", []))
+    guia = comp.get("guia") if isinstance(comp.get("guia"), dict) else None
+    detalle = ""
+    if guia:
+        pasos = guia.get("que_hacer")
+        pasos = "".join(f"<li>{escape(str(p))}</li>" for p in pasos) if isinstance(pasos, list) else ""
+        quien = "No hace falta" if comp.get("estado") == "normal" else QUIEN.get(guia.get("quien"), "Un técnico")
+        detalle = (
+            f'<p><strong>Qué significa:</strong> {escape(str(guia.get("que_significa", "")))}</p>'
+            f'<p><strong>Qué hacer:</strong></p><ul>{pasos}</ul>'
+            f'<p><strong>Quién lo hace:</strong> {escape(quien)}</p>'
+        )
     return (
         f'<div class="tarjeta" style="border-left-color:{color}">'
         f'<h3>{escape(NOMBRES.get(nombre, nombre))}'
-        f'<span class="chip" style="background:{color}">{escape(etiqueta)}</span></h3>'
+        f'<span class="chip" style="border-color:{color}">{escape(etiqueta)}</span></h3>'
         f'<p>{escape(str(comp.get("mensaje", "")))}</p>'
-        f'<p><strong>Qué significa:</strong> {escape(str(guia.get("que_significa", "")))}</p>'
-        f'<p><strong>Qué hacer:</strong></p><ul>{pasos}</ul>'
-        f'<p><strong>Quién lo hace:</strong> {escape(QUIEN.get(guia.get("quien"), "Un técnico"))}</p>'
-        '</div>'
+        + detalle
+        + '</div>'
     )
 
 
@@ -77,12 +84,13 @@ def generar_informe_html(resultado, veredicto):
     orden = {e: i for i, e in enumerate(scanner._SEVERIDAD)}
     ordenados = sorted(comps.items(), key=lambda kv: orden.get(kv[1].get("estado"), len(orden)))
 
-    datos_mb = (comps.get("mainboard") or {}).get("datos") or {}
+    datos_mb = (comps.get("mainboard") or {}).get("datos")
+    datos_mb = datos_mb if isinstance(datos_mb, dict) else {}
     equipo = " ".join(str(datos_mb[k]) for k in ("fabricante", "modelo") if datos_mb.get(k))
     sello = explicador.FRASES_VEREDICTO.get(veredicto, veredicto)
 
     preguntas = [
-        (nombre, (c.get("guia") or {}).get("pregunta_tecnico", ""))
+        (nombre, (c["guia"].get("pregunta_tecnico", "") if isinstance(c.get("guia"), dict) else ""))
         for nombre, c in ordenados if c.get("estado") != "normal"
     ]
     preguntas = [(n, p) for n, p in preguntas if p]
@@ -92,7 +100,10 @@ def generar_informe_html(resultado, veredicto):
         )
         bloque_preguntas = f"<ul>{lista}</ul>"
     else:
-        bloque_preguntas = ("<p>No hacen falta preguntas: todo lo que se pudo medir está normal.</p>")
+        if any(c.get("estado") != "normal" for c in comps.values()):
+            bloque_preguntas = "<p>No hay preguntas sugeridas para este informe.</p>"
+        else:
+            bloque_preguntas = "<p>No hacen falta preguntas: todo está normal.</p>"
 
     cuerpo = (
         '<h1>Informe de diagnóstico</h1>'
@@ -100,6 +111,7 @@ def generar_informe_html(resultado, veredicto):
         f'Fecha: {escape(str(resultado.get("timestamp", "")))}</div>'
         + (f'<div class="meta">Equipo: {escape(equipo)}</div>' if equipo else "")
         + f'<div class="sello">{escape(str(sello))}</div>'
+        '<div class="meta">Según lo que el programa pudo medir.</div>'
         + "".join(_tarjeta(n, c) for n, c in ordenados)
         + '<h2>Preguntas para tu técnico</h2>' + bloque_preguntas
         + f'<p class="limites">{LIMITES}</p>'
