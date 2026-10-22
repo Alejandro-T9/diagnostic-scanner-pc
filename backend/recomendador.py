@@ -23,8 +23,8 @@ _NOTA_W10 = ("Windows 10 dejó de recibir actualizaciones de seguridad gratuitas
 _NOTA_MINIOS = "Es una versión modificada no oficial de Windows 10; instálala con ayuda de un técnico."
 _NOTA_W7 = ("Windows 7 no recibe actualizaciones de seguridad desde 2020. Úsalo solo si tu equipo o tus "
             "programas lo exigen, de preferencia sin internet o con mucho cuidado.")
-_NOTA_TPM = "No se pudo confirmar el TPM 2.0 (se lee con permisos de administrador); confírmalo antes de instalar."
-_NOTA_SB = "No se pudo confirmar el Arranque seguro (Secure Boot); confírmalo antes de instalar."
+_NOTA_TPM = "Falta confirmar el TPM 2.0 (se lee con permisos de administrador): compruébalo antes de instalar."
+_NOTA_SB = "Falta confirmar el Arranque seguro (Secure Boot): compruébalo antes de instalar."
 _NOTA_32 = "Para procesadores de 32 bits hay pocas versiones compatibles; un técnico debe confirmar cuál sirve."
 
 
@@ -70,7 +70,7 @@ def _arq64(res, hechos):
 
 
 def _windows11(cpu_nombre, h):
-    """-> (opcion | None, razones por las que se omitió, confirmado)."""
+    """-> (opcion | None, razones por las que se omitió, datos que faltan confirmar)."""
     apto, fw, sb, tpm = equipo.cpu_apto_windows11(cpu_nombre), h.get("firmware"), h.get("secure_boot"), h.get("tpm_version")
     razones = []
     if apto is False:
@@ -86,10 +86,11 @@ def _windows11(cpu_nombre, h):
     if tpm == "1.2":
         razones.append("TPM 1.2: Windows 11 pide 2.0")
     if razones:
-        return None, razones, False
+        return None, razones, []
+    # Un dato ilegible no descarta Windows 11 (no se afirma incompatibilidad): queda pendiente de confirmar.
+    pendientes = (["el TPM 2.0"] if tpm is None else []) + (["el Arranque seguro"] if sb is None else [])
     notas = ([_NOTA_TPM] if tpm is None else []) + ([_NOTA_SB] if sb is None else [])
-    return {"nombre": "Windows 11", "nota": " ".join(notas),
-            "motivo": ""}, [], not notas
+    return {"nombre": "Windows 11", "nota": " ".join(notas), "motivo": ""}, [], pendientes
 
 
 def _regla_so(res, h):
@@ -98,10 +99,10 @@ def _regla_so(res, h):
         return None
     cpu_nombre, sistema = _dato(res, "cpu", "nombre"), h.get("disco_sistema_tipo")
     g = _g(ram)
-    w11, razones, confirmado = (None, [], False)
+    w11, razones, pendientes = None, [], []
     base = []
     if arq64 and ram >= 4:
-        w11, razones, confirmado = _windows11(cpu_nombre, h)
+        w11, razones, pendientes = _windows11(cpu_nombre, h)
         if w11:
             w11["motivo"] = f"Tu equipo tiene {g} GB de RAM, un procesador reciente y cumple los requisitos que se pudieron comprobar."
         base.append({"nombre": "Windows 10", "nota": _NOTA_W10,
@@ -119,9 +120,8 @@ def _regla_so(res, h):
     if arq64 is False or ram < 2:
         base.append({"nombre": "Windows 7", "nota": _NOTA_W7,
                      "motivo": "Tu equipo es antiguo o tiene muy poca memoria, y puede que no admita sistemas más nuevos."})
-    # Windows 11 sin confirmar (TPM/Secure Boot ilegibles) nunca es la principal si hay otra opción.
     if w11:
-        base.insert(0 if confirmado else 1, w11)
+        base.insert(0, w11)
     if not base:
         return None
     basado = [f"RAM: {g} GB"]
@@ -137,7 +137,9 @@ def _regla_so(res, h):
         basado.append(f"Disco principal: {sistema.upper()}")
     basado += razones
     principal = base[0]["nombre"]
-    quien = "tu_mismo" if principal in ("Windows 11", "Windows 10") else "tecnico"
+    if w11:
+        principal += f" (falta confirmar {' y '.join(pendientes)})" if pendientes else ""
+    quien = "tu_mismo" if base[0]["nombre"] in ("Windows 11", "Windows 10") else "tecnico"
     return _rec("so", "Sistema operativo que conviene a tu equipo",
                 f"Según tus componentes te recomendamos: {principal}. También puedes ver otras opciones.",
                 basado, "baja", quien, base)

@@ -806,11 +806,13 @@ def test_recomendador():
     assert any("16" in linea for linea in r["basado_en"]), r["basado_en"]
     assert r["prioridad"] == "baja" and r["quien"] == "tu_mismo", r
 
-    # (b) TPM ilegible: Windows 11 sigue, con aviso, y no es la principal
+    # (b) TPM ilegible (único dato que falta): Windows 11 es la principal, pendiente de confirmar; Windows 10 sigue
     r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(tpm=None)), "so")
-    w11 = next(o for o in r["opciones"] if o["nombre"] == "Windows 11")
-    assert "No se pudo confirmar" in w11["nota"], w11
-    assert _nombres(r)[0] != "Windows 11", _nombres(r)
+    assert _nombres(r)[:2] == ["Windows 11", "Windows 10"], _nombres(r)
+    assert r["opciones"][0]["nota"] == ("Falta confirmar el TPM 2.0 (se lee con permisos de administrador): "
+                                        "compruébalo antes de instalar."), r["opciones"][0]
+    assert r["detalle"].startswith("Según tus componentes te recomendamos: Windows 11 (falta confirmar el TPM 2.0)."), r["detalle"]
+    assert r["quien"] == "tu_mismo", r
     assert any("TPM: no se pudo leer" in linea for linea in r["basado_en"]), r["basado_en"]
 
     # (c) procesador antiguo: Windows 11 no se ofrece y se explica por qué

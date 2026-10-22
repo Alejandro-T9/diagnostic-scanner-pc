@@ -132,7 +132,7 @@ medidos y, cuando corresponde, una `nota` con sus límites):
 
 | Opción | Se ofrece si | Nota |
 |---|---|---|
-| Windows 11 | 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Es la principal solo con TPM 2.0 y Secure Boot confirmados; si el TPM o Secure Boot no se pudieron leer, va en segundo lugar con la nota "No se pudo confirmar…". Si no se ofrece, `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot |
+| Windows 11 | 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Siempre es la principal si se ofrece. Un dato ilegible (TPM o Secure Boot sin permisos) no la descarta: se ofrece con la nota "Falta confirmar…" y el detalle dice "Windows 11 (falta confirmar el TPM 2.0)". Solo se omite por datos realmente leídos (procesador antiguo, BIOS clásica, Secure Boot desactivado, TPM 1.2) o por firmware/procesador no comprobables; `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot: "Falta confirmar el TPM 2.0 (se lee con permisos de administrador): compruébalo antes de instalar." |
 | Windows 10 | 64 bits y `ram_gb` ≥ 4 | Sin actualizaciones de seguridad gratuitas desde octubre de 2025 |
 | Ubuntu o Linux Mint | `ram_gb` ≥ 4 | En 32 bits: pocas versiones compatibles, lo confirma un técnico |
 | Lubuntu o Linux Mint XFCE | `ram_gb` < 4 | Igual que la anterior |
