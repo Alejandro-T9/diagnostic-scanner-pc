@@ -18,6 +18,7 @@ NOMBRES = {
     "almacenamiento": "Almacenamiento", "fuente_poder": "Fuente de Poder",
     "bateria": "Batería", "red": "Red",
 }
+NOMBRES.update(explicador.NOMBRES_ANALISIS)  # las tarjetas del análisis de Windows usan los mismos estilos
 ESTADOS = {
     "normal": "Normal", "advertencia": "Advertencia", "sospecha": "Sospecha",
     "critico": "Crítico", "no_determinado": "Sin datos",
@@ -93,7 +94,7 @@ def _pagina(cuerpo):
             f'<body>\n{cuerpo}\n</body>\n</html>')
 
 
-def _tarjeta(nombre, comp):
+def _tarjeta(nombre, comp, extra=""):
     estado = comp.get("estado")
     clave = estado if estado in ESTADOS else "no_determinado"  # un estado desconocido nunca llega a una clase CSS
     etiqueta = ESTADOS.get(estado, str(estado))
@@ -116,6 +117,7 @@ def _tarjeta(nombre, comp):
         f'<span class="chip estado-{clave}">{ICONOS_ESTADO[clave]}{escape(etiqueta)}</span></h3>'
         f'<p>{escape(str(comp.get("mensaje", "")))}</p>'
         + detalle
+        + extra
         + '</div>'
     )
 
@@ -157,7 +159,71 @@ def _recomendacion(rec):
     )
 
 
-def generar_informe_html(resultado, veredicto):
+_MAX_FILAS = 30
+
+
+def _lista_corta(filas):
+    """<ul> con hasta _MAX_FILAS filas ya escapadas y 'y N más' si hay más; nada si no hay filas."""
+    filas = [f for f in filas if f]
+    if not filas:
+        return ""
+    items = "".join(f"<li>{f}</li>" for f in filas[:_MAX_FILAS])
+    if len(filas) > _MAX_FILAS:
+        items += f"<li>y {len(filas) - _MAX_FILAS} más</li>"
+    return f"<ul>{items}</ul>"
+
+
+def _nombres(valores, clave):
+    return [escape(v[clave]) for v in valores if isinstance(v, dict) and isinstance(v.get(clave), str)]
+
+
+def _detalle_analisis(nombre, comp):
+    """Listas acotadas del detalle de cada análisis (todo texto del sistema, escapado)."""
+    datos = comp.get("datos") if isinstance(comp.get("datos"), dict) else {}
+    lista = lambda clave: datos.get(clave) if isinstance(datos.get(clave), list) else []
+    if nombre == "inicio":
+        activas = [e for e in lista("entradas") if isinstance(e, dict) and e.get("habilitado", True)]
+        return "<p><strong>Se abren al encender:</strong></p>" + _lista_corta(_nombres(activas, "nombre"))
+    if nombre == "programas":
+        ocultos = [p for p in lista("programas") if isinstance(p, dict) and p.get("oculto")]
+        recientes = [escape(n) for n in lista("recientes_sin_editor") if isinstance(n, str)]
+        return (("<p><strong>Recientes sin editor conocido:</strong></p>" + _lista_corta(recientes) if recientes else "")
+                + ("<p><strong>Ocultos por Windows:</strong></p>" + _lista_corta(_nombres(ocultos, "nombre")) if ocultos else ""))
+    if nombre == "rendimiento":
+        causas = [
+            escape(c["titulo"]) + (" — " + escape("; ".join(e for e in c["evidencia"] if isinstance(e, str)))
+                                   if isinstance(c.get("evidencia"), list) else "")
+            for c in lista("causas") if isinstance(c, dict) and isinstance(c.get("titulo"), str)
+        ]
+        procesos = [
+            f"{escape(p['nombre'])} ({p['cpu']:.0f} % CPU)" for p in lista("procesos_cpu")
+            if isinstance(p, dict) and isinstance(p.get("nombre"), str) and isinstance(p.get("cpu"), (int, float))
+        ]
+        return (("<p><strong>Posibles causas:</strong></p>" + _lista_corta(causas) if causas else "")
+                + ("<p><strong>Procesos que más procesador usan:</strong></p>" + _lista_corta(procesos) if procesos else ""))
+    if nombre == "espacio":
+        carpetas = [
+            f"{escape(c['nombre'])}: {c['tamano_gb']} GB" for c in lista("carpetas")
+            if isinstance(c, dict) and isinstance(c.get("nombre"), str) and isinstance(c.get("tamano_gb"), (int, float))
+        ]
+        return "<p><strong>Dónde se va el espacio:</strong></p>" + _lista_corta(carpetas) if carpetas else ""
+    return ""
+
+
+def _bloque_analisis(analisis):
+    items = analisis.get("analisis") if isinstance(analisis, dict) else None
+    if not isinstance(items, dict) or not items:
+        return ""
+    tarjetas = "".join(
+        _tarjeta(nombre, items[nombre], _detalle_analisis(nombre, items[nombre]))
+        for nombre in scanner.ANALISIS if isinstance(items.get(nombre), dict)
+    )
+    if not tarjetas:
+        return ""
+    return '<h2>Análisis de Windows</h2><p class="meta">Es una foto del momento; solo lee información.</p>' + tarjetas
+
+
+def generar_informe_html(resultado, veredicto, analisis=None):
     """Documento HTML completo del escaneo; página amable si no hay escaneo."""
     if not resultado or not resultado.get("componentes"):
         return _pagina(
@@ -203,6 +269,7 @@ def generar_informe_html(resultado, veredicto):
         '<div class="meta">Según lo que el programa pudo medir.</div>'
         + "".join(_tarjeta(n, c) for n, c in ordenados)
         + bloque_recs
+        + _bloque_analisis(analisis)
         + '<h2>Preguntas para tu técnico</h2>' + bloque_preguntas
         + f'<p class="limites">{LIMITES}</p>'
     )

@@ -113,6 +113,29 @@ def ejecutar_escaneo_completo() -> dict:
     }
 
 
+def ejecutar_analisis() -> dict:
+    """Análisis del Windows instalado (espacio, inicio, programas, rendimiento).
+
+    Misma mecánica que el escaneo de hardware (módulos con el contrato de 5
+    llaves + guía) pero sobre el paquete `analisis`, aparte de COMPONENTES:
+    no entra al veredicto ni a la cobertura del equipo. Se pide a demanda
+    desde su propia pestaña. Un módulo que falle queda no_determinado.
+    """
+    tiempos, analisis = {}, {}
+    inicio_total = time.perf_counter()
+    for nombre in ANALISIS:
+        inicio = time.perf_counter()
+        analisis[nombre] = _escanear_componente(nombre, paquete="analisis")
+        tiempos[nombre] = round(time.perf_counter() - inicio, 3)
+    tiempos["total"] = round(time.perf_counter() - inicio_total, 3)
+    return {
+        "timestamp": utils.obtener_timestamp(),
+        "analisis": analisis,
+        "resumen": _calcular_resumen(analisis),
+        "tiempos": tiempos,
+    }
+
+
 def _generar_id_diagnostico(componentes: dict) -> str:
     """ID legible y trazable de un escaneo puntual — nunca se persiste (no
     rompe la arquitectura stateless, ver decisión 4 en docs/DECISIONES.md),
@@ -160,7 +183,7 @@ def clasificar_equipo(resultado: dict) -> str:
     return "NORMAL"
 
 
-def _escanear_componente(nombre: str) -> dict:
+def _escanear_componente(nombre: str, paquete: str = "modules") -> dict:
     """Ejecuta el diagnóstico de un componente, tolerando módulo faltante.
 
     Intenta importar backend/modules/<nombre>.py y llamar a diagnosticar().
@@ -169,7 +192,7 @@ def _escanear_componente(nombre: str) -> dict:
     como "error" en vez de tumbar el resto del escaneo.
     """
     try:
-        modulo = importlib.import_module(f"modules.{nombre}")
+        modulo = importlib.import_module(f"{paquete}.{nombre}")
     except ImportError:
         return _con_guia(nombre, _resultado_error(nombre, "Módulo no implementado"))
 

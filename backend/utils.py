@@ -103,7 +103,7 @@ def _como_lista(valor) -> list:
     return [valor] if isinstance(valor, str) and valor else []
 
 
-def generar_reporte_texto(resultado, veredicto):
+def generar_reporte_texto(resultado, veredicto, analisis=None):
     """Arma el reporte de texto plano de un escaneo, para descargar desde
     el dashboard (/api/reporte). Recibe el veredicto ya calculado en vez
     de importar scanner.py acá: scanner.py ya depende de utils.py, y un
@@ -174,6 +174,8 @@ def generar_reporte_texto(resultado, veredicto):
                     lineas.append(f"Quién lo hace: {QUIEN_TEXTO.get(rec['quien'], rec['quien'])}")
                 lineas.append("")
 
+    lineas.extend(_seccion_analisis_texto(analisis))
+
     sin_datos = [nombre for nombre, info in componentes.items() if info.get("estado") == "no_determinado"]
     lineas.append("--- LIMITACIONES DE ESTE REPORTE ---")
     if sin_datos:
@@ -181,6 +183,23 @@ def generar_reporte_texto(resultado, veredicto):
     lineas.extend(_LIMITACIONES_CONOCIDAS)
     lineas.append("")
     return "\n".join(lineas)
+
+
+def _seccion_analisis_texto(analisis):
+    """Líneas del reporte de texto para el análisis de Windows (vacío si no hay)."""
+    items = analisis.get("analisis") if isinstance(analisis, dict) else None
+    if not isinstance(items, dict) or not items:
+        return []
+    lineas = ["--- ANÁLISIS DE WINDOWS ---"]
+    for nombre, info in items.items():
+        if not isinstance(info, dict):
+            continue
+        lineas.append(f"[{info.get('estado', '?')}] {nombre}: {info.get('mensaje', '')}")
+        guia = info.get("guia") if isinstance(info.get("guia"), dict) else {}
+        if info.get("estado") != "normal":
+            lineas.extend(f"- {paso}" for paso in _como_lista(guia.get("que_hacer")) if isinstance(paso, str))
+    lineas.append("")
+    return lineas
 
 
 def puerto_libre(preferido=5000):

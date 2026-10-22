@@ -686,7 +686,8 @@ def test_guias_endpoint():
         for c in scanner.COMPONENTES + scanner.ANALISIS:
             assert set(datos[c]) == scanner.ESTADOS_VALIDOS, (c, set(datos[c]))
         assert set(datos["_veredictos"]) == set(explicador.FRASES_VEREDICTO), datos["_veredictos"]
-        assert set(datos) == set(scanner.COMPONENTES) | set(scanner.ANALISIS) | {"_veredictos"}, set(datos)
+        assert set(datos) == set(scanner.COMPONENTES) | set(scanner.ANALISIS) | {"_veredictos", "_nombres_analisis"}, set(datos)
+        assert set(datos["_nombres_analisis"]) == set(scanner.ANALISIS), datos["_nombres_analisis"]
     _en_hilo(_peticion)
 
 
@@ -2027,6 +2028,77 @@ def test_analisis_rendimiento():
     assert dt <= 8.0, f"rendimiento tardó {dt:.1f} s"
 
 
+def test_analisis_orquestador_api_informe():
+    """ejecutar_analisis + /api/analisis + secciones del informe y del reporte de texto."""
+    import informe
+    import types
+    importlib_orig = scanner.importlib
+    base = {"componente": "x", "estado": "normal", "mensaje": "ok", "datos": {}, "recomendacion": "r"}
+
+    def falso(nombre):
+        if nombre.endswith("espacio"):
+            return types.SimpleNamespace(diagnosticar=lambda: {**base, "componente": "espacio", "estado": "advertencia",
+                "datos": {"carpetas": [{"nombre": "<b>Temp</b> & Co", "tamano_gb": 1.5}]}})
+        if nombre.endswith("inicio"):
+            def roto():
+                raise RuntimeError("x")
+            return types.SimpleNamespace(diagnosticar=roto)
+        if nombre.endswith("programas"):
+            return types.SimpleNamespace(diagnosticar=lambda: {"estado": "normal"})  # contrato incumplido
+        return types.SimpleNamespace(diagnosticar=lambda: {**base, "componente": "rendimiento", "datos": {
+            "causas": [{"id": "ram", "titulo": "RAM <i>llena</i>", "evidencia": ["Uso: 93 %"]}],
+            "procesos_cpu": [{"nombre": "<script>alert(1)</script>.exe", "cpu": 62.0, "ram_mb": 10}]}})
+    try:
+        scanner.importlib = types.SimpleNamespace(import_module=falso)
+        r = scanner.ejecutar_analisis()
+        assert list(r["analisis"]) == scanner.ANALISIS and "total" in r["tiempos"], r
+        assert all("guia" in v for v in r["analisis"].values()), r
+        assert r["analisis"]["inicio"]["estado"] == "no_determinado" and r["analisis"]["programas"]["estado"] == "no_determinado"
+        assert r["resumen"]["total_componentes"] == 4 and r["resumen"]["no_determinado"] == 2 and r["resumen"]["advertencia"] == 1, r["resumen"]
+
+        # informe: escapado, topes de filas y ausencia sin análisis
+        h = informe.generar_informe_html(_escaneo_falso(), "CRITICO", r)
+        assert "Análisis de Windows" in h and "&lt;script&gt;alert(1)&lt;/script&gt;.exe" in h, h
+        assert "<script>alert(1)</script>" not in h and "&lt;b&gt;Temp&lt;/b&gt; &amp; Co" in h
+        assert h.index("Análisis de Windows") < h.index("Preguntas para tu técnico")
+        grande = {"analisis": {"inicio": {**base, "estado": "advertencia", "datos": {
+            "entradas": [{"nombre": f"p{i}", "habilitado": True} for i in range(80)]}}}}
+        h2 = informe.generar_informe_html(_escaneo_falso(), "CRITICO", grande)
+        assert "y 50 más" in h2 and h2.count("<li>p") == 30, h2.count("<li>p")
+        assert "Análisis de Windows" not in informe.generar_informe_html(_escaneo_falso(), "CRITICO", None)
+        assert "Análisis de Windows" not in informe.generar_informe_html(_escaneo_falso(), "CRITICO", {"analisis": "x"})
+
+        # reporte de texto
+        txt = utils.generar_reporte_texto(_escaneo_falso(), "CRITICO", r)
+        assert "--- ANÁLISIS DE WINDOWS ---" in txt and "[advertencia] espacio" in txt, txt
+        assert "ANÁLISIS DE WINDOWS" not in utils.generar_reporte_texto(_escaneo_falso(), "CRITICO")
+
+        # endpoint: 200 con análisis; 500 si no serializa sin pisar el último guardado; el informe lo incluye
+        def _peticion():
+            app._ultimo_analisis = None
+            c = app.app.test_client().get("/api/analisis")
+            assert c.status_code == 200 and set(c.get_json()["analisis"]) == set(scanner.ANALISIS), c.status_code
+            previo = app._ultimo_analisis
+            assert previo is not None
+            original = scanner.ejecutar_analisis
+            scanner.ejecutar_analisis = lambda: {"analisis": {"x": object()}}
+            try:
+                c = app.app.test_client().get("/api/analisis")
+                assert c.status_code == 500 and app._ultimo_analisis is previo
+            finally:
+                scanner.ejecutar_analisis = original
+            app._ultimo_escaneo = _escaneo_falso()
+            h = app.app.test_client().get("/api/informe").get_data(as_text=True)
+            assert "Análisis de Windows" in h
+        try:
+            _en_hilo(_peticion)
+        finally:
+            app._ultimo_analisis = None
+            app._ultimo_escaneo = None
+    finally:
+        scanner.importlib = importlib_orig
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
@@ -2069,4 +2141,5 @@ if __name__ == "__main__":
     test_analisis_inicio()
     test_analisis_programas()
     test_analisis_rendimiento()
+    test_analisis_orquestador_api_informe()
     print("test_scanner.py: todos los casos OK")

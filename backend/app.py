@@ -41,6 +41,8 @@ CONFIG_DIR = os.path.join(BASE_DIR, "..", "config")
 # decisión "Persistencia: stateless" en docs/DECISIONES.md). Lo usa
 # /api/reporte para no tener que re-escanear solo para descargar el texto.
 _ultimo_escaneo = None
+# Último resultado de /api/analisis (análisis de Windows), también solo en memoria.
+_ultimo_analisis = None
 
 app = Flask(
     __name__,
@@ -115,11 +117,28 @@ def api_scan():
         }), 500
 
 
+@app.route("/api/analisis")
+def api_analisis():
+    """Análisis del Windows instalado (espacio, inicio, programas, rendimiento)."""
+    global _ultimo_analisis
+    try:
+        resultado = scanner.ejecutar_analisis()
+        respuesta = jsonify(resultado)  # serializar ANTES de guardar, como en /api/scan
+        _ultimo_analisis = resultado
+        return respuesta
+    except Exception as error:
+        return jsonify({
+            "estado": "error",
+            "mensaje": f"No se pudo completar el análisis: {error}",
+        }), 500
+
+
 @app.route("/api/guias")
 def api_guias():
     """Tabla completa de guías en lenguaje simple (componente -> estado -> guía)
     más "_veredictos" (frase corta por veredicto global) para el frontend."""
-    return jsonify({**explicador.GUIAS, "_veredictos": explicador.FRASES_VEREDICTO})
+    return jsonify({**explicador.GUIAS, "_veredictos": explicador.FRASES_VEREDICTO,
+                    "_nombres_analisis": explicador.NOMBRES_ANALISIS})
 
 
 @app.route("/api/reporte")
@@ -128,7 +147,7 @@ def api_reporte():
     nada en disco: se arma al vuelo a partir de _ultimo_escaneo en memoria."""
     try:
         veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
-        texto = utils.generar_reporte_texto(_ultimo_escaneo, veredicto)
+        texto = utils.generar_reporte_texto(_ultimo_escaneo, veredicto, _ultimo_analisis)
         return Response(
             texto,
             mimetype="text/plain",
@@ -147,7 +166,7 @@ def api_informe():
     try:
         veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
         return Response(
-            informe.generar_informe_html(_ultimo_escaneo, veredicto),
+            informe.generar_informe_html(_ultimo_escaneo, veredicto, _ultimo_analisis),
             mimetype="text/html",
         )
     except Exception as error:
