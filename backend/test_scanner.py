@@ -2132,6 +2132,76 @@ def test_analisis_f4b():
         assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
 
 
+def test_respaldo_y_drivers():
+    import os
+    import tempfile
+    import time
+    import mantenimiento as m
+    import respaldo
+    originales = (respaldo._ruta_conocida, respaldo.destinos, utils.es_administrador)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["DSPC_REGISTRO"] = os.path.join(tmp, "reg", "r.db")
+        try:
+            docs, destino = os.path.join(tmp, "Docs"), os.path.join(tmp, "Disco2")
+            os.makedirs(os.path.join(docs, "sub"))
+            os.makedirs(destino)
+            for ruta, datos in ((os.path.join(docs, "a.txt"), b"hola" * 100), (os.path.join(docs, "sub", "b.txt"), b"mundo")):
+                with open(ruta, "wb") as f:
+                    f.write(datos)
+            libre = 10 * 1024 ** 3
+            respaldo._ruta_conocida = lambda guid: docs if guid == respaldo._CARPETAS["documentos"][1] else None
+            respaldo.destinos = lambda: [{"unidad": destino, "libre_gb": 10.0, "libre_bytes": libre, "externo": True}]
+            p = respaldo.previsualizar()
+            assert [c["id"] for c in p["carpetas"]] == ["documentos"] and p["carpetas"][0]["archivos"] == 2 and p["carpetas"][0]["bytes"] == 405, p
+            assert p["destinos"][0]["unidad"] == destino and "correos" in p["aviso"]
+            # validaciones: carpetas fuera de la lista, destino no listado, sin espacio
+            for malo in (None, [], ["../../Windows"], ["documentos", "x"], "documentos"):
+                assert respaldo.copiar(malo, destino)["estado"] == "error", malo
+            assert respaldo.copiar(["documentos"], "C:\\")["estado"] == "error" and respaldo.copiar(["documentos"], None)["estado"] == "error"
+            assert respaldo.copiar(["escritorio"], destino)["estado"] == "error"  # no existe en este equipo simulado
+            respaldo.destinos = lambda: [{"unidad": destino, "libre_gb": 0.0, "libre_bytes": 10, "externo": True}]
+            assert "No cabe" in respaldo.copiar(["documentos"], destino)["mensaje"]
+            # copia real con robocopy: copia, no mueve ni borra el origen
+            respaldo.destinos = lambda: [{"unidad": destino, "libre_gb": 10.0, "libre_bytes": libre, "externo": True}]
+            r = respaldo.copiar(["documentos"], destino.upper())
+            assert r["estado"] == "trabajo" and r["destino"].startswith(destino), r
+            for _ in range(100):
+                if m.estado_trabajo(r["trabajo"])["estado"] != "corriendo":
+                    break
+                time.sleep(0.1)
+            t = m.estado_trabajo(r["trabajo"])
+            assert t["estado"] == "terminado", t
+            copiado = os.path.join(r["destino"], "Documentos", "sub", "b.txt")
+            assert os.path.exists(copiado) and os.path.exists(os.path.join(docs, "sub", "b.txt")), "debía copiar y conservar el origen"
+            # drivers desde el USB: sin carpeta no hace nada; con .inf lanza pnputil por la tarea larga
+            carpeta_drivers = os.path.join(tmp, "drivers")
+            os.environ["DSPC_DRIVERS"] = carpeta_drivers
+            utils.es_administrador = lambda: True
+            assert m.previsualizar("controladores_usb", {})["estado"] == "error" and m.ejecutar("controladores_usb", {})["estado"] == "error"
+            os.makedirs(os.path.join(carpeta_drivers, "audio"))
+            with open(os.path.join(carpeta_drivers, "audio", "x.inf"), "w") as f:
+                f.write("[Version]")
+            assert "1 controlador" in m.previsualizar("controladores_usb", {})["mensaje"]
+            lanzados = []
+            original = m._iniciar_trabajo
+            m._iniciar_trabajo = lambda accion, cmds, ok=(0, 3010): (lanzados.append((accion, cmds)), {"estado": "trabajo", "mensaje": "x", "detalle": [], "trabajo": "t"})[1]
+            try:
+                assert m.ejecutar("controladores_usb", {})["estado"] == "trabajo"
+            finally:
+                m._iniciar_trabajo = original
+            assert lanzados[0][1] == [["pnputil", "/add-driver", os.path.join(os.path.abspath(carpeta_drivers), "*.inf"), "/subdirs", "/install"]], lanzados
+            def _peticion():
+                cl = app.app.test_client()
+                assert cl.get("/api/respaldo").get_json()["carpetas"]
+                assert cl.post("/api/respaldo/copiar").status_code == 400
+                assert cl.post("/api/respaldo/copiar", json={"carpetas": ["../x"], "unidad": destino}).get_json()["estado"] == "error"
+            _en_hilo(_peticion)
+        finally:
+            respaldo._ruta_conocida, respaldo.destinos, utils.es_administrador = originales
+            os.environ.pop("DSPC_REGISTRO", None)
+            os.environ.pop("DSPC_DRIVERS", None)
+
+
 def test_evidencia():
     import datetime
     import os
@@ -2492,6 +2562,7 @@ def test_registro_y_postinstalacion():
 
 
 if __name__ == "__main__":
+    test_respaldo_y_drivers()
     test_evidencia()
     test_instalador()
     test_mantenimiento_y_nota()

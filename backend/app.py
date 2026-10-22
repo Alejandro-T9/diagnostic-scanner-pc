@@ -35,6 +35,7 @@ import instalador
 import mantenimiento
 import postinstalacion
 import registro
+import respaldo
 import scanner
 import utils
 
@@ -239,6 +240,21 @@ def api_registro_nota():
 def _cuerpo_json():
     datos = request.get_json(silent=True)
     return datos if isinstance(datos, dict) else {}
+
+
+@app.route("/api/respaldo")
+def api_respaldo():
+    """Carpetas del usuario con su tamaño y unidades de destino posibles (solo lectura)."""
+    try:
+        return jsonify(respaldo.previsualizar())
+    except Exception as error:
+        return _error_json(f"No se pudo preparar el respaldo: {error}", 500)
+
+
+@app.route("/api/respaldo/copiar", methods=["POST"])
+def api_respaldo_copiar():
+    datos = _cuerpo_json()
+    return jsonify(respaldo.copiar(datos.get("carpetas"), datos.get("unidad")))
 
 
 @app.route("/api/instaladores")

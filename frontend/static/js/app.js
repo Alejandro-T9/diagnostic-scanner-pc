@@ -631,6 +631,71 @@ function sondearInstalacion(id, tid) {
 dibujarPanelInstaladores();
 cargarInstaladores();
 
+
+// --- Respaldo antes de formatear (F7c) ---
+const resp = { datos: null, ocupado: null, resultado: null, trabajo: null, seleccion: new Set(), unidad: null };
+let sondeoRespaldo = null;
+
+function dibujarPanelRespaldo() {
+    dibujarRespaldo(resp.datos, resp, document.getElementById("respaldo-vista"), { alCalcular: calcularRespaldo, alCopiar: copiarRespaldo, alCambiar: dibujarPanelRespaldo });
+}
+
+async function calcularRespaldo() {
+    resp.ocupado = "calculando";
+    dibujarPanelRespaldo();
+    try {
+        const respuesta = await fetch("/api/respaldo");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        resp.datos = await respuesta.json();
+        resp.seleccion = new Set(resp.datos.carpetas.filter((c) => c.id !== "descargas").map((c) => c.id)); // Descargas suele ser basura: no va marcada
+    } catch (error) {
+        resp.resultado = { estado: "error", mensaje: "No se pudo calcular el respaldo." };
+    }
+    resp.ocupado = null;
+    dibujarPanelRespaldo();
+}
+
+async function copiarRespaldo(carpetas, unidad) {
+    resp.ocupado = "copiando";
+    resp.resultado = null;
+    resp.trabajo = null;
+    dibujarPanelRespaldo();
+    try {
+        const r = await _postJson("/api/respaldo/copiar", { carpetas, unidad });
+        resp.resultado = r;
+        anunciar(r.mensaje);
+        if (r.estado === "trabajo") {
+            sondearRespaldo(r.trabajo);
+            return;
+        }
+    } catch (error) {
+        resp.resultado = { estado: "error", mensaje: "No se pudo iniciar la copia." };
+    }
+    resp.ocupado = null;
+    dibujarPanelRespaldo();
+}
+
+function sondearRespaldo(tid) {
+    clearInterval(sondeoRespaldo);
+    sondeoRespaldo = setInterval(async () => {
+        try {
+            const respuesta = await fetch(`/api/mantenimiento/trabajo/${encodeURIComponent(tid)}`);
+            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+            resp.trabajo = await respuesta.json();
+        } catch (error) {
+            resp.trabajo = { estado: "error", salida: [] };
+        }
+        if (resp.trabajo.estado !== "corriendo") {
+            clearInterval(sondeoRespaldo);
+            resp.ocupado = null;
+            anunciar("El respaldo terminó.");
+        }
+        dibujarPanelRespaldo();
+    }, 2000);
+}
+
+dibujarPanelRespaldo();
+
 desdeHash();
 
 // Frases de veredicto del Resumen; al llegar se repinta (si falla, queda el texto de siempre).

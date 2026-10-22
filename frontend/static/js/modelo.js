@@ -256,7 +256,8 @@ function detalleAnalisis(nombre, info) {
     else if (nombre === "estabilidad") grupos = [["Lo que Windows anotó (últimos 30 días)", [
         ["pantallazos_azules", "Pantallazos azules"], ["apagados_inesperados", "Apagados inesperados"], ["errores_disco", "Errores de disco"],
     ].filter(([k]) => Number.isFinite(datos[k])).map(([k, t]) => `${t}: ${datos[k]}`)]];
-    else if (nombre === "controladores") grupos = [["Dispositivos con problema", nombres(lista("dispositivos"))]];
+    else if (nombre === "controladores") grupos = [["Dispositivos con problema (nombre — ID de hardware)", lista("dispositivos").filter((d) => _obj(d) && typeof d.nombre === "string")
+        .map((d) => d.nombre + (typeof d.hardware_id === "string" ? ` — ${d.hardware_id}` : ""))]];
     else if (nombre === "seguridad") grupos = [
         ["Programas que corren desde Temp o Descargas", nombres(lista("procesos_en_carpetas_temporales"))],
         ["Líneas extra en el archivo hosts", lista("hosts_extra").filter((h) => typeof h === "string")],

@@ -60,9 +60,19 @@ ACCIONES = {
             "descripcion": "Abre la herramienta de eliminación de software malintencionado de Microsoft. No reemplaza a un antivirus."},
     "quitar_parche": {"titulo": "Desinstalar una actualización con problemas", "admin": True, "riesgo": "medio", "tarda": "unos minutos",
                       "descripcion": "Quita una actualización de Windows concreta (por ejemplo, KB5120998 si falla el mouse). Solo si un técnico lo indica."},
+    "controladores_usb": {"titulo": "Instalar controladores desde la carpeta drivers del USB", "admin": True, "riesgo": "medio", "tarda": "de 1 a 10 minutos",
+                          "descripcion": "Agrega e instala con pnputil los controladores (.inf) que pusieron en la carpeta drivers del USB. Windows solo acepta controladores firmados."},
 }
 
 _trabajos = {}
+
+
+def _carpeta_drivers() -> str:
+    return os.path.abspath(os.environ.get("DSPC_DRIVERS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "drivers"))
+
+
+def _contar_inf(carpeta: str) -> int:
+    return sum(1 for _, _, archivos in os.walk(carpeta) for a in archivos if a.lower().endswith(".inf"))
 _cerrojo = threading.Lock()
 _antes = None
 
@@ -239,7 +249,7 @@ def _es_portatil() -> bool:
 
 
 # --------------------------------------------------------------------------- trabajos largos
-def _hilo_trabajo(tid: str, comandos: list) -> None:
+def _hilo_trabajo(tid: str, comandos: list, ok: tuple = (0, 3010)) -> None:
     t = _trabajos[tid]
     try:
         for cmd in comandos:
@@ -247,7 +257,7 @@ def _hilo_trabajo(tid: str, comandos: list) -> None:
             codigo, salida = _correr(cmd, 3 * 3600)
             t["salida"] = (t["salida"] + [l.strip() for l in salida.splitlines() if l.strip()])[-40:]
             t["codigos"].append(codigo)
-        t["estado"] = "terminado" if all(c in (0, 3010) for c in t["codigos"]) else "con_avisos"
+        t["estado"] = "terminado" if all(c in ok for c in t["codigos"]) else "con_avisos"
     except Exception as error:
         t["estado"] = "error"
         t["salida"].append(f"No se pudo ejecutar: {error}")
@@ -255,14 +265,14 @@ def _hilo_trabajo(tid: str, comandos: list) -> None:
     _log(t["accion"], t["estado"], f"códigos {t['codigos']}", t["salida"][-6:])
 
 
-def _iniciar_trabajo(accion: str, comandos: list) -> dict:
+def _iniciar_trabajo(accion: str, comandos: list, ok: tuple = (0, 3010)) -> dict:
     with _cerrojo:
         if any(t["estado"] == "corriendo" for t in _trabajos.values()):
             return _resultado("error", "Ya hay una tarea larga en curso. Espera a que termine.")
         tid = uuid.uuid4().hex[:10]
         _trabajos[tid] = {"id": tid, "accion": accion, "estado": "corriendo", "salida": [], "codigos": [], "actual": "",
                           "inicio": datetime.datetime.now().isoformat(timespec="seconds"), "fin": None}
-    threading.Thread(target=_hilo_trabajo, args=(tid, comandos), daemon=True).start()
+    threading.Thread(target=_hilo_trabajo, args=(tid, comandos, ok), daemon=True).start()
     return _resultado("trabajo", "La tarea empezó. Puede tardar; no cierres la aplicación.", trabajo=tid)
 
 
@@ -306,6 +316,12 @@ def previsualizar(accion: str, params: dict) -> dict:
             if not re.fullmatch(r"\d{6,8}", kb):
                 return _resultado("error", "Escribe el número de la actualización, por ejemplo KB5120998.")
             return _resultado("ok", f"Se desinstalaría KB{kb}. Windows puede pedir reiniciar.", [f"KB{kb}"])
+        if accion == "controladores_usb":
+            carpeta = _carpeta_drivers()
+            n = _contar_inf(carpeta) if os.path.isdir(carpeta) else 0
+            if not n:
+                return _resultado("error", f"No hay controladores (.inf) en {carpeta}. Crea esa carpeta y copia ahí los controladores descomprimidos del fabricante.")
+            return _resultado("ok", f"Se instalarían {n} controlador(es) de {carpeta}.", [carpeta])
         if accion in ACCIONES:
             return _resultado("ok", ACCIONES[accion]["descripcion"], [])
         return _resultado("error", "Esa acción no existe.")
@@ -380,6 +396,12 @@ def _ejecutar(accion: str, params: dict) -> dict:
                           [], anterior=anterior)
     if accion in _COMANDOS_LARGOS:
         return _iniciar_trabajo(accion, _COMANDOS_LARGOS[accion])
+    if accion == "controladores_usb":
+        carpeta = _carpeta_drivers()
+        if not os.path.isdir(carpeta) or not _contar_inf(carpeta):
+            return _resultado("error", "No hay controladores (.inf) en la carpeta drivers del USB.")
+        # pnputil: 0 = todo bien, 3010 = reinicio pendiente; un controlador sin firma o ya instalado da aviso, no error grave
+        return _iniciar_trabajo(accion, [["pnputil", "/add-driver", os.path.join(carpeta, "*.inf"), "/subdirs", "/install"]])
     if accion in ("memoria", "mrt"):
         exe = shutil.which("mdsched.exe" if accion == "memoria" else "mrt.exe")
         if not exe:

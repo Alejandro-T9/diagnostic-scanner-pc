@@ -830,3 +830,66 @@ function dibujarInstaladores(datos, est, contenedor, { alInstalar, alHuellas } =
     }
     contenedor.replaceChildren(bloque);
 }
+
+
+// Respaldo antes de formatear (F7c): copia (nunca mueve) las carpetas del usuario a otra unidad. datos = /api/respaldo o null.
+// est = {ocupado, resultado, trabajo, seleccion:Set, unidad}.
+function dibujarRespaldo(datos, est, contenedor, { alCalcular, alCopiar, alCambiar } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Respaldo antes de formatear"));
+    bloque.append(crear("p", "recomendaciones-nota", "Copia los archivos del dueño a otra unidad. Solo copia: no mueve ni borra nada del equipo."));
+    const calcular = crear("button", "boton-mas", est.ocupado === "calculando" ? "Calculando…" : (datos ? "Calcular de nuevo" : "Calcular tamaños"));
+    calcular.type = "button";
+    calcular.disabled = !!est.ocupado;
+    calcular.addEventListener("click", () => alCalcular && alCalcular());
+    bloque.append(calcular);
+    if (_esDict(datos) && Array.isArray(datos.carpetas)) {
+        bloque.append(crear("p", "recomendaciones-nota", datos.aviso));
+        const gb = (b) => (b / 1024 ** 3).toFixed(2);
+        const ul = crear("ul", "lista-marcas");
+        datos.carpetas.filter(_esDict).forEach((c) => {
+            const li = crear("li");
+            const et = crear("label");
+            const marca = crear("input");
+            marca.type = "checkbox";
+            marca.checked = est.seleccion.has(c.id);
+            marca.addEventListener("change", () => { if (marca.checked) est.seleccion.add(c.id); else est.seleccion.delete(c.id); if (alCambiar) alCambiar(); });
+            et.append(marca, ` ${c.nombre}: ${gb(c.bytes)} GB (${c.archivos} archivos${c.completo ? "" : ", cálculo parcial"})`);
+            li.append(et);
+            ul.append(li);
+        });
+        bloque.append(ul);
+        const total = datos.carpetas.filter((c) => _esDict(c) && est.seleccion.has(c.id)).reduce((s, c) => s + c.bytes, 0);
+        const destinos = Array.isArray(datos.destinos) ? datos.destinos.filter(_esDict) : [];
+        if (!destinos.length) {
+            bloque.append(crear("p", "aviso-mant", "No hay otra unidad donde guardar el respaldo. Conecta un disco o memoria externa y vuelve a calcular."));
+        } else {
+            const campo = crear("label", "campo-registro", "Guardar en la unidad");
+            const sel = crear("select");
+            destinos.forEach((d) => {
+                const op = crear("option", "", `${d.unidad} — ${d.libre_gb} GB libres${d.externo ? " (externa)" : ""}`);
+                op.value = d.unidad;
+                sel.append(op);
+            });
+            sel.value = est.unidad && destinos.some((d) => d.unidad === est.unidad) ? est.unidad : destinos[0].unidad;
+            est.unidad = sel.value;
+            sel.addEventListener("change", () => { est.unidad = sel.value; });
+            campo.append(sel);
+            bloque.append(campo);
+            const boton = crear("button", "boton-primario", est.ocupado === "copiando" ? "Copiando…" : `Copiar (${gb(total)} GB)`);
+            boton.type = "button";
+            boton.disabled = !!est.ocupado || est.seleccion.size === 0;
+            boton.addEventListener("click", () => {
+                if (window.confirm(`Se copiarán ${gb(total)} GB a ${sel.value}. No cierres la aplicación ni saques la unidad. ¿Continuar?`) && alCopiar) alCopiar([...est.seleccion], sel.value);
+            });
+            bloque.append(boton);
+        }
+    }
+    if (_esDict(est.resultado)) bloque.append(crear("p", est.resultado.estado === "error" ? "aviso-mant" : "tarjeta-comp-mensaje", est.resultado.mensaje));
+    if (_esDict(est.trabajo)) {
+        const texto = { corriendo: "Copiando… no cierres la aplicación.", terminado: "Respaldo terminado.", con_avisos: "Terminó con avisos: algún archivo no se pudo copiar. Revisa el resultado.", error: "No se pudo copiar." }[est.trabajo.estado] || "";
+        bloque.append(crear("p", est.trabajo.estado === "terminado" ? "tarjeta-comp-mensaje" : "aviso-mant", texto));
+        if (Array.isArray(est.trabajo.salida) && est.trabajo.salida.length) bloque.append(crear("pre", "salida-mant", est.trabajo.salida.slice(-12).join("\n")));
+    }
+    contenedor.replaceChildren(bloque);
+}

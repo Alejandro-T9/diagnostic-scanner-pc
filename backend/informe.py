@@ -212,8 +212,9 @@ def _detalle_analisis(nombre, comp):
                                                  ("errores_disco", "Errores de disco")) if isinstance(datos.get(k), int)]
         return "<p><strong>Lo que Windows anotó (últimos 30 días):</strong></p>" + _lista_corta(filas) if filas else ""
     if nombre == "controladores":
-        nombres = _nombres(lista("dispositivos"), "nombre")
-        return "<p><strong>Dispositivos con problema:</strong></p>" + _lista_corta(nombres) if nombres else ""
+        filas = [escape(d["nombre"]) + (f" — {escape(d['hardware_id'])}" if isinstance(d.get("hardware_id"), str) else "")
+                 for d in lista("dispositivos") if isinstance(d, dict) and isinstance(d.get("nombre"), str)]
+        return "<p><strong>Dispositivos con problema (nombre — ID de hardware):</strong></p>" + _lista_corta(filas) if filas else ""
     if nombre == "seguridad":
         hosts = [escape(h) for h in lista("hosts_extra") if isinstance(h, str)]
         return (("<p><strong>Programas que corren desde Temp o Descargas:</strong></p>" + _lista_corta(_nombres(lista("procesos_en_carpetas_temporales"), "nombre"))

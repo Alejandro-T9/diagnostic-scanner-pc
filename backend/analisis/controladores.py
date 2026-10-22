@@ -2,7 +2,7 @@
 backend/analisis/controladores.py — Dispositivos con driver faltante o con error.
 
 SOLO LECTURA, sin administrador: consulta WMI (Win32_PnPEntity) por dispositivos cuyo código de
-error es distinto de 0. Se ignoran los deshabilitados a propósito (código 22). No revisa versiones
+error es distinto de 0. Se ignoran los deshabilitados a propósito (código 22). Incluye el ID de hardware para buscar el controlador. No revisa versiones
 de drivers ni si hay uno más nuevo.
 """
 
@@ -20,8 +20,9 @@ _RECOMENDACIONES = {
 
 def _leer_dispositivos() -> list:
     c = wmi.WMI()
-    return [{"nombre": d.Name or "Dispositivo sin nombre", "codigo": int(d.ConfigManagerErrorCode)}
-            for d in c.query("SELECT Name, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0")
+    return [{"nombre": d.Name or "Dispositivo sin nombre", "codigo": int(d.ConfigManagerErrorCode),
+             "hardware_id": str(d.HardwareID[0]) if d.HardwareID else None}
+            for d in c.query("SELECT Name, ConfigManagerErrorCode, HardwareID FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0")
             if int(d.ConfigManagerErrorCode) != 22]  # 22 = deshabilitado por el usuario
 
 
