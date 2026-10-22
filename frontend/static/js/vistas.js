@@ -1,14 +1,14 @@
 // frontend/static/js/vistas.js — Vistas: cada función dibuja el DOM de una pestaña a partir de datos ya calculados
 // por modelo.js. Solo crear()/textContent/crearIcono/crearChipEstado: nada del escaneo entra como HTML.
-// Depende de estado.js, iconos.js, dom.js y modelo.js (cargados antes); al hacer clic usa activarPestana y
-// abrirComponente de app.js, que se resuelven en ese momento (app.js se carga después).
+// Depende de estado.js, iconos.js, dom.js y modelo.js (cargados antes); al hacer clic usa activarPestana,
+// seleccionarComponente y escanearSistema de app.js, que se resuelven en ese momento (app.js se carga después).
 
-// Estado vacío (sin escaneo todavía). El botón es el mismo "Revisar mi PC" de la barra; marcarOcupado lo gestiona por id.
+// Estado vacío (sin escaneo todavía), el mismo en Resumen y en Componentes. El botón es el mismo "Revisar mi PC"
+// de la barra; marcarOcupado lo gestiona por su clase.
 function _resumenVacio() {
     const vacio = crear("div", "simple-vacio");
-    const boton = crear("button", "boton-primario boton-grande", "Revisar mi PC");
+    const boton = crear("button", "boton-primario boton-grande boton-revisar-vacio", "Revisar mi PC");
     boton.type = "button";
-    boton.id = "boton-revisar-vacio";
     boton.addEventListener("click", () => escanearSistema());
     vacio.append(
         crear("p", "simple-vacio-titulo", "Todavía no hemos revisado tu PC."),
@@ -61,11 +61,11 @@ function _resumenEquipo(resultado) {
 // Va a la pestaña del destino ("componentes:<id>" o "recomendaciones") y deja el foco dentro de ella.
 function _irA(destino, componentes) {
     const [pestana, id] = destino.split(/:(.*)/s);
-    if (id && componentes[id] && typeof componentes[id] === "object") abrirComponente(id, componentes[id]); // selecciona el detalle y activa Componentes
+    window.scrollTo(0, 0); // antes de cambiar: la tarjeta o fila elegida se desplaza a la vista después
+    if (seleccionValida(id, componentes)) seleccionarComponente(id); // activa Componentes y resalta ese componente
     else activarPestana(pestana, true);
     const panel = document.getElementById(`panel-${pestana}`);
     if (panel && !panel.hidden) panel.focus({ preventScroll: true });
-    window.scrollTo(0, 0);
 }
 
 function _resumenLoPrimero(resultado) {
@@ -131,4 +131,246 @@ function dibujarResumen(resultado, contenedor) {
     columnas.append(...[_resumenEquipo(resultado), _resumenLoPrimero(resultado)].filter(Boolean));
     raiz.append(_resumenHero(resultado), columnas, _resumenFichas(comps));
     contenedor.replaceChildren(raiz);
+}
+
+// --- Componentes: tarjetas con guía (modo simple) o tabla técnica con filas expandibles (modo técnico) ---
+
+const _esDict = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+
+function _etiquetaCampo(clave) {
+    if (Object.hasOwn(ETIQUETAS_CAMPOS, clave)) return ETIQUETAS_CAMPOS[clave];
+    return clave.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
+function _formatearValor(clave, valor) {
+    if (valor === null || valor === undefined) return "—";
+    if (typeof valor === "boolean") return valor ? "Sí" : "No";
+    if (clave.endsWith("_mhz")) return `${valor} MHz`;
+    if (clave.endsWith("_gb")) return `${valor} GB`;
+    if (clave.endsWith("_c")) return `${valor}°C`;
+    if (clave.endsWith("_mbps")) return `${valor} Mbps`;
+    if (clave === "voltios") return `${valor} V`;
+    if (clave === "rpm") return `${valor} RPM`;
+    if (clave.includes("porcentaje") || clave.startsWith("salud_")) return `${valor}%`;
+    if (clave === "horas_encendido") return `${valor} h`;
+    return String(valor);
+}
+
+// Arma el detalle "lo más interno posible" a partir del dict "datos" tal
+// cual lo devuelve cada módulo, sin lógica particular por componente:
+// - un array (ej. datos.discos_internos, datos.interfaces) se desglosa
+//   en un subitem por elemento;
+// - un objeto anidado (ej. datos.gpu) se desglosa recursivamente con la
+//   misma función, en vez de un caso especial por llave — así un módulo
+//   futuro puede anidar lo que necesite (ej. bateria.cargador) sin tocar
+//   este renderer de nuevo;
+// - cualquier otra llave se muestra como fila etiqueta/valor.
+// Devuelve un arreglo de nodos (todo por textContent: nada del escaneo entra como HTML).
+function _filaDato(clave, valor) {
+    const fila = crear("div", "detalle-fila");
+    fila.append(crear("span", "", _etiquetaCampo(clave)), crear("span", "dato-tecnico", _formatearValor(clave, valor)));
+    return fila;
+}
+
+function _renderizarCuerpoDatos(datos) {
+    return Object.entries(datos).map(([clave, valor]) => {
+        const esArray = Array.isArray(valor);
+        if (!esArray && (valor === null || typeof valor !== "object")) return _filaDato(clave, valor);
+        const grupo = crear("div", "detalle-grupo");
+        grupo.append(crear("h4", "", _etiquetaCampo(clave)));
+        if (esArray) {
+            valor.forEach((item) => {
+                if (!_esDict(item)) { grupo.append(_filaDato(clave, item)); return; } // elemento suelto (no objeto): una fila, sin romper el dibujo
+                const sub = crear("div", "detalle-subitem");
+                sub.append(...Object.entries(item).map(([k, v]) => _filaDato(k, v)));
+                grupo.append(sub);
+            });
+        } else {
+            grupo.append(..._renderizarCuerpoDatos(valor));
+        }
+        return grupo;
+    });
+}
+
+function pasosGuia(guia) {
+    return Array.isArray(guia.que_hacer) ? guia.que_hacer : [];
+}
+
+// Guía en el detalle técnico. Sin guía no se dibuja nada.
+function bloqueGuia(guia) {
+    if (!_esDict(guia)) return null;
+    const rotulado = (rotulo, texto) => {
+        const p = crear("p");
+        p.append(crear("strong", "", rotulo), ` ${texto}`);
+        return p;
+    };
+    const bloque = crear("div", "detalle-guia");
+    bloque.append(crear("h4", "", "Guía"), rotulado("Qué significa:", guia.que_significa || ""));
+    const pasos = pasosGuia(guia);
+    if (pasos.length) {
+        const lista = crear("ol");
+        pasos.forEach((p) => lista.append(crear("li", "", p)));
+        const titulo = crear("p");
+        titulo.append(crear("strong", "", "Qué hacer:"));
+        bloque.append(titulo, lista);
+    }
+    bloque.append(rotulado("Quién lo hace:", Object.hasOwn(QUIEN_TEXTO, guia.quien) ? QUIEN_TEXTO[guia.quien] : guia.quien || ""));
+    return bloque;
+}
+
+// Modo simple: una tarjeta por componente con icono, estado, mensaje y la guía (qué significa, qué hacer, quién, urgencia).
+function _tarjetaComponente(id, info) {
+    const estado = normalizarEstado(info.estado);
+    const icono = crear("span", "tarjeta-comp-icono");
+    icono.append(crearIcono(iconoComponente(id)));
+    const cabecera = crear("header", "tarjeta-comp-cabecera");
+    cabecera.append(icono, crear("h3", "", nombreComp(id)), crearChipEstado(estado));
+    const tarjeta = crear("article", `tarjeta-comp estado--${estado}`);
+    tarjeta.append(cabecera, crear("p", "tarjeta-comp-mensaje", info.mensaje));
+    const guia = _esDict(info.guia) ? info.guia : null;
+    if (!guia) return tarjeta;
+    if (guia.que_significa) tarjeta.append(crear("p", "tarjeta-comp-significa", guia.que_significa));
+    const pasos = pasosGuia(guia);
+    if (pasos.length) {
+        const lista = crear("ol", "tarjeta-simple-pasos");
+        pasos.forEach((p) => lista.append(crear("li", "", p)));
+        tarjeta.append(crear("h4", "tarjeta-comp-subtitulo", estado === "normal" ? "Para mantenerlo bien" : "Qué hacer"), lista);
+    }
+    const etiquetas = crear("div", "tarjeta-simple-etiquetas");
+    if (Object.hasOwn(QUIEN_TEXTO, guia.quien)) etiquetas.append(crear("span", `etiqueta-quien ${guia.quien}`, QUIEN_TEXTO[guia.quien]));
+    if (["baja", "media", "alta"].includes(guia.urgencia)) etiquetas.append(crear("span", `etiqueta-urgencia ${guia.urgencia}`, `Urgencia: ${guia.urgencia}`));
+    if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
+    return tarjeta;
+}
+
+// Modo técnico: lo que muestra la fila expandida (resumen + guía a un lado, datos del módulo al otro).
+function _detalleTecnico(id, info) {
+    const resumen = crear("div", "detalle-resumen");
+    const cabecera = crear("div", "detalle-cabecera");
+    cabecera.append(crear("h3", "", nombreComp(id)), crearChipEstado(info.estado));
+    resumen.append(cabecera, crear("p", "detalle-mensaje", info.mensaje));
+    if (info.recomendacion) {
+        const recomendacion = crear("div", "detalle-recomendacion");
+        recomendacion.append(crear("strong", "", "Recomendación:"), ` ${info.recomendacion}`);
+        resumen.append(recomendacion);
+    }
+    const guia = bloqueGuia(info.guia);
+    if (guia) resumen.append(guia);
+    const datos = crear("div", "detalle-datos");
+    if (_esDict(info.datos) && Object.keys(info.datos).length) datos.append(..._renderizarCuerpoDatos(info.datos));
+    else datos.append(crear("p", "detalle-sin-datos", "Sin datos técnicos adicionales para este componente."));
+    const cuerpo = crear("div", "detalle-cuerpo");
+    cuerpo.append(resumen, datos);
+    return cuerpo;
+}
+
+// Abre o cierra una fila de la tabla técnica (aria-expanded + el detalle que controla).
+function _alternarFila(fila, abrir) {
+    fila.classList.toggle("abierta", abrir);
+    fila.querySelector("button").setAttribute("aria-expanded", String(abrir));
+    fila.nextElementSibling.hidden = !abrir;
+}
+
+// Devuelve [fila, detalle]: dos <tr> hermanos (el detalle va oculto hasta abrir la fila).
+function _filaComponente(id, info, n) {
+    const estado = normalizarEstado(info.estado);
+    const idDetalle = `detalle-comp-${n}`;
+    const icono = crear("span", "fila-comp-icono");
+    icono.append(crearIcono(iconoComponente(id)));
+    const flecha = crear("span", "fila-comp-flecha");
+    flecha.append(crearIcono(iconoUi("flecha")));
+    const boton = crear("button", "fila-comp-boton");
+    boton.type = "button";
+    boton.setAttribute("aria-expanded", "false");
+    boton.setAttribute("aria-controls", idDetalle);
+    boton.append(flecha, icono, crear("span", "fila-comp-nombre", nombreComp(id)));
+    const nombre = crear("th", "celda-nombre");
+    nombre.scope = "row";
+    nombre.append(boton);
+    const celda = (rotulo, clase, ...contenido) => {
+        const td = crear("td", clase);
+        td.dataset.label = rotulo; // en ventana angosta el CSS lo muestra como rótulo de la fila apilada
+        td.append(...contenido);
+        return td;
+    };
+    const fila = crear("tr", `fila-comp estado--${estado}`);
+    fila.dataset.id = id;
+    fila.append(nombre, celda("Estado", "", crearChipEstado(estado)),
+        celda("Medición clave", "dato-tecnico", medidaClave(id, info)),
+        celda("Mensaje", "", typeof info.mensaje === "string" ? info.mensaje : ""));
+    // El botón recibe Enter/Espacio y su clic sube hasta la fila: un solo manejador sirve a mouse y teclado.
+    fila.addEventListener("click", () => _alternarFila(fila, !fila.classList.contains("abierta")));
+
+    const detalle = crear("tr", `detalle-comp estado--${estado}`);
+    detalle.id = idDetalle;
+    detalle.hidden = true;
+    const celdaDetalle = crear("td");
+    celdaDetalle.colSpan = 4;
+    celdaDetalle.append(_detalleTecnico(id, info));
+    detalle.append(celdaDetalle);
+    return [fila, detalle];
+}
+
+function _tablaComponentes(ids, comps, abiertas) {
+    const encabezado = crear("tr");
+    ["Componente", "Estado", "Medición clave", "Mensaje"].forEach((t) => {
+        const th = crear("th", "", t);
+        th.scope = "col";
+        encabezado.append(th);
+    });
+    const cabeza = crear("thead");
+    cabeza.append(encabezado);
+    const cuerpo = crear("tbody");
+    const filas = new Map();
+    ids.forEach((id, n) => {
+        const [fila, detalle] = _filaComponente(id, comps[id], n);
+        cuerpo.append(fila, detalle);
+        if (abiertas.has(id)) _alternarFila(fila, true);
+        filas.set(id, fila);
+    });
+    const tabla = crear("table", "tabla-comp");
+    tabla.append(crear("caption", "sr-only", "Componentes del equipo: estado, medición clave y mensaje. Cada fila se puede abrir para ver el detalle técnico."), cabeza, cuerpo);
+    const envoltura = crear("div", "tabla-comp-envoltura");
+    envoltura.append(tabla);
+    return { envoltura, filas };
+}
+
+// resultado = {componentes,...} de un escaneo (null/sin componentes = la invitación a revisar); modo = "simple" | "tecnico";
+// seleccionado = id del componente a resaltar (tarjeta) o expandir (fila), o null.
+function dibujarComponentes(resultado, modo, seleccionado, contenedor) {
+    const comps = resultado && resultado.componentes;
+    if (!comps || typeof comps !== "object" || Array.isArray(comps) || !Object.keys(comps).length) {
+        contenedor.replaceChildren(_resumenVacio());
+        return;
+    }
+    const elegido = seleccionValida(seleccionado, comps);
+    // Un redibujo con la misma selección (nuevo escaneo, cambio de modo) no cierra las filas que el usuario abrió a mano;
+    // si la selección cambió, solo queda abierta la elegida.
+    const mismaSeleccion = (contenedor.dataset.seleccion || "") === (elegido || "");
+    const abiertas = new Set(mismaSeleccion ? [...contenedor.querySelectorAll(".fila-comp.abierta")].map((f) => f.dataset.id) : []);
+    contenedor.dataset.seleccion = elegido || "";
+    if (elegido) abiertas.add(elegido);
+    const ids = ordenarPorGravedad(Object.keys(comps).filter((id) => _esDict(comps[id])), comps);
+
+    const raiz = crear("div", "componentes");
+    raiz.append(crear("h2", "", modo === "tecnico" ? "Detalle técnico de cada parte" : "Cada parte de tu PC, explicada"));
+    let destino = null;
+    if (modo === "tecnico") {
+        const { envoltura, filas } = _tablaComponentes(ids, comps, abiertas);
+        raiz.append(envoltura);
+        destino = elegido && filas.get(elegido);
+    } else {
+        const lista = crear("div", "tarjetas-comp");
+        ids.forEach((id) => {
+            const tarjeta = _tarjetaComponente(id, comps[id]);
+            if (id === elegido) { tarjeta.setAttribute("aria-current", "true"); destino = tarjeta; }
+            lista.append(tarjeta);
+        });
+        raiz.append(lista);
+    }
+    contenedor.replaceChildren(raiz);
+    if (destino) { // sin efecto si la pestaña no se ve (panel oculto)
+        const reducido = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        destino.scrollIntoView({ block: "nearest", behavior: reducido ? "auto" : "smooth" });
+    }
 }

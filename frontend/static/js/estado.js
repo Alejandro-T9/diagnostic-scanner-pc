@@ -31,21 +31,9 @@ const CHIP_TEXTO = {
 // no debe quedar tapada en el titular por un sensor que no respondió.
 const SEVERIDAD = ["critico", "sospecha", "advertencia", "no_determinado", "normal"];
 
-// Posición aproximada de cada componente sobre la silueta de la laptop en
-// el mapa físico (viewBox 300x260 de #mapa-svg) — ver frontend/templates/index.html.
-const POSICIONES_MAPA = {
-    mainboard: [150, 45],
-    cpu: [110, 95],
-    ram: [190, 95],
-    almacenamiento: [230, 150],
-    red: [70, 150],
-    bateria: [150, 195],
-    fuente_poder: [150, 130],
-};
-
 // Etiquetas en español para las llaves de "datos" que devuelve cada
 // módulo — ver backend/modules/*.py. Una llave sin entrada acá cae al
-// fallback de _etiquetaCampo() (reemplaza guiones bajos, capitaliza).
+// fallback de _etiquetaCampo() en vistas.js (reemplaza guiones bajos, capitaliza).
 const ETIQUETAS_CAMPOS = {
     fabricante: "Fabricante", modelo: "Modelo", version: "Versión",
     bios_vendor: "Proveedor BIOS", bios_version: "Versión BIOS", bios_fecha: "Fecha BIOS",
@@ -92,5 +80,5 @@ const QUIEN_TEXTO = {
 const ANALISIS_DISPONIBLE = false;
 
 if (typeof module !== "undefined") {
-    module.exports = { ANALISIS_DISPONIBLE, NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, POSICIONES_MAPA, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
+    module.exports = { ANALISIS_DISPONIBLE, NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
 }

@@ -216,9 +216,15 @@ function ordenarPorGravedad(ids, componentes) {
     return (Array.isArray(ids) ? ids.slice() : []).sort((a, b) => peso(a) - peso(b));
 }
 
+// El componente seleccionado solo vale si es un componente propio del resultado (nunca una propiedad heredada).
+function seleccionValida(id, componentes) {
+    const comps = _obj(componentes);
+    return typeof id === "string" && comps && Object.hasOwn(comps, id) && _obj(comps[id]) ? id : null;
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
         PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
-        nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad,
+        nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad, seleccionValida,
     };
 }

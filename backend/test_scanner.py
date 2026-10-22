@@ -1373,11 +1373,35 @@ def test_indice_estructura():
     _en_hilo(_peticiones)
 
 
+_RESTOS_DEL_MAPA = ("mapa-svg", "POSICIONES_MAPA", "mapa-silueta", "resaltarComponente", "punto-etiqueta")
+
+
+def test_sin_codigo_del_mapa():
+    """El mapa de puntos ya no existe en ninguna parte: ni en la plantilla, ni en los scripts, ni en la hoja."""
+    frontend = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+    archivos = [os.path.join(frontend, "templates", "index.html"), os.path.join(frontend, "static", "css", "style.css")]
+    carpeta_js = os.path.join(frontend, "static", "js")
+    archivos += [os.path.join(carpeta_js, n) for n in sorted(os.listdir(carpeta_js)) if n.endswith(".js")]
+    for ruta in archivos:
+        with open(ruta, encoding="utf-8") as f:
+            texto = f.read()
+        for resto in _RESTOS_DEL_MAPA:
+            assert resto not in texto, (os.path.basename(ruta), resto)
+
+    def _peticion():
+        html = app.app.test_client().get("/").get_data(as_text=True)
+        assert 'id="mapa-svg"' not in html
+        assert 'id="componentes-vista"' in html
+
+    _en_hilo(_peticion)
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
     test_frontend_sin_innerhtml_inseguro()
     test_indice_estructura()
+    test_sin_codigo_del_mapa()
     test_ram()
     test_bateria()
     test_almacenamiento()

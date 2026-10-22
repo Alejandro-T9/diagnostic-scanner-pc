@@ -294,188 +294,6 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
     color: var(--color-texto-secundario);
 }
 
-/* --- Panel de diagnóstico: sello de veredicto + mapa físico + ficha --- */
-.panel-diagnostico {
-    background-color: var(--color-tarjeta);
-    border-radius: var(--radio-borde);
-    box-shadow: var(--sombra-tarjeta);
-    padding: 20px;
-    margin-bottom: 16px;
-}
-
-.panel-diagnostico-cabecera {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 16px;
-}
-
-.sello {
-    font-family: var(--fuente-mono);
-    font-size: 13px;
-    font-weight: bold;
-    letter-spacing: 0.08em;
-    padding: 6px 16px;
-    border: 2px solid var(--color-verde);
-    color: var(--color-verde);
-    border-radius: var(--radio-0);
-    transition: var(--transicion-color);
-}
-
-.sello.ADVERTENCIA { border-color: var(--color-amarillo); color: var(--color-amarillo); }
-.sello.SOSPECHA { border-color: var(--color-naranja); color: var(--color-naranja); }
-.sello.CRITICO { border-color: var(--color-rojo); color: var(--color-rojo); }
-.sello.NO_DETERMINADO { border-color: var(--color-texto-secundario); color: var(--color-texto-secundario); }
-
-.resumen-texto {
-    color: var(--color-texto-secundario);
-    font-size: 13px;
-    font-family: var(--fuente-mono);
-}
-
-/* Cobertura del escaneo: cuánto se pudo medir, no cuán sano está el
-   equipo (ver decisión 22 en docs/DECISIONES.md) — por eso vive aparte
-   del resumen de estados, no mezclado con él. Vacío en modo demo o
-   antes del primer escaneo real: no tiene sentido mostrar cobertura de
-   datos que no vinieron de una lectura real. */
-.cobertura-texto {
-    color: var(--color-texto-secundario);
-    font-size: 12px;
-    font-family: var(--fuente-mono);
-    opacity: 0.8;
-}
-
-.panel-diagnostico-cuerpo {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 20px;
-}
-
-/* --- Mapa físico: silueta de laptop con un punto por componente,
-   ubicado en su posición real aproximada (ver POSICIONES_MAPA en app.js) --- */
-.mapa-svg-wrap {
-    /* Líneas de grilla: --color-grilla es el acento al ~7%, estilo plano
-       técnico. Token fijo en vez de color-mix() por compatibilidad con el
-       Chromium que traiga el WinPE de destino. */
-    background-image:
-        linear-gradient(var(--color-grilla) 1px, transparent 1px),
-        linear-gradient(90deg, var(--color-grilla) 1px, transparent 1px);
-    background-size: 24px 24px;
-    background-color: var(--color-fondo);
-    border-radius: var(--radio-0);
-    border: 1px solid var(--color-borde);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px;
-}
-
-.mapa-silueta {
-    fill: none;
-    stroke: var(--color-borde);
-    stroke-width: 1.5;
-}
-
-.punto {
-    cursor: pointer;
-    transition: transform 0.15s;
-    transform-origin: center;
-}
-
-.punto:hover, .punto.resaltado, .punto.seleccionado {
-    transform: scale(1.25);
-}
-
-.punto circle.halo {
-    opacity: 0.22;
-    transition: opacity 0.15s;
-}
-
-.punto:hover circle.halo, .punto.resaltado circle.halo, .punto.seleccionado circle.halo {
-    opacity: 0.42;
-}
-
-.punto.seleccionado circle.nucleo {
-    stroke: var(--color-texto);
-    stroke-width: 2;
-}
-
-.punto.normal circle.nucleo, .punto.normal circle.halo { fill: var(--color-verde); }
-.punto.advertencia circle.nucleo, .punto.advertencia circle.halo { fill: var(--color-amarillo); }
-.punto.sospecha circle.nucleo, .punto.sospecha circle.halo { fill: var(--color-naranja); }
-.punto.critico circle.nucleo, .punto.critico circle.halo { fill: var(--color-rojo); }
-.punto.no_determinado circle.nucleo, .punto.no_determinado circle.halo { fill: var(--color-texto-secundario); }
-
-.punto-etiqueta {
-    fill: var(--color-texto-secundario);
-    font-size: 10px;
-    font-family: var(--fuente-mono);
-    pointer-events: none;
-}
-
-/* --- Ficha: una fila por componente, franja de severidad a la izquierda --- */
-.filas {
-    display: flex;
-    flex-direction: column;
-}
-
-.fila {
-    display: grid;
-    grid-template-columns: 4px 24px 1fr auto;
-    align-items: center;
-    gap: 14px;
-    padding: 10px;
-    border-radius: var(--radio-0);
-    cursor: pointer;
-    transition: background-color 0.15s;
-}
-
-.fila.resaltado {
-    background-color: var(--color-acento-tenue);
-}
-
-.fila.seleccionado {
-    background-color: var(--color-acento-suave);
-    box-shadow: inset 2px 0 0 var(--color-acento);
-}
-
-.franja {
-    height: 22px;
-    border-radius: var(--radio-0);
-    transition: var(--transicion-color);
-}
-
-.franja.normal { background-color: var(--color-verde); }
-.franja.advertencia { background-color: var(--color-amarillo); }
-.franja.sospecha { background-color: var(--color-naranja); }
-.franja.critico { background-color: var(--color-rojo); }
-.franja.no_determinado { background-color: var(--color-texto-secundario); }
-
-.fila-icono svg {
-    width: 20px;
-    height: 20px;
-}
-
-.fila-icono {
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-texto-secundario);
-}
-
-.fila-info .nombre {
-    font-size: 14px;
-    font-weight: bold;
-}
-
-.fila-info .detalle {
-    font-size: 12px;
-    color: var(--color-texto-secundario);
-    margin-top: 2px;
-}
-
 .chip-estado {
     display: inline-flex;
     align-items: center;
@@ -503,58 +321,53 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
 .chip-estado--critico { background-color: var(--color-estado-critico-fondo); color: var(--color-rojo); }
 .chip-estado--no_determinado { background-color: var(--color-estado-nodeterminado-fondo); color: var(--color-texto-secundario); }
 
-/* --- Panel de detalle: se llena al hacer clic en un punto del mapa o
-   una fila de la ficha, con TODO lo que "datos" trae del módulo --- */
-.detalle-panel {
-    background-color: var(--color-tarjeta);
-    border-radius: var(--radio-borde);
-    box-shadow: var(--sombra-tarjeta);
-    padding: 20px;
-    margin-bottom: 24px;
+/* --- Detalle técnico (fila expandida de la tabla de Componentes): lo que "datos" trae del módulo + la guía --- */
+.detalle-cuerpo {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--espacio-5);
+    align-items: start;
 }
 
-.detalle-vacio {
-    color: var(--color-texto-secundario);
-    font-size: 14px;
-    text-align: center;
-    margin: 8px 0;
+.detalle-resumen, .detalle-datos {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .detalle-cabecera {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 4px;
+    gap: var(--espacio-3);
 }
 
 .detalle-cabecera h3 {
     margin: 0;
-    font-size: 16px;
+    font-size: var(--texto-m);
 }
 
 .detalle-mensaje {
+    margin: var(--espacio-2) 0 var(--espacio-4);
     color: var(--color-texto-secundario);
-    font-size: 13px;
-    margin: 4px 0 16px 0;
+    font-size: var(--texto-s);
 }
 
 .detalle-sin-datos {
-    color: var(--color-texto-secundario);
-    font-size: 13px;
     margin: 0;
+    color: var(--color-texto-secundario);
+    font-size: var(--texto-s);
 }
 
-/* Recomendación accionable por estado — la respuesta a "¿y ahora qué
-   hago?", se destaca del resto del detalle técnico. */
+/* Recomendación accionable por estado: la respuesta a "¿y ahora qué hago?", se destaca del resto del detalle. */
 .detalle-recomendacion {
-    background-color: var(--color-fondo);
+    margin-bottom: var(--espacio-4);
+    padding: var(--espacio-3) var(--espacio-4);
+    background-color: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
     border-left: 3px solid var(--color-acento);
     border-radius: var(--radio-0);
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    font-size: 13px;
     color: var(--color-texto);
+    font-size: var(--texto-s);
 }
 
 .detalle-recomendacion strong {
@@ -564,10 +377,10 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
 .detalle-fila {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
-    padding: 6px 0;
+    gap: var(--espacio-3);
+    padding: var(--espacio-2) 0;
     border-bottom: 1px solid var(--color-borde);
-    font-size: 13px;
+    font-size: var(--texto-s);
 }
 
 .detalle-fila:last-child {
@@ -578,33 +391,54 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
     color: var(--color-texto-secundario);
 }
 
+.detalle-fila span:last-child {
+    min-width: 0;
+    text-align: right;
+}
+
 .detalle-grupo {
-    margin-top: 12px;
+    margin-top: var(--espacio-3);
+}
+
+.detalle-grupo:first-child {
+    margin-top: 0;
 }
 
 .detalle-grupo h4 {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    margin: 0 0 var(--espacio-2);
     color: var(--color-texto-secundario);
-    margin: 0 0 8px 0;
+    font-size: var(--texto-xs);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
 
 .detalle-subitem {
-    background-color: var(--color-fondo);
+    margin-bottom: var(--espacio-2);
+    padding: var(--espacio-1) var(--espacio-3);
+    background-color: var(--color-tarjeta);
     border: 1px solid var(--color-borde);
     border-radius: var(--radio-0);
-    padding: 4px 12px;
-    margin-bottom: 8px;
 }
 
-.detalle-subitem .detalle-fila {
-    border-bottom: 1px solid var(--color-borde);
+.detalle-guia {
+    margin-bottom: var(--espacio-4);
+    padding: var(--espacio-1) var(--espacio-4) var(--espacio-2);
+    background-color: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-0);
+    font-size: var(--texto-s);
 }
 
-.detalle-subitem .detalle-fila:last-child {
-    border-bottom: none;
+.detalle-guia h4 {
+    margin: var(--espacio-3) 0 0;
+    color: var(--color-acento);
+    font-size: var(--texto-xs);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
 }
+
+.detalle-guia p { margin: var(--espacio-2) 0 var(--espacio-1); }
+.detalle-guia ol { margin: 0; padding-left: 20px; }
 
 /* --- Barra de progreso: línea fina al pie de la barra superior --- */
 .barra-progreso-contenedor {
@@ -659,52 +493,10 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
     color: var(--color-marino);
 }
 
-/* --- Guía dentro del panel de detalle (modo técnico) --- */
-.detalle-guia {
-    background-color: var(--color-fondo);
-    border: 1px solid var(--color-borde);
-    border-radius: var(--radio-0);
-    padding: 4px 14px 8px;
-    margin-bottom: 16px;
-    font-size: 13px;
-}
-
-.detalle-guia h4 {
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--color-acento);
-    margin: 10px 0 0 0;
-}
-
-.detalle-guia p { margin: 8px 0 4px; }
-.detalle-guia ol { margin: 0; padding-left: 20px; }
-
-/* --- Modo simple: se oculta el mapa y el detalle técnico --- */
-.vista-simple { display: none; }
-
-body.modo-simple:not(.sin-escaneo) .vista-simple { display: block; margin-bottom: 24px; }
-body.modo-simple .panel-diagnostico-cuerpo,
-body.modo-simple .detalle-panel,
-body.modo-simple .resumen-texto { display: none; }
-
 /* Sin escaneo todavía: nunca se muestran datos inventados como si fueran reales. */
 .simple-vacio { text-align: center; padding: var(--espacio-6) 0; }
-body.sin-escaneo .panel-diagnostico { display: none; }
 .simple-vacio-titulo { font-size: 20px; margin: 0 0 20px 0; }
 .simple-vacio-nota { color: var(--color-texto-secundario); font-size: 14px; margin: 16px 0 0 0; }
-
-.simple-resumen {
-    font-size: 16px;
-    margin: 0 0 16px 0;
-}
-
-.simple-tarjetas {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 20px;
-}
 
 .tarjeta-simple {
     background-color: var(--color-tarjeta);
@@ -716,26 +508,8 @@ body.sin-escaneo .panel-diagnostico { display: none; }
     overflow-wrap: anywhere;
 }
 
-.tarjeta-simple.normal { border-left-color: var(--color-verde); }
-.tarjeta-simple.advertencia { border-left-color: var(--color-amarillo); }
-.tarjeta-simple.sospecha { border-left-color: var(--color-naranja); }
-.tarjeta-simple.critico { border-left-color: var(--color-rojo); }
-
 .tarjeta-simple p { margin: 8px 0; }
 
-.tarjeta-simple-cabecera {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-.tarjeta-simple-cabecera h3 {
-    margin: 0;
-    font-size: 17px;
-}
-
-.tarjeta-simple-mensaje { color: var(--color-texto-secundario); }
 .tarjeta-simple-pasos { margin: 8px 0; padding-left: 22px; }
 .tarjeta-simple-pasos li { margin-bottom: 4px; }
 
@@ -760,6 +534,150 @@ body.sin-escaneo .panel-diagnostico { display: none; }
 .etiqueta-urgencia.alta { color: var(--color-rojo); border-color: var(--color-rojo); }
 .etiqueta-urgencia.media { color: var(--color-naranja); border-color: var(--color-naranja); }
 .etiqueta-urgencia.baja { color: var(--color-amarillo); border-color: var(--color-amarillo); }
+
+/* --- Componentes: tarjetas con guía (modo simple) y tabla técnica con filas expandibles (modo técnico).
+   El color de cada estado llega por --estado-color (clases .estado--*, definidas en el bloque del Resumen). --- */
+.componentes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-4);
+}
+
+.componentes h2 {
+    margin: 0;
+    font-size: var(--texto-l);
+    line-height: 1.3;
+}
+
+.tarjetas-comp {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+    gap: var(--espacio-4);
+    align-items: start;
+}
+
+.tarjeta-comp {
+    min-width: 0;
+    padding: var(--espacio-5);
+    background-color: var(--color-tarjeta);
+    color: var(--color-texto);
+    border: 1px solid var(--color-borde);
+    border-left: 6px solid var(--estado-color);
+    border-radius: var(--radio-2);
+    box-shadow: var(--sombra-1);
+    overflow-wrap: anywhere;
+    scroll-margin: var(--espacio-4);
+}
+
+/* El componente al que se llegó desde el Resumen: contorno de acento (además de estar desplazado a la vista). */
+.tarjeta-comp[aria-current="true"] {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+    box-shadow: var(--sombra-2);
+}
+
+.tarjeta-comp-cabecera {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-3);
+}
+
+.tarjeta-comp-cabecera h3 {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: var(--texto-m);
+}
+
+.tarjeta-comp-icono { display: inline-flex; flex-shrink: 0; color: var(--color-texto-secundario); }
+.tarjeta-comp-icono svg { width: 24px; height: 24px; }
+
+.tarjeta-comp p { margin: var(--espacio-3) 0 0; font-size: var(--texto-s); }
+.tarjeta-comp .tarjeta-comp-mensaje { font-size: var(--texto-m); }
+.tarjeta-comp-significa { color: var(--color-texto-secundario); }
+
+.tarjeta-comp-subtitulo {
+    margin: var(--espacio-4) 0 0;
+    font-size: var(--texto-s);
+}
+
+.tarjeta-comp .tarjeta-simple-pasos { margin: var(--espacio-2) 0 0; font-size: var(--texto-s); }
+.tarjeta-comp .tarjeta-simple-etiquetas { margin-top: var(--espacio-4); }
+
+.tabla-comp-envoltura {
+    background-color: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-2);
+    box-shadow: var(--sombra-1);
+    overflow-x: auto; /* si algo no cabe, se desplaza la tabla, no la página */
+}
+
+.tabla-comp {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--texto-s);
+}
+
+.tabla-comp thead th {
+    padding: var(--espacio-3) var(--espacio-4);
+    background-color: var(--color-fondo);
+    border-bottom: 1px solid var(--color-borde);
+    color: var(--color-texto-secundario);
+    font-size: var(--texto-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tabla-comp td, .tabla-comp .celda-nombre {
+    border-top: 1px solid var(--color-borde);
+    vertical-align: middle;
+}
+
+.tabla-comp td { padding: var(--espacio-3) var(--espacio-4); overflow-wrap: break-word; } /* break-word (no anywhere): no encoge las columnas al mínimo */
+.tabla-comp tbody tr:first-child > * { border-top: none; }
+
+.fila-comp { cursor: pointer; }
+.fila-comp:hover > * { background-color: var(--color-acento-tenue); }
+.fila-comp.abierta > * { background-color: var(--color-acento-suave); }
+
+/* La franja de color del estado marca el borde izquierdo de la fila y de su detalle. */
+.celda-nombre, .detalle-comp > td { box-shadow: inset 4px 0 0 var(--estado-color); }
+
+.celda-nombre {
+    padding: 0;
+    font-weight: 600;
+    text-align: left;
+}
+
+.fila-comp-boton {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-3);
+    width: 100%;
+    min-height: 48px;
+    padding: var(--espacio-3) var(--espacio-4) var(--espacio-3) var(--espacio-5);
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.fila-comp-boton:focus-visible { outline-offset: -3px; }
+.fila-comp-nombre { min-width: 0; overflow-wrap: break-word; }
+.fila-comp-icono { display: inline-flex; flex-shrink: 0; color: var(--color-texto-secundario); }
+.fila-comp-icono svg { width: 22px; height: 22px; }
+.fila-comp-flecha { display: inline-flex; flex-shrink: 0; color: var(--color-texto-secundario); transition: transform 0.15s ease; }
+.fila-comp-boton[aria-expanded="true"] .fila-comp-flecha { transform: rotate(90deg); }
+
+.detalle-comp > td {
+    padding: var(--espacio-5);
+    background-color: var(--color-fondo);
+}
 
 /* --- Recomendaciones del equipo (F3): reusa .tarjeta-simple y las etiquetas --- */
 .recomendaciones { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
@@ -1069,17 +987,51 @@ body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin e
 }
 
 /* --- Responsive --- */
-@media (max-width: 640px) {
-    .panel-diagnostico-cuerpo {
-        grid-template-columns: 1fr;
-    }
+@media (max-width: 860px) {
+    .detalle-cuerpo { grid-template-columns: minmax(0, 1fr); }
+}
 
-    .fila {
-        grid-template-columns: 4px 20px 1fr;
+/* Ventana angosta: cada fila de la tabla pasa a un bloque apilado ("Estado: ...", "Mensaje: ...") sin desplazamiento horizontal. */
+@media (max-width: 700px) {
+    .tarjeta-comp { padding: var(--espacio-4); }
+    .tabla-comp-envoltura { background: none; border: none; box-shadow: none; overflow: visible; }
+    .tabla-comp, .tabla-comp tbody, .tabla-comp tr, .tabla-comp th, .tabla-comp td { display: block; }
+    .tabla-comp thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
     }
-
-    .fila .chip-estado {
-        display: none;
+    .fila-comp {
+        margin-top: var(--espacio-3);
+        background-color: var(--color-tarjeta);
+        border: 1px solid var(--color-borde);
+        border-left: 6px solid var(--estado-color);
+        border-radius: var(--radio-2);
+        box-shadow: var(--sombra-1);
+        overflow: hidden;
+    }
+    .tabla-comp tbody tr:first-child { margin-top: 0; }
+    .fila-comp.abierta { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; box-shadow: none; }
+    .fila-comp > td { display: flex; align-items: baseline; gap: var(--espacio-3); padding: var(--espacio-2) var(--espacio-4); border-top: none; }
+    .fila-comp > td::before {
+        content: attr(data-label);
+        flex: 0 0 104px;
+        color: var(--color-texto-secundario);
+        font-family: var(--fuente);
+        font-size: var(--texto-xs);
+        font-weight: 600;
+    }
+    .tabla-comp .celda-nombre { box-shadow: none; border-top: none; }
+    .fila-comp-boton { padding: var(--espacio-3) var(--espacio-4); }
+    .detalle-comp > td {
+        padding: var(--espacio-4);
+        border: 1px solid var(--color-borde);
+        border-top: none;
+        border-left: 6px solid var(--estado-color);
+        border-radius: 0 0 var(--radio-2) var(--radio-2);
+        box-shadow: none;
     }
 }
 

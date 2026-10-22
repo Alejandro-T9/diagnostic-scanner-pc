@@ -4,7 +4,7 @@ const assert = require("assert");
 const { iconoEstado, iconoComponente, iconoUi } = require("../static/js/iconos.js");
 const { CHIP_TEXTO } = require("../static/js/estado.js");
 const { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
-    calcularVeredicto, normalizarEstado, nombreComp, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
+    calcularVeredicto, normalizarEstado, nombreComp, seleccionValida, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
 
 const ESTADOS = ["normal", "advertencia", "sospecha", "critico", "no_determinado"];
 const COMPONENTES = ["mainboard", "cpu", "ram", "almacenamiento", "fuente_poder", "bateria", "red"];
@@ -239,5 +239,15 @@ const ord = { a: comp("a", "normal"), b: comp("b", "critico"), c: comp("c", "nor
 assert.deepStrictEqual(ordenarPorGravedad(["a", "b", "c", "d", "e"], ord), ["b", "e", "d", "a", "c"]); // estable
 assert.deepStrictEqual(ordenarPorGravedad(["q", "a", "b"], ord), ["b", "q", "a"]);                      // desconocido = no_determinado, antes de normal
 assert.deepStrictEqual(ordenarPorGravedad([], null), []);
+assert.deepStrictEqual(ordenarPorGravedad(["ram", "cpu", "red"], { ram: { estado: "normal" }, cpu: { estado: "critico" }, red: { estado: "advertencia" } }), ["cpu", "red", "ram"]);
+assert.deepStrictEqual(ordenarPorGravedad([], {}), []);
+const original = ["a", "b"]; ordenarPorGravedad(original, ord); assert.deepStrictEqual(original, ["a", "b"]); // no muta la entrada
+
+// (f) seleccionValida: solo un componente propio del resultado (nunca una propiedad heredada)
+assert.strictEqual(seleccionValida("cpu", { cpu: comp("cpu", "normal") }), "cpu");
+assert.strictEqual(seleccionValida("a", ord), "a");
+["zzz", "constructor", "__proto__", "toString", "", null, undefined, 5, {}, ["a"]].forEach((v) => assert.strictEqual(seleccionValida(v, ord), null, String(v)));
+[null, undefined, 5, "a", [], { a: null }, { a: 5 }].forEach((c) => assert.strictEqual(seleccionValida("a", c), null, JSON.stringify(c)));
+assert.strictEqual(seleccionValida("__proto__", JSON.parse('{"__proto__":{"estado":"normal"}}')), "__proto__"); // propio -> vale
 
 console.log("modelo.test.js: OK");

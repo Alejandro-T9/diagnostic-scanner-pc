@@ -1,8 +1,8 @@
 // frontend/static/js/app.js — Lógica del dashboard de Diagnostic Scanner PC.
 // Sin dependencias externas. Responsabilidades: polling de /api/status cada
-// 2s (timestamp, salud de conexión), disparo de /api/scan, y el panel de
-// detalle por componente (mapa físico + ficha, enlazados por selección), y el armazón:
-// pestañas (con hash en la URL), menú "Más" y botón único de revisión.
+// 2s (timestamp, salud de conexión), disparo de /api/scan, la selección de componente
+// (que dibuja vistas.js en Resumen y Componentes) y el armazón: pestañas (con hash en la
+// URL), menú "Más" y botón único de revisión.
 
 let componenteSeleccionado = null;
 let ultimoResultado = null; // resultado del último render ({componentes, hechos, cobertura, recomendaciones}), para repintar al cambiar de modo
@@ -11,242 +11,31 @@ let modo = "simple";
 let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
 
-function resaltarComponente(id, activo) {
-    document.querySelectorAll(`[data-id="${id}"]`).forEach((el) => el.classList.toggle("resaltado", activo));
-}
-
-function marcarSeleccionado(id) {
-    document.querySelectorAll(".punto, .fila").forEach((el) => {
-        el.classList.toggle("seleccionado", el.dataset.id === id);
-    });
-}
-
-function renderizarResumen(componentes, cobertura) {
-    const veredicto = calcularVeredicto(componentes);
-    const sello = document.getElementById("sello");
-    // Modo simple: frase en palabras (tabla del backend); sin tabla, el texto de siempre.
-    const frase = tablaGuias && tablaGuias._veredictos && tablaGuias._veredictos[veredicto];
-    sello.textContent = modo === "simple" && frase ? frase : veredicto;
-    sello.className = `sello ${veredicto}`;
-
-    const conteo = { normal: 0, advertencia: 0, sospecha: 0, critico: 0, no_determinado: 0 };
-    Object.values(componentes).forEach((c) => { conteo[c.estado] = (conteo[c.estado] || 0) + 1; });
-
-    // Solo se muestran los niveles con al menos 1 componente, en orden de
-    // severidad — con 7 componentes y 5 estados posibles, listar ceros
-    // sería puro ruido.
-    const partes = SEVERIDAD.filter((nivel) => conteo[nivel] > 0)
-        .map((nivel) => `${conteo[nivel]} ${CHIP_TEXTO[nivel].toLowerCase()}`);
-    document.getElementById("resumen-texto").textContent = partes.join(" · ");
-
-    // Sin cobertura (modo demo): se limpia en vez de mostrar
-    // un dato que no vino de un escaneo real.
-    document.getElementById("cobertura-texto").textContent = cobertura
-        ? `Cobertura: ${cobertura.porcentaje}% (${cobertura.completos}/${cobertura.completos + cobertura.parciales} evaluados por completo)`
-        : "";
-}
-
-// resultado = {componentes, hechos?, cobertura?, recomendaciones?}. El Resumen lo dibuja vistas.js; el panel de
-// diagnóstico (sello, mapa y filas) sigue provisionalmente en Componentes hasta que se rehaga esa pestaña.
+// resultado = {componentes, hechos?, cobertura?, recomendaciones?}. Cada vista se dibuja en vistas.js.
 function renderizarDiagnostico(resultado) {
-    const { componentes, cobertura, recomendaciones } = resultado;
+    const { componentes, recomendaciones } = resultado;
     document.body.classList.remove("sin-escaneo");
     // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
     // así ninguna clase CSS ni texto sale de un valor no previsto.
     for (const info of Object.values(componentes)) info.estado = normalizarEstado(info.estado);
-    const svg = document.getElementById("mapa-svg");
-    svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
-
-    const filasEl = document.getElementById("filas");
-    filasEl.replaceChildren();
-
-    for (const [id, info] of Object.entries(componentes)) {
-        const posicion = POSICIONES_MAPA[id];
-        if (posicion) {
-            const [x, y] = posicion;
-            const grupo = document.createElementNS("http://www.w3.org/2000/svg", "g");
-            grupo.setAttribute("class", `punto ${info.estado}`);
-            grupo.dataset.id = id;
-            grupo.setAttribute("transform", `translate(${x},${y})`);
-            grupo.innerHTML = '<circle class="halo" r="16"></circle><circle class="nucleo" r="6"></circle>';
-            grupo.addEventListener("mouseenter", () => resaltarComponente(id, true));
-            grupo.addEventListener("mouseleave", () => resaltarComponente(id, false));
-            grupo.addEventListener("click", () => abrirComponente(id, info));
-            svg.appendChild(grupo);
-
-            const etiqueta = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            etiqueta.setAttribute("class", "punto-etiqueta");
-            etiqueta.setAttribute("x", x);
-            etiqueta.setAttribute("y", y > 100 ? y + 26 : y - 14);
-            etiqueta.setAttribute("text-anchor", "middle");
-            etiqueta.textContent = nombreComp(id).split(" ")[0].toUpperCase();
-            svg.appendChild(etiqueta);
-        }
-
-        const fila = crear("div", "fila");
-        fila.dataset.id = id;
-        const icono = crear("div", "fila-icono");
-        icono.append(crearIcono(iconoComponente(id)));
-        const textos = crear("div", "fila-info");
-        textos.append(crear("div", "nombre", nombreComp(id)), crear("div", "detalle", info.mensaje));
-        fila.append(crear("div", `franja ${info.estado}`), icono, textos, crearChipEstado(info.estado));
-        fila.addEventListener("mouseenter", () => resaltarComponente(id, true));
-        fila.addEventListener("mouseleave", () => resaltarComponente(id, false));
-        fila.addEventListener("click", () => abrirComponente(id, info));
-        filasEl.appendChild(fila);
-    }
-
+    // La selección sigue solo si el componente existe en este resultado.
+    componenteSeleccionado = seleccionValida(componenteSeleccionado, componentes);
     ultimoResultado = resultado;
     dibujarResumen(resultado, document.getElementById("resumen-vista"));
-    renderizarResumen(componentes, cobertura);
-    renderizarSimple(componentes);
+    redibujarComponentes();
     renderizarRecomendaciones(recomendaciones);
     actualizarPestanas();
 }
 
-function seleccionarComponente(id, info) {
+function redibujarComponentes() {
+    dibujarComponentes(ultimoResultado, modo, componenteSeleccionado, document.getElementById("componentes-vista"));
+}
+
+// Clic en una ficha o en "Ver ..." del Resumen: abre Componentes con ese componente resaltado (tarjeta) o expandido (fila).
+function seleccionarComponente(id) {
     componenteSeleccionado = id;
-    marcarSeleccionado(id);
-    renderizarDetalle(id, info);
-}
-
-// Clic en un punto del mapa o una fila (pestaña Resumen): el detalle vive en Componentes.
-function abrirComponente(id, info) {
-    seleccionarComponente(id, info);
-    activarPestana("componentes", true);
-}
-
-function _etiquetaCampo(clave) {
-    if (ETIQUETAS_CAMPOS[clave]) return ETIQUETAS_CAMPOS[clave];
-    return clave.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-}
-
-function _formatearValor(clave, valor) {
-    if (valor === null || valor === undefined) return "—";
-    if (typeof valor === "boolean") return valor ? "Sí" : "No";
-    if (clave.endsWith("_mhz")) return `${valor} MHz`;
-    if (clave.endsWith("_gb")) return `${valor} GB`;
-    if (clave.endsWith("_c")) return `${valor}°C`;
-    if (clave.endsWith("_mbps")) return `${valor} Mbps`;
-    if (clave === "voltios") return `${valor} V`;
-    if (clave === "rpm") return `${valor} RPM`;
-    if (clave.includes("porcentaje") || clave.startsWith("salud_")) return `${valor}%`;
-    if (clave === "horas_encendido") return `${valor} h`;
-    return String(valor);
-}
-
-// Arma el detalle "lo más interno posible" a partir del dict "datos" tal
-// cual lo devuelve cada módulo, sin lógica particular por componente:
-// - un array (ej. datos.discos_internos, datos.interfaces) se desglosa
-//   en un subitem por elemento;
-// - un objeto anidado (ej. datos.gpu) se desglosa recursivamente con la
-//   misma función, en vez de un caso especial por llave — así un módulo
-//   futuro puede anidar lo que necesite (ej. bateria.cargador) sin tocar
-//   este renderer de nuevo;
-// - cualquier otra llave se muestra como fila etiqueta/valor.
-// Devuelve un arreglo de nodos (todo por textContent: nada del escaneo entra como HTML).
-function _filaDato(clave, valor) {
-    const fila = crear("div", "detalle-fila");
-    fila.append(crear("span", "", _etiquetaCampo(clave)), crear("span", "dato-tecnico", _formatearValor(clave, valor)));
-    return fila;
-}
-
-function _renderizarCuerpoDatos(datos) {
-    return Object.entries(datos).map(([clave, valor]) => {
-        const esArray = Array.isArray(valor);
-        if (!esArray && (valor === null || typeof valor !== "object")) return _filaDato(clave, valor);
-        const grupo = crear("div", "detalle-grupo");
-        grupo.append(crear("h4", "", _etiquetaCampo(clave)));
-        if (esArray) {
-            valor.forEach((item) => {
-                const sub = crear("div", "detalle-subitem");
-                sub.append(...Object.entries(item).map(([k, v]) => _filaDato(k, v)));
-                grupo.append(sub);
-            });
-        } else {
-            grupo.append(..._renderizarCuerpoDatos(valor));
-        }
-        return grupo;
-    });
-}
-
-function renderizarDetalle(id, info) {
-    const panel = document.getElementById("detalle-panel");
-    const cabecera = crear("div", "detalle-cabecera");
-    cabecera.append(crear("h3", "", nombreComp(id)), crearChipEstado(info.estado));
-    panel.replaceChildren(cabecera, crear("p", "detalle-mensaje", info.mensaje));
-
-    if (info.recomendacion) {
-        const recomendacion = crear("div", "detalle-recomendacion");
-        recomendacion.append(crear("strong", "", "Recomendación:"), ` ${info.recomendacion}`);
-        panel.append(recomendacion);
-    }
-    const guia = bloqueGuia(info.guia);
-    if (guia) panel.append(guia);
-    if (info.datos) panel.append(..._renderizarCuerpoDatos(info.datos));
-    else panel.append(crear("p", "detalle-sin-datos", "Sin datos técnicos adicionales para este componente."));
-}
-
-function pasosGuia(guia) {
-    return Array.isArray(guia.que_hacer) ? guia.que_hacer : [];
-}
-
-// Guía en el panel de detalle (modo técnico). Sin guía no se dibuja nada.
-function bloqueGuia(guia) {
-    if (!guia) return null;
-    const rotulado = (rotulo, texto) => {
-        const p = crear("p");
-        p.append(crear("strong", "", rotulo), ` ${texto}`);
-        return p;
-    };
-    const bloque = crear("div", "detalle-guia");
-    bloque.append(crear("h4", "", "Guía"), rotulado("Qué significa:", guia.que_significa || ""));
-    const pasos = pasosGuia(guia);
-    if (pasos.length) {
-        const lista = crear("ol");
-        pasos.forEach((p) => lista.append(crear("li", "", p)));
-        const titulo = crear("p");
-        titulo.append(crear("strong", "", "Qué hacer:"));
-        bloque.append(titulo, lista);
-    }
-    bloque.append(rotulado("Quién lo hace:", Object.hasOwn(QUIEN_TEXTO, guia.quien) ? QUIEN_TEXTO[guia.quien] : guia.quien || ""));
-    return bloque;
-}
-
-// --- Modo simple: veredicto en palabras, una línea de resumen y una tarjeta
-// por componente de más a menos grave. Solo DOM + textContent. ---
-function renderizarSimple(componentes) {
-    const ids = Object.keys(componentes);
-    document.getElementById("simple-resumen").textContent = lineaResumen(componentes);
-
-    const contenedor = document.getElementById("simple-tarjetas");
-    contenedor.replaceChildren();
-    ordenarPorGravedad(ids, componentes).forEach((id) => {
-        const info = componentes[id];
-        const tarjeta = crear("div", `tarjeta-simple ${info.estado}`);
-        const cab = crear("div", "tarjeta-simple-cabecera");
-        cab.append(crear("h3", "", nombreComp(id)),
-            crearChipEstado(info.estado));
-        tarjeta.append(cab, crear("p", "tarjeta-simple-mensaje", info.mensaje));
-        const guia = info.guia;
-        if (guia) {
-            if (guia.que_significa) tarjeta.append(crear("p", "", guia.que_significa));
-            const pasos = pasosGuia(guia);
-            if (pasos.length) {
-                if (info.estado === "normal") { const t = crear("p", ""); t.append(crear("strong", "", "Para mantenerlo bien:")); tarjeta.append(t); }
-                const lista = crear("ol", "tarjeta-simple-pasos");
-                pasos.forEach((p) => lista.append(crear("li", "", p)));
-                tarjeta.append(lista);
-            }
-            const etiquetas = crear("div", "tarjeta-simple-etiquetas");
-            if (Object.hasOwn(QUIEN_TEXTO, guia.quien)) etiquetas.append(crear("span", `etiqueta-quien ${guia.quien}`, QUIEN_TEXTO[guia.quien]));
-            if (["baja", "media", "alta"].includes(guia.urgencia)) {
-                etiquetas.append(crear("span", `etiqueta-urgencia ${guia.urgencia}`, `Urgencia: ${guia.urgencia}`));
-            }
-            if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
-        }
-        contenedor.append(tarjeta);
-    });
+    activarPestana("componentes", true); // antes de dibujar: scrollIntoView necesita el panel visible
+    redibujarComponentes();
 }
 
 // Recomendaciones del equipo (F3): solo de escaneos reales que las traigan; sin lista, el bloque no existe.
@@ -295,28 +84,18 @@ function pintarVacio() {
     document.body.classList.add("sin-escaneo");
     renderizarRecomendaciones(null);
     dibujarResumen(null, document.getElementById("resumen-vista"));
-    if (escaneando) marcarOcupado(true); // el botón del estado vacío acaba de recrearse
-    const sello = document.getElementById("sello");
-    sello.textContent = "Sin escaneo todavía";
-    sello.className = "sello NO_DETERMINADO";
-    document.getElementById("resumen-texto").textContent = "";
-    document.getElementById("cobertura-texto").textContent = "";
-    document.getElementById("filas").replaceChildren();
-    document.getElementById("mapa-svg").querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
+    dibujarComponentes(null, modo, null, document.getElementById("componentes-vista"));
+    if (escaneando) marcarOcupado(true); // los botones del estado vacío acaban de recrearse
     actualizarPestanas();
 }
 
 function repintar() {
-    if (!ultimoResultado) { pintarVacio(); return; }
-    renderizarDiagnostico(ultimoResultado);
-    if (componenteSeleccionado && ultimoResultado.componentes[componenteSeleccionado]) {
-        seleccionarComponente(componenteSeleccionado, ultimoResultado.componentes[componenteSeleccionado]);
-    }
+    if (ultimoResultado) renderizarDiagnostico(ultimoResultado);
+    else pintarVacio();
 }
 
 function aplicarModo(nuevo, guardar) {
     modo = modoValido(nuevo);
-    document.body.classList.toggle("modo-simple", modo === "simple");
     document.getElementById("modo-simple-btn").setAttribute("aria-pressed", String(modo === "simple"));
     document.getElementById("modo-tecnico-btn").setAttribute("aria-pressed", String(modo === "tecnico"));
     if (guardar) {
@@ -383,7 +162,7 @@ async function actualizarStatus() {
 
 // Botón único de revisión (barra superior + el grande del estado vacío): ocupado mientras corre el escaneo.
 function marcarOcupado(ocupado) {
-    const botones = [document.getElementById("boton-revisar"), document.getElementById("boton-revisar-vacio")].filter(Boolean);
+    const botones = [document.getElementById("boton-revisar"), ...document.querySelectorAll(".boton-revisar-vacio")];
     const teniaFoco = botones.includes(document.activeElement);
     botones.forEach((b) => { b.disabled = ocupado; if (ocupado) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy"); b.classList.toggle("ocupado", ocupado); });
     document.getElementById("boton-revisar-texto").textContent =
@@ -398,19 +177,14 @@ async function escanearSistema() {
     escaneando = true;
     marcarOcupado(true);
     try {
-        const guias = cargarGuias(); // en paralelo al escaneo: el sello en palabras necesita _veredictos (nunca lanza)
+        const guias = cargarGuias(); // en paralelo al escaneo: el titular en palabras necesita _veredictos (nunca lanza)
         const respuesta = await fetch("/api/scan");
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
         const resultado = await respuesta.json();
         await guias;
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
         escaneosReales++;
-        renderizarDiagnostico(resultado);
-        // Si había un componente abierto, se refresca con el dato nuevo en
-        // vez de perder la selección en cada escaneo.
-        if (componenteSeleccionado && resultado.componentes[componenteSeleccionado]) {
-            seleccionarComponente(componenteSeleccionado, resultado.componentes[componenteSeleccionado]);
-        }
+        renderizarDiagnostico(resultado); // conserva la selección si el componente sigue existiendo
         ocultarError();
     } catch (error) {
         mostrarError("No se pudo completar el escaneo. Verifica que el servidor esté corriendo.");
@@ -446,10 +220,8 @@ async function verModoDemo() {
         const guia = tabla && tabla[info.componente] && tabla[info.componente][info.estado];
         if (guia) info.guia = guia; else delete info.guia;
     }
+    componenteSeleccionado = null; // la demo empieza sin selección
     renderizarDiagnostico(DATOS_MOCK);
-    componenteSeleccionado = null;
-    document.getElementById("detalle-panel").replaceChildren(
-        crear("p", "detalle-vacio", "Selecciona un componente del mapa o la lista para ver el detalle completo."));
 }
 
 document.getElementById("boton-revisar").addEventListener("click", escanearSistema);
@@ -579,7 +351,7 @@ aplicarModo(modoGuardado, false);
 // Arranque: sin datos hasta el primer escaneo (DATOS_MOCK solo sale con "Ver demostración").
 desdeHash();
 
-// Frases de veredicto para el sello; al llegar se repinta (si falla, queda el texto de siempre).
+// Frases de veredicto del Resumen; al llegar se repinta (si falla, queda el texto de siempre).
 cargarGuias().then((t) => { if (t) repintar(); });
 actualizarStatus();
 setInterval(actualizarStatus, 2000);

@@ -68,33 +68,7 @@
     </section>
 
     <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" tabindex="0" hidden>
-        <!-- Provisional: el sello, el mapa y las filas se reemplazan al rehacer esta pestaña. -->
-        <div class="panel-diagnostico">
-            <div class="panel-diagnostico-cabecera">
-                <span class="sello" id="sello">Sin escaneo todavía</span>
-                <span class="resumen-texto" id="resumen-texto"></span>
-                <span class="cobertura-texto" id="cobertura-texto"></span>
-            </div>
-            <div class="panel-diagnostico-cuerpo">
-                <div class="mapa-svg-wrap">
-                    <svg id="mapa-svg" viewBox="0 0 300 260" width="300" height="260">
-                        <rect class="mapa-silueta" x="10" y="20" width="280" height="200" rx="14"></rect>
-                        <rect class="mapa-silueta" x="30" y="40" width="240" height="160" rx="4"></rect>
-                        <rect class="mapa-silueta" x="0" y="220" width="300" height="14" rx="4"></rect>
-                    </svg>
-                </div>
-                <div class="filas" id="filas"></div>
-            </div>
-        </div>
-
-        <div class="vista-simple" id="simple-contenido">
-            <p class="simple-resumen" id="simple-resumen"></p>
-            <div class="simple-tarjetas" id="simple-tarjetas"></div>
-        </div>
-
-        <div class="detalle-panel" id="detalle-panel">
-            <p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>
-        </div>
+        <div id="componentes-vista"></div>
     </section>
 
     <section role="tabpanel" id="panel-recomendaciones" aria-labelledby="tab-recomendaciones" tabindex="0" hidden>
