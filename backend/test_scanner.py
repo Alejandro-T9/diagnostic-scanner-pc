@@ -24,7 +24,9 @@ import contextlib
 import io
 import os
 import re
+import shutil
 import socket
+import subprocess
 import threading
 
 import app
@@ -1267,8 +1269,45 @@ def test_paleta():
             assert r >= 4.5, (tema, e, r)
 
 
+def test_frontend_node():
+    """Pruebas de lógica pura del frontend con node (se omiten si node no está instalado)."""
+    if not shutil.which("node"):
+        return
+    raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    r = subprocess.run(["node", os.path.join("frontend", "tests", "modelo.test.js")], cwd=raiz,
+                       capture_output=True, text=True, timeout=30)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+# Líneas que insertan HTML y están permitidas por nombre: solo reciben cadenas constantes de iconos.js.
+_HTML_PERMITIDO = ('marco.insertAdjacentHTML("beforeend", svg);',)
+
+
+def test_frontend_sin_innerhtml_inseguro():
+    """Toda línea que inserta HTML en frontend/static/js/*.js: (i) asigna un literal sin ${ ni +,
+    (ii) pasa por escapar(, o (iii) está en la lista blanca _HTML_PERMITIDO (íconos constantes)."""
+    carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "static", "js")
+    literal = re.compile(r"""\.innerHTML\s*=\s*("[^"$+]*"|'[^'$+]*')\s*;?\s*$""")
+    malas = []
+    for nombre in sorted(os.listdir(carpeta)):
+        if not nombre.endswith(".js"):
+            continue
+        with open(os.path.join(carpeta, nombre), encoding="utf-8") as f:
+            for n, linea in enumerate(f, 1):
+                if not re.search(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write", linea):
+                    continue
+                if linea.lstrip().startswith("//"):
+                    continue
+                if literal.search(linea) or "escapar(" in linea or linea.strip() in _HTML_PERMITIDO:
+                    continue
+                malas.append(f"{nombre}:{n}: {linea.strip()}")
+    assert not malas, "HTML sin escapar:\n" + "\n".join(malas)
+
+
 if __name__ == "__main__":
     test_paleta()
+    test_frontend_node()
+    test_frontend_sin_innerhtml_inseguro()
     test_ram()
     test_bateria()
     test_almacenamiento()

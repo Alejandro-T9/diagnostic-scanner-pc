@@ -3,98 +3,6 @@
 // 2s (timestamp, salud de conexión), disparo de /api/scan, y el panel de
 // detalle por componente (mapa físico + ficha, enlazados por selección).
 
-// Nombres legibles de cada componente (mismo orden que backend/scanner.py COMPONENTES).
-const NOMBRES_COMPONENTES = {
-    mainboard: "Tarjeta Madre",
-    cpu: "Procesador",
-    ram: "Memoria RAM",
-    almacenamiento: "Almacenamiento",
-    fuente_poder: "Fuente de Poder",
-    bateria: "Batería",
-    red: "Red",
-};
-
-// Texto corto del chip de estado (la palabra "estado" ya no hace falta,
-// el color + la palabra alcanzan). Mismos 5 niveles que
-// backend/scanner.py ESTADOS_VALIDOS.
-const CHIP_TEXTO = {
-    normal: "Normal",
-    advertencia: "Advertencia",
-    sospecha: "Sospecha",
-    critico: "Crítico",
-    no_determinado: "Sin datos",
-};
-
-// Mismo orden que _SEVERIDAD en backend/scanner.py (ver decisión 22 en
-// docs/DECISIONES.md): el estado más severo presente entre los
-// componentes define el veredicto global. "no_determinado" pesa menos
-// que "advertencia" — evidencia real de un problema en OTRO componente
-// no debe quedar tapada en el titular por un sensor que no respondió.
-const SEVERIDAD = ["critico", "sospecha", "advertencia", "no_determinado", "normal"];
-
-// Posición aproximada de cada componente sobre la silueta de la laptop en
-// el mapa físico (viewBox 300x260 de #mapa-svg) — ver frontend/templates/index.html.
-const POSICIONES_MAPA = {
-    mainboard: [150, 45],
-    cpu: [110, 95],
-    ram: [190, 95],
-    almacenamiento: [230, 150],
-    red: [70, 150],
-    bateria: [150, 195],
-    fuente_poder: [150, 130],
-};
-
-// Fragmentos de <path>/<rect> por componente (viewBox 24x24, stroke
-// currentColor) — mismo ícono se usa en la fila de la ficha.
-const ICONOS = {
-    mainboard: '<rect x="4" y="4" width="16" height="16" rx="1.5"/><rect x="9" y="9" width="6" height="6"/><line x1="4" y1="9" x2="1.5" y2="9"/><line x1="4" y1="15" x2="1.5" y2="15"/><line x1="20" y1="9" x2="22.5" y2="9"/><line x1="20" y1="15" x2="22.5" y2="15"/>',
-    cpu: '<rect x="6" y="6" width="12" height="12" rx="1"/><line x1="9" y1="2" x2="9" y2="6"/><line x1="15" y1="2" x2="15" y2="6"/><line x1="9" y1="18" x2="9" y2="22"/><line x1="15" y1="18" x2="15" y2="22"/><line x1="2" y1="9" x2="6" y2="9"/><line x1="2" y1="15" x2="6" y2="15"/><line x1="18" y1="9" x2="22" y2="9"/><line x1="18" y1="15" x2="22" y2="15"/>',
-    ram: '<rect x="3" y="8" width="18" height="8" rx="1"/><line x1="7" y1="8" x2="7" y2="16"/><line x1="11" y1="8" x2="11" y2="16"/><line x1="15" y1="8" x2="15" y2="16"/>',
-    almacenamiento: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/>',
-    fuente_poder: '<path d="M13 2 4 14h6l-1 8 9-12h-6z"/>',
-    bateria: '<rect x="4" y="7" width="14" height="10" rx="2"/><line x1="18" y1="10" x2="21" y2="10"/><line x1="18" y1="14" x2="21" y2="14"/>',
-    red: '<path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/>',
-};
-
-// Etiquetas en español para las llaves de "datos" que devuelve cada
-// módulo — ver backend/modules/*.py. Una llave sin entrada acá cae al
-// fallback de _etiquetaCampo() (reemplaza guiones bajos, capitaliza).
-const ETIQUETAS_CAMPOS = {
-    fabricante: "Fabricante", modelo: "Modelo", version: "Versión",
-    bios_vendor: "Proveedor BIOS", bios_version: "Versión BIOS", bios_fecha: "Fecha BIOS",
-    nombre: "Nombre", arquitectura: "Arquitectura",
-    nucleos_fisicos: "Núcleos físicos", hilos_logicos: "Hilos lógicos",
-    frecuencia_maxima_mhz: "Frecuencia máxima", temperatura_c: "Temperatura",
-    temperatura_gpu_c: "Temperatura GPU", ventiladores: "Ventiladores", rpm: "Velocidad",
-    capacidad_fisica_gb: "Capacidad física instalada",
-    capacidad_disponible_so_gb: "Disponible para el sistema operativo",
-    velocidad_mhz: "Velocidad", frecuencia_actual_mhz: "Frecuencia actual",
-    configuracion_canales: "Canales", modulos_detectados: "Módulos detectados",
-    porcentaje_uso: "Uso", interfaz: "Interfaz", tamano_gb: "Tamaño",
-    salud: "Salud", desgaste_porcentaje: "Desgaste", externo: "Conexión USB",
-    horas_encendido: "Horas de encendido", errores_lectura: "Errores de lectura",
-    aplica: "Aplica", estado_carga: "Estado de carga",
-    porcentaje_carga_actual: "Carga actual", ciclos_carga: "Ciclos de carga",
-    salud_porcentaje: "Salud", link_activo: "Enlace activo",
-    velocidad_mbps: "Velocidad", errores_rx: "Errores recibidos",
-    discos_internos: "Discos internos", discos_externos: "Discos externos (no afectan el estado)",
-    interfaces: "Interfaces",
-    origen: "Origen", sensor: "Sensor", voltios: "Voltaje", rieles: "Sensores de voltaje",
-    gpu: "GPU", driver: "Controlador (driver)",
-};
-
-const DATOS_MOCK = {
-    componentes: {
-        mainboard: { componente: "mainboard", estado: "normal", mensaje: "Chipset y buses estables", datos: null },
-        cpu: { componente: "cpu", estado: "normal", mensaje: "4 núcleos, 45°C", datos: null },
-        ram: { componente: "ram", estado: "advertencia", mensaje: "8GB detectados, uso elevado", datos: null },
-        almacenamiento: { componente: "almacenamiento", estado: "sospecha", mensaje: "Salud reducida (Windows Storage Health) en 1 disco", datos: null },
-        fuente_poder: { componente: "fuente_poder", estado: "normal", mensaje: "Voltajes dentro de rango", datos: null },
-        bateria: { componente: "bateria", estado: "critico", mensaje: "Capacidad al 42% del diseño original", datos: null },
-        red: { componente: "red", estado: "no_determinado", mensaje: "No se detectó ninguna interfaz de red física", datos: null },
-    },
-};
-
 let componenteSeleccionado = null;
 let ultimoResultado = null; // {componentes, cobertura} del último render, para repintar al cambiar de modo
 let tablaGuias = null;      // respuesta de /api/guias (guías por componente/estado + _veredictos)
@@ -102,27 +10,8 @@ let modo = "simple";
 let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
 
-// Todo texto que venga del escaneo (mensaje, nombres de dispositivos, guía)
-// pasa por acá antes de entrar a un innerHTML.
-function escapar(valor) {
-    return String(valor).replace(/[&<>"']/g, (c) => (
-        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
-    ));
-}
-
-function crear(etiqueta, clase, texto) {
-    const nodo = document.createElement(etiqueta);
-    if (clase) nodo.className = clase;
-    if (texto !== undefined) nodo.textContent = texto;
-    return nodo;
-}
-
 function nombreComp(id) {
     return NOMBRES_COMPONENTES[id] || id;
-}
-
-function iconoSvg(id) {
-    return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">${ICONOS[id] || ""}</svg>`;
 }
 
 function calcularVeredicto(componentes) {
@@ -179,7 +68,7 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
     svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
 
     const filasEl = document.getElementById("filas");
-    filasEl.innerHTML = "";
+    filasEl.replaceChildren();
 
     for (const [id, info] of Object.entries(componentes)) {
         const posicion = POSICIONES_MAPA[id];
@@ -204,18 +93,13 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
             svg.appendChild(etiqueta);
         }
 
-        const fila = document.createElement("div");
-        fila.className = "fila";
+        const fila = crear("div", "fila");
         fila.dataset.id = id;
-        fila.innerHTML = `
-            <div class="franja ${escapar(info.estado)}"></div>
-            <div class="fila-icono">${iconoSvg(id)}</div>
-            <div class="fila-info">
-                <div class="nombre">${escapar(nombreComp(id))}</div>
-                <div class="detalle">${escapar(info.mensaje)}</div>
-            </div>
-            <div class="fila-chip ${escapar(info.estado)}">${escapar(CHIP_TEXTO[info.estado] || info.estado)}</div>
-        `;
+        const icono = crear("div", "fila-icono");
+        icono.append(crearIcono(iconoComponente(id)));
+        const textos = crear("div", "fila-info");
+        textos.append(crear("div", "nombre", nombreComp(id)), crear("div", "detalle", info.mensaje));
+        fila.append(crear("div", `franja ${info.estado}`), icono, textos, crearChipEstado(info.estado));
         fila.addEventListener("mouseenter", () => resaltarComponente(id, true));
         fila.addEventListener("mouseleave", () => resaltarComponente(id, false));
         fila.addEventListener("click", () => seleccionarComponente(id, info));
@@ -262,69 +146,73 @@ function _formatearValor(clave, valor) {
 //   futuro puede anidar lo que necesite (ej. bateria.cargador) sin tocar
 //   este renderer de nuevo;
 // - cualquier otra llave se muestra como fila etiqueta/valor.
+// Devuelve un arreglo de nodos (todo por textContent: nada del escaneo entra como HTML).
+function _filaDato(clave, valor) {
+    const fila = crear("div", "detalle-fila");
+    fila.append(crear("span", "", _etiquetaCampo(clave)), crear("span", "dato-tecnico", _formatearValor(clave, valor)));
+    return fila;
+}
+
 function _renderizarCuerpoDatos(datos) {
     return Object.entries(datos).map(([clave, valor]) => {
-        if (Array.isArray(valor)) {
-            const items = valor.map((item) => `
-                <div class="detalle-subitem">
-                    ${Object.entries(item).map(([k, v]) => `
-                        <div class="detalle-fila"><span>${escapar(_etiquetaCampo(k))}</span><span class="dato-tecnico">${escapar(_formatearValor(k, v))}</span></div>
-                    `).join("")}
-                </div>
-            `).join("");
-            return `<div class="detalle-grupo"><h4>${escapar(_etiquetaCampo(clave))}</h4>${items}</div>`;
+        const esArray = Array.isArray(valor);
+        if (!esArray && (valor === null || typeof valor !== "object")) return _filaDato(clave, valor);
+        const grupo = crear("div", "detalle-grupo");
+        grupo.append(crear("h4", "", _etiquetaCampo(clave)));
+        if (esArray) {
+            valor.forEach((item) => {
+                const sub = crear("div", "detalle-subitem");
+                sub.append(...Object.entries(item).map(([k, v]) => _filaDato(k, v)));
+                grupo.append(sub);
+            });
+        } else {
+            grupo.append(..._renderizarCuerpoDatos(valor));
         }
-        if (valor !== null && typeof valor === "object") {
-            return `<div class="detalle-grupo"><h4>${escapar(_etiquetaCampo(clave))}</h4>${_renderizarCuerpoDatos(valor)}</div>`;
-        }
-        return `<div class="detalle-fila"><span>${escapar(_etiquetaCampo(clave))}</span><span class="dato-tecnico">${escapar(_formatearValor(clave, valor))}</span></div>`;
-    }).join("");
+        return grupo;
+    });
 }
 
 function renderizarDetalle(id, info) {
     const panel = document.getElementById("detalle-panel");
-    const cuerpo = info.datos
-        ? _renderizarCuerpoDatos(info.datos)
-        : `<p class="detalle-sin-datos">Sin datos técnicos adicionales para este componente.</p>`;
+    const cabecera = crear("div", "detalle-cabecera");
+    cabecera.append(crear("h3", "", nombreComp(id)), crearChipEstado(info.estado));
+    panel.replaceChildren(cabecera, crear("p", "detalle-mensaje", info.mensaje));
 
-    const recomendacion = info.recomendacion
-        ? `<div class="detalle-recomendacion"><strong>Recomendación:</strong> ${escapar(info.recomendacion)}</div>`
-        : "";
-
-    panel.innerHTML = `
-        <div class="detalle-cabecera">
-            <h3>${escapar(nombreComp(id))}</h3>
-            <span class="fila-chip ${escapar(info.estado)}">${escapar(CHIP_TEXTO[info.estado] || info.estado)}</span>
-        </div>
-        <p class="detalle-mensaje">${escapar(info.mensaje)}</p>
-        ${recomendacion}
-        ${bloqueGuiaHtml(info.guia)}
-        ${cuerpo}
-    `;
+    if (info.recomendacion) {
+        const recomendacion = crear("div", "detalle-recomendacion");
+        recomendacion.append(crear("strong", "", "Recomendación:"), ` ${info.recomendacion}`);
+        panel.append(recomendacion);
+    }
+    const guia = bloqueGuia(info.guia);
+    if (guia) panel.append(guia);
+    if (info.datos) panel.append(..._renderizarCuerpoDatos(info.datos));
+    else panel.append(crear("p", "detalle-sin-datos", "Sin datos técnicos adicionales para este componente."));
 }
-
-const QUIEN_TEXTO = {
-    tu_mismo: "Lo puedes hacer tú",
-    tecnico: "Mejor con un técnico",
-    nadie: "No necesita acción",
-};
 
 function pasosGuia(guia) {
     return Array.isArray(guia.que_hacer) ? guia.que_hacer : [];
 }
 
 // Guía en el panel de detalle (modo técnico). Sin guía no se dibuja nada.
-function bloqueGuiaHtml(guia) {
-    if (!guia) return "";
-    const pasos = pasosGuia(guia).map((p) => `<li>${escapar(p)}</li>`).join("");
-    return `
-        <div class="detalle-guia">
-            <h4>Guía</h4>
-            <p><strong>Qué significa:</strong> ${escapar(guia.que_significa || "")}</p>
-            ${pasos ? `<p><strong>Qué hacer:</strong></p><ol>${pasos}</ol>` : ""}
-            <p><strong>Quién lo hace:</strong> ${escapar(QUIEN_TEXTO[guia.quien] || guia.quien || "")}</p>
-        </div>
-    `;
+function bloqueGuia(guia) {
+    if (!guia) return null;
+    const rotulado = (rotulo, texto) => {
+        const p = crear("p");
+        p.append(crear("strong", "", rotulo), ` ${texto}`);
+        return p;
+    };
+    const bloque = crear("div", "detalle-guia");
+    bloque.append(crear("h4", "", "Guía"), rotulado("Qué significa:", guia.que_significa || ""));
+    const pasos = pasosGuia(guia);
+    if (pasos.length) {
+        const lista = crear("ol");
+        pasos.forEach((p) => lista.append(crear("li", "", p)));
+        const titulo = crear("p");
+        titulo.append(crear("strong", "", "Qué hacer:"));
+        bloque.append(titulo, lista);
+    }
+    bloque.append(rotulado("Quién lo hace:", QUIEN_TEXTO[guia.quien] || guia.quien || ""));
+    return bloque;
 }
 
 // --- Modo simple: veredicto en palabras, una línea de resumen y una tarjeta
@@ -352,7 +240,7 @@ function renderizarSimple(componentes) {
         const tarjeta = crear("div", `tarjeta-simple ${info.estado}`);
         const cab = crear("div", "tarjeta-simple-cabecera");
         cab.append(crear("h3", "", nombreComp(id)),
-            crear("span", `fila-chip ${info.estado}`, CHIP_TEXTO[info.estado] || info.estado));
+            crearChipEstado(info.estado));
         tarjeta.append(cab, crear("p", "tarjeta-simple-mensaje", info.mensaje));
         const guia = info.guia;
         if (guia) {
@@ -569,8 +457,8 @@ async function verModoDemo() {
     }
     renderizarDiagnostico(DATOS_MOCK.componentes);
     componenteSeleccionado = null;
-    document.getElementById("detalle-panel").innerHTML =
-        '<p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>';
+    document.getElementById("detalle-panel").replaceChildren(
+        crear("p", "detalle-vacio", "Selecciona un componente del mapa o la lista para ver el detalle completo."));
 }
 
 document.getElementById("boton-escanear").addEventListener("click", escanearSistema);

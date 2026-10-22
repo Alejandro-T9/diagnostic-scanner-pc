@@ -169,7 +169,7 @@ body {
 
 .fila {
     display: grid;
-    grid-template-columns: 4px 24px 1fr 90px;
+    grid-template-columns: 4px 24px 1fr auto;
     align-items: center;
     gap: 14px;
     padding: 10px;
@@ -199,6 +199,11 @@ body {
 .franja.critico { background-color: var(--color-rojo); }
 .franja.no_determinado { background-color: var(--color-texto-secundario); }
 
+.fila-icono svg {
+    width: 20px;
+    height: 20px;
+}
+
 .fila-icono {
     width: 22px;
     height: 22px;
@@ -219,22 +224,32 @@ body {
     margin-top: 2px;
 }
 
-.fila-chip {
-    font-family: var(--fuente-mono);
-    font-size: 10px;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    text-align: center;
-    padding: 3px 0;
-    border-radius: var(--radio-0);
-    font-weight: bold;
+.chip-estado {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espacio-1);
+    min-height: 28px;
+    padding: 0 var(--espacio-2);
+    border: 1px solid currentColor;
+    border-radius: var(--radio-1);
+    font-size: var(--texto-xs);
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+    justify-self: end;
 }
 
-.fila-chip.normal { background-color: var(--color-estado-normal-fondo); color: var(--color-verde); border: 1px solid var(--color-verde); }
-.fila-chip.advertencia { background-color: var(--color-estado-advertencia-fondo); color: var(--color-amarillo); border: 1px solid var(--color-amarillo); }
-.fila-chip.sospecha { background-color: var(--color-estado-sospecha-fondo); color: var(--color-naranja); border: 1px solid var(--color-naranja); }
-.fila-chip.critico { background-color: var(--color-estado-critico-fondo); color: var(--color-rojo); border: 1px solid var(--color-rojo); }
-.fila-chip.no_determinado { background-color: var(--color-estado-nodeterminado-fondo); color: var(--color-texto-secundario); border: 1px solid var(--color-texto-secundario); }
+.chip-estado svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.chip-estado--normal { background-color: var(--color-estado-normal-fondo); color: var(--color-verde); }
+.chip-estado--advertencia { background-color: var(--color-estado-advertencia-fondo); color: var(--color-amarillo); }
+.chip-estado--sospecha { background-color: var(--color-estado-sospecha-fondo); color: var(--color-naranja); }
+.chip-estado--critico { background-color: var(--color-estado-critico-fondo); color: var(--color-rojo); }
+.chip-estado--no_determinado { background-color: var(--color-estado-nodeterminado-fondo); color: var(--color-texto-secundario); }
 
 /* --- Panel de detalle: se llena al hacer clic en un punto del mapa o
    una fila de la ficha, con TODO lo que "datos" trae del módulo --- */
@@ -264,10 +279,6 @@ body {
 .detalle-cabecera h3 {
     margin: 0;
     font-size: 16px;
-}
-
-.detalle-cabecera .fila-chip {
-    padding: 4px 10px;
 }
 
 .detalle-mensaje {
@@ -578,13 +589,6 @@ body.modo-simple.sin-escaneo #boton-escanear { display: none; }
     font-size: 17px;
 }
 
-/* El chip global se oculta en pantallas angostas; en la tarjeta siempre se ve. */
-.tarjeta-simple .fila-chip {
-    display: inline-block;
-    flex-shrink: 0;
-    padding: 4px 10px;
-}
-
 .tarjeta-simple-mensaje { color: var(--color-texto-secundario); }
 .tarjeta-simple-pasos { margin: 8px 0; padding-left: 22px; }
 .tarjeta-simple-pasos li { margin-bottom: 4px; }
@@ -630,7 +634,7 @@ body.modo-simple.sin-escaneo #boton-escanear { display: none; }
         grid-template-columns: 4px 20px 1fr;
     }
 
-    .fila-chip {
+    .fila .chip-estado {
         display: none;
     }
 }
