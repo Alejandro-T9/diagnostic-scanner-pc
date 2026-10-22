@@ -359,20 +359,20 @@ GUIAS = {
     "inicio": {
         "normal": {
             "que_significa": "Hay pocos programas de inicio (menos de 10). Un programa de inicio es uno que arranca solo al encender el equipo. Es un conteo; no dice si cada uno hace falta.",
-            "que_hacer": ["Si algún día el arranque se alarga, revisa la pestaña Inicio del Administrador de tareas (Ctrl+Mayús+Esc)."],
+            "que_hacer": ["Si algún día el arranque se alarga, revisa la pestaña Inicio (en Windows 11, «Aplicaciones de inicio») del Administrador de tareas (Ctrl+Mayús+Esc)."],
             "quien": "nadie",
             "urgencia": "ninguna",
             "pregunta_tecnico": "",
         },
         "advertencia": {
             "que_significa": "Hay 10 o más programas de inicio, es decir, que arrancan solos al encender el equipo. Muchos juntos pueden hacer lento el arranque. Que haya muchos no significa que alguno sea malo.",
-            "que_hacer": ["Abre el Administrador de tareas (Ctrl+Mayús+Esc) y entra en la pestaña Inicio.", "Con clic derecho, desactiva los que no necesites al encender. No se borran y puedes volver a activarlos.", "Si dudas de alguno, déjalo como está."],
+            "que_hacer": ["Abre el Administrador de tareas (Ctrl+Mayús+Esc) y entra en la pestaña Inicio (en Windows 11, «Aplicaciones de inicio»).", "Con clic derecho, usa «Deshabilitar» en los que no necesites al encender. No se borran y puedes volver a habilitarlos.", "No deshabilites el antivirus ni lo que diga controlador, audio o video. Si dudas de alguno, déjalo como está."],
             "quien": "tu_mismo",
             "urgencia": "baja",
             "pregunta_tecnico": "¿Cuáles de mis programas de inicio puedo desactivar sin problema y cuáles conviene dejar?",
         },
         "sospecha": {
-            "que_significa": "Para los programas de inicio esta revisión solo cuenta cuántos hay y los clasifica en otros niveles. Si ves este resultado, es un error al interpretar los datos.",
+            "que_significa": "Este análisis no produce este nivel para los programas de inicio; solo cuenta cuántos hay. Si lo ves, trátalo como un error del análisis, no como un diagnóstico.",
             "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
             "quien": "tecnico",
             "urgencia": "media",
@@ -387,7 +387,7 @@ GUIAS = {
         },
         "no_determinado": {
             "que_significa": "No se pudo leer la lista de programas de inicio (los que arrancan solos al encender). No significa que haya demasiados: solo que el dato no se obtuvo.",
-            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Mientras tanto, mira la lista en el Administrador de tareas (Ctrl+Mayús+Esc), pestaña Inicio."],
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Mientras tanto, mira la lista en el Administrador de tareas (Ctrl+Mayús+Esc), pestaña Inicio (en Windows 11, «Aplicaciones de inicio»)."],
             "quien": "tu_mismo",
             "urgencia": "baja",
             "pregunta_tecnico": "¿Puedes revisar qué programas arrancan con el equipo, ya que esta herramienta no pudo leerlos?",
@@ -404,10 +404,10 @@ GUIAS = {
         },
         "advertencia": {
             "que_significa": "En los últimos 30 días se instalaron 3 o más programas de editor desconocido (quien lo creó). No significa que sean malos: muchos programas no informan su editor. Conviene reconocerlos.",
-            "que_hacer": ["Mira la lista y busca los que no reconozcas o no uses.", "Quita esos desde Configuración → Aplicaciones: menos programas puede aliviar el equipo.", "Si dudas de alguno, pregunta a un técnico antes de quitarlo."],
+            "que_hacer": ["Revisa en la lista los programas instalados hace poco y sin editor conocido.", "Si no reconoces alguno, búscalo o pregunta a un técnico antes de quitarlo.", "Quita solo lo que sepas que no usas (Configuración → Aplicaciones)."],
             "quien": "tu_mismo",
             "urgencia": "baja",
-            "pregunta_tecnico": "¿Qué hace este programa y por qué conviene quitarlo?",
+            "pregunta_tecnico": "¿Cuáles de estos programas recientes conviene conservar y cuáles quitar, y por qué?",
         },
         "sospecha": {
             "que_significa": "Para los programas instalados esta revisión no usa el nivel de sospecha: solo avisa si hay varios recientes de editor desconocido. Si ves este resultado, es un error al interpretar los datos.",
