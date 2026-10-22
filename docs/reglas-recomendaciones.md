@@ -114,7 +114,7 @@ resultados del análisis y los hechos de `backend/equipo.py`. Son sugerencias
 adicionales a las recomendaciones por componente de arriba. Cada regla solo
 corre si existen los datos que usa: lo que no se pudo leer no se afirma. Salida
 ordenada por prioridad (alta, media, baja) y, dentro de cada una, en el orden
-de esta tabla. Datos usados: `ram_gb` = RAM física (si falta, la que ve el SO);
+de esta tabla. Datos usados: `ram_gb` = RAM física (si falta o es 0, la que ve el SO; si tampoco hay, no hay recomendación `so`);
 `arq64` = 64 bits si el SO o el procesador lo dicen (32 bits solo si dicen 32/x86).
 
 | Id | Condición | Recomendación | Prioridad | Quién |
@@ -134,10 +134,15 @@ medidos y, cuando corresponde, una `nota` con sus límites):
 |---|---|---|
 | Windows 11 | 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Siempre es la principal si se ofrece. Un dato ilegible (TPM o Secure Boot sin permisos) no la descarta: se ofrece con la nota "Falta confirmar…" y el detalle dice "Windows 11 (falta confirmar el TPM 2.0)". Solo se omite por datos realmente leídos (procesador antiguo, BIOS clásica, Secure Boot desactivado, TPM 1.2) o por firmware/procesador no comprobables; `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot: "Falta confirmar el TPM 2.0 (se lee con permisos de administrador): compruébalo antes de instalar." |
 | Windows 10 | 64 bits y `ram_gb` ≥ 4 | Sin actualizaciones de seguridad gratuitas desde octubre de 2025 |
-| Ubuntu o Linux Mint | `ram_gb` ≥ 4 | En 32 bits: pocas versiones compatibles, lo confirma un técnico |
-| Lubuntu o Linux Mint XFCE | `ram_gb` < 4 | Igual que la anterior |
+| Ubuntu o Linux Mint | `ram_gb` ≥ 4. Motivo: "Con X GB de RAM tu equipo cumple lo que suelen pedir estas versiones de Linux." (solo el dato medido, sin prometer fluidez) | En 32 bits: pocas versiones compatibles, lo confirma un técnico |
+| Lubuntu o Linux Mint XFCE | `ram_gb` < 4. Motivo: versiones livianas pensadas para equipos con poca memoria, con el dato de RAM | Igual que la anterior |
 | MiniOS10 | 64 bits, `ram_gb` ≥ 2 y (`ram_gb` < 4, o disco de sistema HDD con `ram_gb` < 8) | Versión modificada no oficial de Windows 10; con ayuda de un técnico |
 | Windows 7 | Siempre al final; solo si 32 bits o `ram_gb` < 2 | Sin actualizaciones de seguridad desde 2020; solo si el equipo o los programas lo exigen, de preferencia sin internet |
 
 `basado_en` solo lleva líneas con dato real (RAM, procesador, arquitectura,
 firmware, TPM —o "no se pudo leer"—, tipo de disco principal).
+
+En `respaldo`, `basado_en` lleva el estado del disco en lenguaje simple y una
+línea "Disco afectado: <modelo>" por cada disco interno con ese estado. No
+copia el `mensaje` del módulo de almacenamiento, que usa términos técnicos
+("Salud reducida (Windows Storage Health) en: ...").

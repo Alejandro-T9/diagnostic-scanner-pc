@@ -1172,8 +1172,8 @@ sugiere, sin que el programa afirme lo que no pudo medir.
 **Consecuencias:**
 
 - Módulos nuevos: `equipo.py` (lee los hechos del sistema: ninguna lectura
-  exige administrador; las del TPM degradan a "falta confirmar" si no se
-  pueden leer) y `recomendador.py` (reglas puras, nunca lanzan).
+  es obligatoria como administrador; el TPM solo se puede leer con esos
+  permisos y, si no, queda en "falta confirmar") y `recomendador.py` (reglas puras, nunca lanzan).
 - Opciones de S.O., en orden: Windows 11 (cuando se cumplen los requisitos o
   solo el TPM / Arranque seguro no se pudieron leer), Windows 10 (con su nota
   de fin de actualizaciones de seguridad), Ubuntu / Linux Mint o Lubuntu /
@@ -1187,5 +1187,14 @@ sugiere, sin que el programa afirme lo que no pudo medir.
 - El informe imprimible muestra la sección "Recomendaciones para tu equipo"
   antes de "Preguntas para tu técnico", con las opciones desplegadas para
   que salgan en el papel. El modo demostración no inventa recomendaciones.
-- El tiempo de escaneo aumentó porque `leer_hechos` agrega lecturas; queda
-  pendiente optimizarlo.
+- Rendimiento: la primera versión de `leer_hechos` tardaba ~5,5 s sin
+  administrador (el TPM tardaba ~5 s en dar "acceso denegado"). Ahora sin
+  administrador el TPM ni se consulta, las dos lecturas de discos comparten
+  una conexión WMI y usan consultas filtradas (disco de C: y su disco físico):
+  `leer_hechos` baja a ~0,4 s y el escaneo completo a ~5 s, la mayor parte
+  del procesador (~3 s, ya existente). `tiempos` trae `hechos` y
+  `recomendaciones` por separado.
+- Endurecimiento: una RAM de 0 GB (lectura sin capacidad) cuenta como dato
+  ausente; los textos de Linux dan solo hechos medidos (sin "funciona con
+  fluidez"); la recomendación de respaldo nombra el disco afectado en vez de
+  copiar el mensaje técnico del módulo.
