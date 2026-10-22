@@ -22,6 +22,8 @@ devuelvan lo que se espera en una laptop concreta.
 
 import contextlib
 import io
+import os
+import re
 import socket
 import threading
 
@@ -1182,7 +1184,81 @@ def test_recomendador_endurecimiento():
     assert opciones[-1]["nombre"] == "Windows 7" and "actualizaciones de seguridad" in opciones[-1]["nota"], opciones
 
 
+def _variables_css(texto, selector):
+    """Variables --nombre: valor del bloque `selector { ... }` (sin comentarios)."""
+    texto = re.sub(r"/\*.*?\*/", "", texto, flags=re.S)
+    bloque = re.search(re.escape(selector) + r"\s*\{(.*?)\}", texto, flags=re.S)
+    assert bloque, f"no hay bloque {selector}"
+    return {n: v.strip() for n, v in re.findall(r"(--[\w-]+)\s*:\s*([^;]+);", bloque.group(1))}
+
+
+def _luminancia(color):
+    canales = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    r, g, b = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in canales]
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _contraste(a, b):
+    la, lb = sorted((_luminancia(a), _luminancia(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+_ESTADOS_PALETA = ("normal", "advertencia", "sospecha", "critico", "nodeterminado")
+_TOKENS_PALETA = (
+    ["--color-fondo", "--color-tarjeta", "--color-texto", "--color-texto-secundario", "--color-verde",
+     "--color-amarillo", "--color-naranja", "--color-rojo", "--color-acento", "--color-borde",
+     "--radio-borde", "--sombra-tarjeta", "--color-marino", "--color-sobre-marino", "--color-borde-control",
+     "--radio-1", "--radio-2", "--sombra-1", "--sombra-2", "--fuente"]
+    + [f"--color-estado-{e}-fondo" for e in _ESTADOS_PALETA]
+    + [f"--espacio-{i}" for i in range(1, 9)]
+    + [f"--texto-{t}" for t in ("xs", "s", "m", "l", "xl", "xxl")])
+
+
+def test_paleta():
+    raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    with open(os.path.join(raiz, "config", "palette.css"), encoding="utf-8") as f:
+        paleta = f.read()
+    with open(os.path.join(raiz, "frontend", "static", "css", "style.css"), encoding="utf-8") as f:
+        estilos = f.read()
+    temas = {"claro": _variables_css(paleta, ":root"),
+             "oscuro": _variables_css(paleta, ':root[data-theme="dark"]')}
+
+    # (h) mismos nombres en ambos temas
+    assert set(temas["claro"]) == set(temas["oscuro"]), set(temas["claro"]) ^ set(temas["oscuro"])
+
+    # (g) toda var(--x) de style.css (sin contar el respaldo) está definida en ambos temas
+    usadas = set(re.findall(r"var\(\s*(--[\w-]+)", re.sub(r"/\*.*?\*/", "", estilos, flags=re.S)))
+    for tema, v in temas.items():
+        assert usadas <= set(v), (tema, sorted(usadas - set(v)))
+
+    for tema, v in temas.items():
+        # (a) tokens presentes
+        faltan = [t for t in _TOKENS_PALETA if t not in v]
+        assert not faltan, (tema, faltan)
+        tarjeta, fondo = v["--color-tarjeta"], v["--color-fondo"]
+        # (b) texto sobre tarjeta y fondo
+        for t in ("--color-texto", "--color-texto-secundario"):
+            for base in (tarjeta, fondo):
+                assert _contraste(v[t], base) >= 4.5, (tema, t, base, _contraste(v[t], base))
+        # (c) estados y acento sobre tarjeta
+        for t in ("--color-verde", "--color-amarillo", "--color-naranja", "--color-rojo", "--color-acento"):
+            assert _contraste(v[t], tarjeta) >= 4.5, (tema, t, _contraste(v[t], tarjeta))
+        # (d) texto sobre la barra marino
+        assert _contraste(v["--color-sobre-marino"], v["--color-marino"]) >= 4.5, tema
+        # (d2) texto de los botones de acento
+        assert _contraste(v["--color-sobre-acento"], v["--color-acento"]) >= 4.5, tema
+        # (e) borde de controles
+        assert _contraste(v["--color-borde-control"], tarjeta) >= 3.0, (tema, _contraste(v["--color-borde-control"], tarjeta))
+        # (f) chip: color de estado sobre su fondo teñido ("no determinado" usa el texto secundario)
+        colores = {"normal": "--color-verde", "advertencia": "--color-amarillo", "sospecha": "--color-naranja",
+                   "critico": "--color-rojo", "nodeterminado": "--color-texto-secundario"}
+        for e, t in colores.items():
+            r = _contraste(v[t], v[f"--color-estado-{e}-fondo"])
+            assert r >= 4.5, (tema, e, r)
+
+
 if __name__ == "__main__":
+    test_paleta()
     test_ram()
     test_bateria()
     test_almacenamiento()

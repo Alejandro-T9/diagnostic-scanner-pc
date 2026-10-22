@@ -448,6 +448,25 @@ function aplicarModo(nuevo, guardar) {
     repintar();
 }
 
+// Tema claro/oscuro. Claro por defecto: solo "oscuro" exacto activa el oscuro
+// (se mueve a modelo.js en la Tarea 3).
+function temaValido(valor) {
+    return valor === "oscuro" ? "oscuro" : "claro";
+}
+
+function aplicarTema(tema, guardar) {
+    const oscuro = temaValido(tema) === "oscuro";
+    if (oscuro) document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+    const boton = document.getElementById("boton-tema");
+    boton.setAttribute("aria-pressed", String(oscuro));
+    boton.setAttribute("aria-label", oscuro ? "Cambiar a tema claro" : "Cambiar a tema oscuro");
+    boton.textContent = oscuro ? "Tema claro" : "Tema oscuro";
+    if (guardar) {
+        try { localStorage.setItem("tema_interfaz", oscuro ? "oscuro" : "claro"); } catch (e) { /* sin almacenamiento: solo no se recuerda */ }
+    }
+}
+
 // Tabla de guías + frases de veredicto. Si falla, la app sigue sin guías.
 async function cargarGuias() {
     if (tablaGuias) return tablaGuias;
@@ -566,6 +585,12 @@ document.addEventListener("contextmenu", (evento) => evento.preventDefault());
 
 document.getElementById("modo-simple-btn").addEventListener("click", () => aplicarModo("simple", true));
 document.getElementById("modo-tecnico-btn").addEventListener("click", () => aplicarModo("tecnico", true));
+
+document.getElementById("boton-tema").addEventListener("click", () =>
+    aplicarTema(document.documentElement.getAttribute("data-theme") === "dark" ? "claro" : "oscuro", true));
+let temaGuardado = null;
+try { temaGuardado = localStorage.getItem("tema_interfaz"); } catch (e) { /* almacenamiento bloqueado: tema claro */ }
+aplicarTema(temaGuardado, false);
 
 let modoGuardado = null;
 try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* almacenamiento bloqueado: se usa el modo simple */ }

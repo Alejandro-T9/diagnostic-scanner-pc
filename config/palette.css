@@ -1,29 +1,129 @@
-/* config/palette.css — Paleta de colores única de Diagnostic Scanner PC.
-   Fuente de verdad de todos los colores del proyecto. Se importa desde
-   frontend/static/css/style.css: cambiar un color acá lo cambia en toda
-   la interfaz sin tocar el resto de las hojas de estilo. */
+/* config/palette.css — Tokens de diseño únicos de Diagnostic Scanner PC.
+   Fuente de verdad de colores, espaciado, radios, sombras y tipografía.
+   Se importa desde frontend/static/css/style.css: cambiar un valor acá lo
+   cambia en toda la interfaz. Tema claro por defecto (:root); el oscuro se
+   activa con data-theme="dark" en <html> y debe definir EXACTAMENTE los
+   mismos nombres (test_paleta en backend/test_scanner.py lo verifica, junto
+   con los contrastes WCAG: texto >= 4,5:1, bordes de controles >= 3:1). */
 
 :root {
     /* Colores base */
-    --color-fondo: #0D1117;
-    --color-tarjeta: #161B22;
-    --color-texto: #E6EDF3;
-    --color-texto-secundario: #8B949E;
+    --color-fondo: #F4F6F9;
+    --color-tarjeta: #FFFFFF;
+    --color-texto: #1B2430;
+    --color-texto-secundario: #566273;
+    --color-marino: #0F2A47;          /* barra superior */
+    --color-sobre-marino: #FFFFFF;    /* texto sobre la barra */
+    --color-acento: #1F5FBF;
+    --color-sobre-acento: #FFFFFF;    /* texto sobre botones de acento */
 
     /* Colores de estado (mismos nombres que backend/scanner.py ESTADOS_VALIDOS).
-       --color-naranja se agregó para "sospecha" (ver decisión en
-       docs/DECISIONES.md) — sistema de 5 niveles en vez de 3. "no_determinado"
-       reusa --color-texto-secundario (gris = neutral/desconocido, no hace
-       falta un color nuevo para eso). */
-    --color-verde: #3FB950;
-    --color-amarillo: #D29922;
-    --color-naranja: #DB6D28;
-    --color-rojo: #F85149;
-    --color-acento: #58A6FF;
+       --color-naranja es "sospecha" (sistema de 5 niveles, ver
+       docs/DECISIONES.md); "no determinado" usa --color-texto-secundario. */
+    --color-verde: #1A7F4B;
+    --color-amarillo: #9A6700;
+    --color-naranja: #B54708;
+    --color-rojo: #B42318;
 
-    /* Bordes, sombras y transiciones */
-    --color-borde: #30363D;
+    /* Fondos teñidos suaves de cada estado (chip = texto de color sobre ellos) */
+    --color-estado-normal-fondo: #EEF8F2;
+    --color-estado-advertencia-fondo: #FEF7E6;
+    --color-estado-sospecha-fondo: #FDF0E4;
+    --color-estado-critico-fondo: #FDEDEB;
+    --color-estado-nodeterminado-fondo: #F0F2F6;
+
+    /* Bordes */
+    --color-borde: #D5DBE3;
+    --color-borde-control: #8793A3;   /* botones, campos, chips: >= 3:1 sobre tarjeta */
+
+    /* Realces basados en el acento (grilla del mapa, fila resaltada/seleccionada) */
+    --color-grilla: rgba(31, 95, 191, 0.07);
+    --color-acento-tenue: rgba(31, 95, 191, 0.07);
+    --color-acento-suave: rgba(31, 95, 191, 0.12);
+
+    /* Espaciado */
+    --espacio-1: 4px;
+    --espacio-2: 8px;
+    --espacio-3: 12px;
+    --espacio-4: 16px;
+    --espacio-5: 24px;
+    --espacio-6: 32px;
+    --espacio-7: 48px;
+    --espacio-8: 64px;
+
+    /* Radios y sombras */
+    --radio-0: 4px;
+    --radio-1: 8px;
+    --radio-2: 12px;
     --radio-borde: 8px;
-    --sombra-tarjeta: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --sombra-1: 0 1px 2px rgba(15, 42, 71, 0.08), 0 1px 3px rgba(15, 42, 71, 0.06);
+    --sombra-2: 0 4px 12px rgba(15, 42, 71, 0.12);
+    --sombra-tarjeta: var(--sombra-1);
     --transicion-color: background-color 0.2s ease, border-color 0.2s ease;
+
+    /* Tipografía */
+    --fuente: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --fuente-mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+    --texto-xs: 12px;
+    --texto-s: 14px;
+    --texto-m: 16px;
+    --texto-l: 20px;
+    --texto-xl: 24px;
+    --texto-xxl: 32px;
+}
+
+:root[data-theme="dark"] {
+    --color-fondo: #0F141B;
+    --color-tarjeta: #171E27;
+    --color-texto: #E8EDF3;
+    --color-texto-secundario: #A3AEBD;
+    --color-marino: #0A1B2E;
+    --color-sobre-marino: #FFFFFF;
+    --color-acento: #6EA8FF;
+    --color-sobre-acento: #0F141B;
+
+    --color-verde: #4CC38A;
+    --color-amarillo: #E0A93B;
+    --color-naranja: #F08A4B;
+    --color-rojo: #FF6B61;
+
+    --color-estado-normal-fondo: #12301F;
+    --color-estado-advertencia-fondo: #33290F;
+    --color-estado-sospecha-fondo: #3A2112;
+    --color-estado-critico-fondo: #3D1A18;
+    --color-estado-nodeterminado-fondo: #232C38;
+
+    --color-borde: #2C3745;
+    --color-borde-control: #6B7A8C;
+
+    --color-grilla: rgba(110, 168, 255, 0.07);
+    --color-acento-tenue: rgba(110, 168, 255, 0.07);
+    --color-acento-suave: rgba(110, 168, 255, 0.14);
+
+    --espacio-1: 4px;
+    --espacio-2: 8px;
+    --espacio-3: 12px;
+    --espacio-4: 16px;
+    --espacio-5: 24px;
+    --espacio-6: 32px;
+    --espacio-7: 48px;
+    --espacio-8: 64px;
+
+    --radio-0: 4px;
+    --radio-1: 8px;
+    --radio-2: 12px;
+    --radio-borde: 8px;
+    --sombra-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.35);
+    --sombra-2: 0 4px 12px rgba(0, 0, 0, 0.55);
+    --sombra-tarjeta: var(--sombra-1);
+    --transicion-color: background-color 0.2s ease, border-color 0.2s ease;
+
+    --fuente: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+    --fuente-mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+    --texto-xs: 12px;
+    --texto-s: 14px;
+    --texto-m: 16px;
+    --texto-l: 20px;
+    --texto-xl: 24px;
+    --texto-xxl: 32px;
 }

@@ -11,7 +11,7 @@
 body {
     background-color: var(--color-fondo);
     color: var(--color-texto);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: var(--fuente);
     margin: 0;
     padding: 24px;
 }
@@ -19,7 +19,7 @@ body {
 /* Datos técnicos (temperaturas, voltajes, capacidades) en monoespaciada
    para que las cifras se alineen y se lean como en una terminal. */
 .dato-tecnico {
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
 }
 
 /* --- Cabecera --- */
@@ -59,14 +59,14 @@ body {
 }
 
 .sello {
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
     font-size: 13px;
     font-weight: bold;
     letter-spacing: 0.08em;
     padding: 6px 16px;
     border: 2px solid var(--color-verde);
     color: var(--color-verde);
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     transition: var(--transicion-color);
 }
 
@@ -78,7 +78,7 @@ body {
 .resumen-texto {
     color: var(--color-texto-secundario);
     font-size: 13px;
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
 }
 
 /* Cobertura del escaneo: cuánto se pudo medir, no cuán sano está el
@@ -89,7 +89,7 @@ body {
 .cobertura-texto {
     color: var(--color-texto-secundario);
     font-size: 12px;
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
     opacity: 0.8;
 }
 
@@ -102,15 +102,15 @@ body {
 /* --- Mapa físico: silueta de laptop con un punto por componente,
    ubicado en su posición real aproximada (ver POSICIONES_MAPA en app.js) --- */
 .mapa-svg-wrap {
-    /* Líneas de grilla al 6% de --color-acento (#58A6FF), estilo plano
-       técnico. Valor fijo en vez de color-mix() por compatibilidad con el
+    /* Líneas de grilla: --color-grilla es el acento al ~7%, estilo plano
+       técnico. Token fijo en vez de color-mix() por compatibilidad con el
        Chromium que traiga el WinPE de destino. */
     background-image:
-        linear-gradient(rgba(88, 166, 255, 0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(88, 166, 255, 0.06) 1px, transparent 1px);
+        linear-gradient(var(--color-grilla) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grilla) 1px, transparent 1px);
     background-size: 24px 24px;
     background-color: var(--color-fondo);
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     border: 1px solid var(--color-borde);
     display: flex;
     align-items: center;
@@ -157,7 +157,7 @@ body {
 .punto-etiqueta {
     fill: var(--color-texto-secundario);
     font-size: 10px;
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
     pointer-events: none;
 }
 
@@ -173,23 +173,23 @@ body {
     align-items: center;
     gap: 14px;
     padding: 10px;
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     cursor: pointer;
     transition: background-color 0.15s;
 }
 
 .fila.resaltado {
-    background-color: rgba(88, 166, 255, 0.06);
+    background-color: var(--color-acento-tenue);
 }
 
 .fila.seleccionado {
-    background-color: rgba(88, 166, 255, 0.1);
+    background-color: var(--color-acento-suave);
     box-shadow: inset 2px 0 0 var(--color-acento);
 }
 
 .franja {
     height: 22px;
-    border-radius: 2px;
+    border-radius: var(--radio-0);
     transition: var(--transicion-color);
 }
 
@@ -220,21 +220,21 @@ body {
 }
 
 .fila-chip {
-    font-family: "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-family: var(--fuente-mono);
     font-size: 10px;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     text-align: center;
     padding: 3px 0;
-    border-radius: 3px;
+    border-radius: var(--radio-0);
     font-weight: bold;
 }
 
-.fila-chip.normal { color: var(--color-verde); border: 1px solid var(--color-verde); }
-.fila-chip.advertencia { color: var(--color-amarillo); border: 1px solid var(--color-amarillo); }
-.fila-chip.sospecha { color: var(--color-naranja); border: 1px solid var(--color-naranja); }
-.fila-chip.critico { color: var(--color-rojo); border: 1px solid var(--color-rojo); }
-.fila-chip.no_determinado { color: var(--color-texto-secundario); border: 1px solid var(--color-texto-secundario); }
+.fila-chip.normal { background-color: var(--color-estado-normal-fondo); color: var(--color-verde); border: 1px solid var(--color-verde); }
+.fila-chip.advertencia { background-color: var(--color-estado-advertencia-fondo); color: var(--color-amarillo); border: 1px solid var(--color-amarillo); }
+.fila-chip.sospecha { background-color: var(--color-estado-sospecha-fondo); color: var(--color-naranja); border: 1px solid var(--color-naranja); }
+.fila-chip.critico { background-color: var(--color-estado-critico-fondo); color: var(--color-rojo); border: 1px solid var(--color-rojo); }
+.fila-chip.no_determinado { background-color: var(--color-estado-nodeterminado-fondo); color: var(--color-texto-secundario); border: 1px solid var(--color-texto-secundario); }
 
 /* --- Panel de detalle: se llena al hacer clic en un punto del mapa o
    una fila de la ficha, con TODO lo que "datos" trae del módulo --- */
@@ -287,7 +287,7 @@ body {
 .detalle-recomendacion {
     background-color: var(--color-fondo);
     border-left: 3px solid var(--color-acento);
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     padding: 10px 14px;
     margin-bottom: 16px;
     font-size: 13px;
@@ -330,7 +330,7 @@ body {
 .detalle-subitem {
     background-color: var(--color-fondo);
     border: 1px solid var(--color-borde);
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     padding: 4px 12px;
     margin-bottom: 8px;
 }
@@ -352,9 +352,9 @@ body {
 
 .boton-escanear {
     background-color: var(--color-acento);
-    color: var(--color-fondo);
+    color: var(--color-sobre-acento);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radio-1);
     padding: 12px 24px;
     font-size: 16px;
     font-weight: bold;
@@ -376,7 +376,7 @@ body {
     background-color: transparent;
     color: var(--color-acento);
     border: 1px solid var(--color-acento);
-    border-radius: 6px;
+    border-radius: var(--radio-1);
     padding: 12px 24px;
     font-size: 16px;
     font-weight: bold;
@@ -391,10 +391,22 @@ body {
 .boton-demo {
     background-color: transparent;
     color: var(--color-texto-secundario);
-    border: 1px solid var(--color-borde);
-    border-radius: 6px;
+    border: 1px solid var(--color-borde-control);
+    border-radius: var(--radio-1);
     padding: 12px 24px;
     font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Botón de tema (provisional: la cabecera se reemplaza en la Tarea 3) */
+.boton-tema {
+    background-color: transparent;
+    color: var(--color-texto);
+    border: 1px solid var(--color-borde-control);
+    border-radius: var(--radio-1);
+    padding: 8px 16px;
+    font-size: 14px;
     font-weight: bold;
     cursor: pointer;
 }
@@ -404,7 +416,7 @@ body {
     display: none;
     height: 6px;
     background-color: var(--color-tarjeta);
-    border-radius: 3px;
+    border-radius: var(--radio-0);
     margin-top: 16px;
     overflow: hidden;
 }
@@ -459,8 +471,8 @@ body {
 /* --- Interruptor de modo (simple / técnico) --- */
 .interruptor-modo {
     display: inline-flex;
-    border: 1px solid var(--color-borde);
-    border-radius: 6px;
+    border: 1px solid var(--color-borde-control);
+    border-radius: var(--radio-1);
     overflow: hidden;
 }
 
@@ -483,14 +495,14 @@ body.demo #boton-informe { display: none; }
 
 .interruptor-modo button[aria-pressed="true"] {
     background-color: var(--color-acento);
-    color: var(--color-fondo);
+    color: var(--color-sobre-acento);
 }
 
 /* --- Guía dentro del panel de detalle (modo técnico) --- */
 .detalle-guia {
     background-color: var(--color-fondo);
     border: 1px solid var(--color-borde);
-    border-radius: 4px;
+    border-radius: var(--radio-0);
     padding: 4px 14px 8px;
     margin-bottom: 16px;
     font-size: 13px;
@@ -588,8 +600,8 @@ body.modo-simple.sin-escaneo #boton-escanear { display: none; }
     font-size: 12px;
     font-weight: bold;
     padding: 3px 10px;
-    border-radius: 12px;
-    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-2);
+    border: 1px solid var(--color-borde-control);
     color: var(--color-texto-secundario);
 }
 
