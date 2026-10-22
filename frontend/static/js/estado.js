@@ -88,6 +88,9 @@ const QUIEN_TEXTO = {
     nadie: "No necesita acción",
 };
 
+// "Análisis de Windows" llega en F4a: hasta entonces su pestaña y su panel están ocultos.
+const ANALISIS_DISPONIBLE = false;
+
 if (typeof module !== "undefined") {
-    module.exports = { NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, POSICIONES_MAPA, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
+    module.exports = { ANALISIS_DISPONIBLE, NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, POSICIONES_MAPA, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
 }

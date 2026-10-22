@@ -3,6 +3,7 @@
 const assert = require("assert");
 const { iconoEstado, iconoComponente, iconoUi } = require("../static/js/iconos.js");
 const { CHIP_TEXTO } = require("../static/js/estado.js");
+const { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun } = require("../static/js/modelo.js");
 
 const ESTADOS = ["normal", "advertencia", "sospecha", "critico", "no_determinado"];
 const COMPONENTES = ["mainboard", "cpu", "ram", "almacenamiento", "fuente_poder", "bateria", "red"];
@@ -38,5 +39,42 @@ ui.forEach((svg) => assert(svg.includes('aria-hidden="true"') && svg.includes('s
 
 // estado.js: cada estado tiene texto de chip
 ESTADOS.forEach((e) => assert(typeof CHIP_TEXTO[e] === "string" && CHIP_TEXTO[e]));
+
+// --- modelo.js: pestañas, tema, modo ---
+const TRES = ["resumen", "componentes", "recomendaciones"];
+assert.deepStrictEqual(PESTANAS, ["resumen", "componentes", "recomendaciones", "analisis"]);
+
+// (a) pestanaDesdeHash
+assert.strictEqual(pestanaDesdeHash("#componentes", ["resumen", "componentes"]), "componentes");
+assert.strictEqual(pestanaDesdeHash("#componentes", ["resumen"]), "resumen");
+assert.strictEqual(pestanaDesdeHash("#analisis", ["resumen", "componentes"]), "resumen");
+[ "", "#zzz", null, undefined, 5, {}, "#__proto__", "#constructor" ].forEach((h) =>
+    assert.strictEqual(pestanaDesdeHash(h, ["resumen", "componentes"]), "resumen", String(h)));
+assert.strictEqual(pestanaDesdeHash("#zzz", null), "resumen");
+assert.strictEqual(pestanaDesdeHash("#componentes", undefined), "resumen");
+
+// (b) siguientePestana
+assert.strictEqual(siguientePestana("resumen", "ArrowRight", TRES), "componentes");
+assert.strictEqual(siguientePestana("recomendaciones", "ArrowRight", TRES), "resumen");
+assert.strictEqual(siguientePestana("resumen", "ArrowLeft", TRES), "recomendaciones");
+assert.strictEqual(siguientePestana("componentes", "Home", TRES), "resumen");
+assert.strictEqual(siguientePestana("resumen", "End", TRES), "recomendaciones");
+assert.strictEqual(siguientePestana("componentes", "x", TRES), "componentes");
+assert.strictEqual(siguientePestana("resumen", "ArrowRight", ["resumen", "recomendaciones"]), "recomendaciones");
+assert.strictEqual(siguientePestana("resumen", "ArrowLeft", ["resumen", "recomendaciones"]), "recomendaciones");
+assert.strictEqual(siguientePestana("resumen", "ArrowRight", ["resumen"]), "resumen");
+assert.strictEqual(siguientePestana("analisis", "ArrowRight", TRES), "resumen"); // actual fuera de las habilitadas
+
+// (c) temaValido / modoValido
+assert.strictEqual(temaValido("oscuro"), "oscuro");
+["x", null, {}, undefined, "Oscuro"].forEach((v) => assert.strictEqual(temaValido(v), "claro"));
+assert.strictEqual(temaValido("claro"), "claro");
+assert.strictEqual(modoValido("tecnico"), "tecnico");
+["x", undefined, null, {}, "Tecnico"].forEach((v) => assert.strictEqual(modoValido(v), "simple"));
+
+// (d) habilitadasSegun
+assert.deepStrictEqual(habilitadasSegun(false, true), ["resumen"]);
+assert.deepStrictEqual(habilitadasSegun(true, false), TRES);
+assert.deepStrictEqual(habilitadasSegun(true, true), PESTANAS);
 
 console.log("modelo.test.js: OK");
