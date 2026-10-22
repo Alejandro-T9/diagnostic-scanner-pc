@@ -7,6 +7,7 @@ fijos de este archivo van sin escapar. El HTML es autocontenido: estilos en
 línea, sin JS ni recursos externos (debe verse igual sin internet).
 """
 
+from datetime import datetime
 from html import escape
 
 import explicador
@@ -22,7 +23,6 @@ ESTADOS = {
     "sospecha": ("Sospecha", "#DB6D28"), "critico": ("Crítico", "#F85149"),
     "no_determinado": ("No determinado", "#8B949E"),
 }
-QUIEN = {"tu_mismo": "Tú mismo", "tecnico": "Un técnico", "nadie": "Nadie"}
 
 LIMITES = "Este informe se basa solo en lo que el programa pudo medir; no reemplaza la revisión de un técnico."
 
@@ -39,8 +39,16 @@ h1 { margin: 0 0 4px 0; } h2 { margin: 28px 0 8px 0; border-bottom: 1px solid #D
         padding: 0 10px; font-size: 13px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
 .tarjeta p { margin: 4px 0; } .tarjeta ul { margin: 4px 0 4px 20px; padding: 0; }
 .limites { margin-top: 28px; font-size: 14px; color: #57606A; }
-@media print { .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
+@media print { .no-imprimir { display: none; } .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
 """
+
+
+def _fecha_local(ts):
+    """ISO UTC -> 'dd/mm/aaaa HH:MM' en hora local; si no se puede, el texto original (escapado)."""
+    try:
+        return datetime.fromisoformat(ts).astimezone().strftime("%d/%m/%Y %H:%M")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return escape(str(ts))
 
 
 def _pagina(cuerpo):
@@ -57,10 +65,12 @@ def _tarjeta(nombre, comp):
     if guia:
         pasos = guia.get("que_hacer")
         pasos = "".join(f"<li>{escape(str(p))}</li>" for p in pasos) if isinstance(pasos, list) else ""
-        quien = "No hace falta" if comp.get("estado") == "normal" else QUIEN.get(guia.get("quien"), "Un técnico")
+        normal = comp.get("estado") == "normal"
+        quien = "No hace falta" if normal else explicador.QUIEN_TEXTO.get(guia.get("quien"), "Un técnico")
+        titulo_pasos = "Para mantenerlo bien:" if normal else "Qué hacer:"
         detalle = (
             f'<p><strong>Qué significa:</strong> {escape(str(guia.get("que_significa", "")))}</p>'
-            f'<p><strong>Qué hacer:</strong></p><ul>{pasos}</ul>'
+            f'<p><strong>{titulo_pasos}</strong></p><ul>{pasos}</ul>'
             f'<p><strong>Quién lo hace:</strong> {escape(quien)}</p>'
         )
     return (
@@ -78,7 +88,7 @@ def generar_informe_html(resultado, veredicto):
     if not resultado or not resultado.get("componentes"):
         return _pagina(
             '<h1>Informe de diagnóstico</h1>'
-            '<p>Aún no hay un escaneo. Vuelve al panel y pulsa «Escanear Sistema».</p>'
+            '<p>Aún no hay un escaneo. Vuelve al panel y pulsa «Revisar mi PC» (o «Escanear Sistema»).</p>'
         )
     comps = resultado["componentes"]
     orden = {e: i for i, e in enumerate(scanner._SEVERIDAD)}
@@ -108,7 +118,8 @@ def generar_informe_html(resultado, veredicto):
     cuerpo = (
         '<h1>Informe de diagnóstico</h1>'
         f'<div class="meta">ID: {escape(str(resultado.get("id_diagnostico", "")))} · '
-        f'Fecha: {escape(str(resultado.get("timestamp", "")))}</div>'
+        f'Fecha: {_fecha_local(resultado.get("timestamp", ""))}</div>'
+        '<p class="no-imprimir">Para imprimirlo o guardarlo como PDF, pulsa Ctrl+P.</p>'
         + (f'<div class="meta">Equipo: {escape(equipo)}</div>' if equipo else "")
         + f'<div class="sello">{escape(str(sello))}</div>'
         '<div class="meta">Según lo que el programa pudo medir.</div>'

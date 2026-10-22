@@ -331,10 +331,12 @@ function bloqueGuiaHtml(guia) {
 function renderizarSimple(componentes) {
     const ids = Object.keys(componentes);
     const bien = ids.filter((id) => componentes[id].estado === "normal").map(nombreComp);
-    const atencion = ids.filter((id) => componentes[id].estado !== "normal").map(nombreComp);
+    const sinDatos = ids.filter((id) => componentes[id].estado === "no_determinado").map(nombreComp);
+    const atencion = ids.filter((id) => !["normal", "no_determinado"].includes(componentes[id].estado)).map(nombreComp);
+    const noRevisados = sinDatos.length ? `No se pudieron revisar: ${sinDatos.join(", ")}.` : "";
     let linea;
-    if (!atencion.length) linea = "Todo lo que pudimos revisar está bien.";
-    else linea = (bien.length ? `Están bien: ${bien.join(", ")}. ` : "") + `Necesitan atención: ${atencion.join(", ")}.`;
+    if (!atencion.length) linea = ["Todo lo que pudimos revisar está bien.", noRevisados].filter(Boolean).join(" ");
+    else linea = [bien.length && `Están bien: ${bien.join(", ")}.`, `Necesitan atención: ${atencion.join(", ")}.`, noRevisados].filter(Boolean).join(" ");
     document.getElementById("simple-resumen").textContent = linea;
 
     const contenedor = document.getElementById("simple-tarjetas");
@@ -355,6 +357,7 @@ function renderizarSimple(componentes) {
             if (guia.que_significa) tarjeta.append(crear("p", "", guia.que_significa));
             const pasos = pasosGuia(guia);
             if (pasos.length) {
+                if (info.estado === "normal") { const t = crear("p", ""); t.append(crear("strong", "", "Para mantenerlo bien:")); tarjeta.append(t); }
                 const lista = crear("ol", "tarjeta-simple-pasos");
                 pasos.forEach((p) => lista.append(crear("li", "", p)));
                 tarjeta.append(lista);
@@ -452,9 +455,11 @@ async function escanearSistema() {
     botonRevisar.disabled = true;
     barra.classList.add("activa");
     try {
+        const guias = cargarGuias(); // en paralelo al escaneo: el sello en palabras necesita _veredictos (nunca lanza)
         const respuesta = await fetch("/api/scan");
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
         const resultado = await respuesta.json();
+        await guias;
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
         escaneosReales++;
         renderizarDiagnostico(resultado.componentes, resultado.cobertura);

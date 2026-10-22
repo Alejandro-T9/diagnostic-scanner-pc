@@ -630,7 +630,7 @@ def test_informe():
     # (b) sin escaneo: página amable, no lanza
     for vacio in (None, {}):
         h = informe.generar_informe_html(vacio, "SIN_DATOS")
-        assert "Aún no hay un escaneo" in h and "Escanear Sistema" in h, h
+        assert "Aún no hay un escaneo" in h and "Revisar mi PC" in h and "Escanear Sistema" in h, h
     # (c) preguntas solo de componentes no normales; límites siempre
     g = explicador.guia_para("cpu", "critico")
     assert "Preguntas para tu técnico" in html and html.count(g["pregunta_tecnico"]) == 1
@@ -660,6 +660,21 @@ def test_informe():
     assert "todo está normal" not in h and "No hay preguntas sugeridas" in h, h
     assert h.count("Qué significa:") == 1 and h.count("Quién lo hace:") == 1, h  # solo la tarjeta normal
     assert "Quién lo hace: No hace falta" in h.replace("</strong> ", " ").replace("<strong>", "")
+
+    # (f) fecha local legible, pista de impresión, paso de mantenimiento en normales
+    assert explicador.QUIEN_TEXTO == {"tu_mismo": "Tú mismo", "tecnico": "Un técnico", "nadie": "Nadie"}
+    assert utils.QUIEN_TEXTO is explicador.QUIEN_TEXTO
+    import re
+    assert re.search(r"Fecha: \d{2}/\d{2}/\d{4} \d{2}:\d{2}<", informe.generar_informe_html(
+        {**_escaneo_falso(), "timestamp": "2026-10-21T23:10:05.123456+00:00"}, "CRITICO")), "fecha local"
+    for basura in ("2026-10-21 10:00:00", "<i>x</i>", "", None):
+        h = informe.generar_informe_html({**_escaneo_falso(), "timestamp": basura}, "CRITICO")
+        assert "<i>x</i>" not in h and "Fecha:" in h, basura
+    h = informe.generar_informe_html({**_escaneo_falso(), "timestamp": "<i>x</i>"}, "CRITICO")
+    assert "Fecha: &lt;i&gt;x&lt;/i&gt;" in h, h
+    assert '<p class="no-imprimir">Para imprimirlo o guardarlo como PDF, pulsa Ctrl+P.</p>' in html
+    assert ".no-imprimir { display: none" in html
+    assert html.count("Para mantenerlo bien:") == 1 and html.count("Qué hacer:") == 1, html  # normal vs crítico
 
     # (e) ruta: sin escaneo responde 200 text/html; con excepción, JSON 500
     original, generar = app._ultimo_escaneo, informe.generar_informe_html

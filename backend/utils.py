@@ -19,6 +19,8 @@ import winreg
 import psutil
 import wmi
 
+from explicador import QUIEN_TEXTO
+
 # Namespaces WMI que los 7 módulos consultan (ver backend/modules/).
 # root/cimv2 es el namespace por defecto (placa, CPU, RAM, red, disco);
 # root/wmi es el que usan las clases de batería y temperatura. Pivote de
@@ -94,9 +96,6 @@ _LIMITACIONES_CONOCIDAS = [
 ]
 
 
-_QUIEN_TEXTO = {"tu_mismo": "Tú mismo", "tecnico": "Un técnico", "nadie": "Nadie"}
-
-
 def generar_reporte_texto(resultado, veredicto):
     """Arma el reporte de texto plano de un escaneo, para descargar desde
     el dashboard (/api/reporte). Recibe el veredicto ya calculado en vez
@@ -139,7 +138,7 @@ def generar_reporte_texto(resultado, veredicto):
             lineas.append(f"Qué significa: {guia['que_significa']}")
             lineas.append("Qué hacer:")
             lineas.extend(f"- {paso}" for paso in guia["que_hacer"])
-            lineas.append(f"Quién lo hace: {_QUIEN_TEXTO.get(guia['quien'], guia['quien'])}")
+            lineas.append(f"Quién lo hace: {QUIEN_TEXTO.get(guia['quien'], guia['quien'])}")
         if info.get("datos"):
             lineas.append(json.dumps(info["datos"], indent=2, ensure_ascii=False))
         lineas.append("")

@@ -24,6 +24,9 @@ import copy
 QUIEN_VALIDOS = {"tu_mismo", "tecnico", "nadie"}
 URGENCIAS_VALIDAS = {"ninguna", "baja", "media", "alta"}
 
+# Palabras con que el informe y el reporte de texto nombran a quien hace el paso.
+QUIEN_TEXTO = {"tu_mismo": "Tú mismo", "tecnico": "Un técnico", "nadie": "Nadie"}
+
 # Frase corta del veredicto global (llaves = scanner._SEVERIDAD en mayúsculas).
 FRASES_VEREDICTO = {
     "NORMAL": "Tu PC está bien",
@@ -149,7 +152,7 @@ GUIAS = {
             "que_hacer": ["Guarda tu trabajo y cierra los programas que no necesites.", "Reinicia el equipo y vuelve a analizar para ver si el uso sigue igual de alto."],
             "quien": "tu_mismo",
             "urgencia": "alta",
-            "pregunta_tecnico": "¿Qué programa consume tanta memoria, o qué prueba muestra que los módulos instalados no alcanzan?",
+            "pregunta_tecnico": "¿Qué programa consume tanta memoria, o qué prueba muestra que las memorias instaladas no alcanzan?",
         },
         "no_determinado": {
             "que_significa": "No se pudo leer la información de la memoria RAM. No significa que esté dañada: solo que el equipo no entregó esos datos.",
@@ -277,7 +280,7 @@ GUIAS = {
     "red": {
         "normal": {
             "que_significa": "La tarjeta de red tiene enlace con tu router o red (por cable o Wi-Fi) y no registra errores en los paquetes de datos. No se comprueba que el internet funcione ni su velocidad.",
-            "que_hacer": ["Mantén al día las actualizaciones de Windows, que incluyen mejoras del software de la tarjeta de red."],
+            "que_hacer": ["Mantén al día las actualizaciones de Windows, que pueden incluir mejoras del software de la tarjeta de red."],
             "quien": "nadie",
             "urgencia": "ninguna",
             "pregunta_tecnico": "",
