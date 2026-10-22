@@ -80,6 +80,8 @@ def diagnosticar() -> dict:
             "programas": programas[:_MAX_LISTA],
             "recientes_sin_editor": [p["nombre"] for p in _recientes_sin_editor(programas, hoy)][:_MAX_RECIENTES],
         }
+        if not datos["instalados"]:  # solo menú Inicio: el total de instalados es desconocido, no 0
+            datos["total"] = datos["instalados"] = None
     return {"componente": "programas", "estado": estado, "mensaje": mensaje, "datos": datos,
             "recomendacion": _RECOMENDACIONES[estado]}
 

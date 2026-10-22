@@ -1749,7 +1749,7 @@ def test_analisis_programas():
         programas._leer_aplicaciones_inicio = lambda: [dict(x) for x in tienda]
         r = programas.diagnosticar()
         _assert_estado("programas sin registro", r["estado"], "no_determinado")
-        assert r["datos"]["total"] == 2 and r["datos"]["instalados"] == 0 and r["datos"]["en_menu_inicio"] == 2
+        assert r["datos"]["total"] is None and r["datos"]["instalados"] is None and r["datos"]["en_menu_inicio"] == 2
         assert "No se pudo leer" in r["mensaje"] and "2 accesos" in r["mensaje"], r["mensaje"]
         programas._leer_registro = lambda: [dict(x) for x in registro]
         programas._leer_aplicaciones_inicio = _lanza
