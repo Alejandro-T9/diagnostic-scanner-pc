@@ -15,6 +15,7 @@ se ignoran por entrada.
 """
 
 import ctypes
+import math
 import os
 import time
 
@@ -31,7 +32,7 @@ _RECOMENDACIONES = {
     "normal": "Tu disco principal tiene espacio de sobra; no hace falta hacer nada.",
     "advertencia": "Conviene liberar espacio pronto: empieza por la papelera y las descargas que ya no uses.",
     "sospecha": "Libera espacio cuanto antes: vacía la papelera, borra descargas viejas y pasa tus archivos a otro disco.",
-    "no_determinado": "Mira en Este equipo cuánto espacio queda libre en el disco C: y repite el análisis.",
+    "no_determinado": "Mira en Este equipo cuánto espacio queda libre y repite el análisis.",
 }
 
 
@@ -45,10 +46,10 @@ def diagnosticar() -> dict:
     except Exception:
         carpetas = []
 
-    if not disco:
+    try:
+        estado, mensaje = _clasificar(disco["libre_pct"], disco) if disco else _clasificar(None)
+    except Exception:  # lectura mal formada: se degrada, no se lanza
         estado, mensaje = _clasificar(None)
-    else:
-        estado, mensaje = _clasificar(disco["libre_pct"], disco)
     return {
         "componente": "espacio", "estado": estado, "mensaje": mensaje,
         "datos": {"disco_c": disco, "carpetas": carpetas},
@@ -57,13 +58,16 @@ def diagnosticar() -> dict:
 
 
 def _clasificar(libre_pct, disco=None) -> tuple:
-    if libre_pct is None:
+    if (isinstance(libre_pct, bool) or not isinstance(libre_pct, (int, float))
+            or not 0 <= libre_pct <= 100):  # None, texto, NaN, negativo o > 100: no es una lectura válida
         return "no_determinado", "No se pudo leer cuánto espacio libre queda en el disco principal."
     unidad = (disco or {}).get("unidad", "C:")
     detalle = ""
     if disco:
         detalle = f" ({disco['libre_gb']:.0f} GB de {disco['total_gb']:.0f} GB)"
-    mensaje = f"Te queda el {libre_pct:.0f} % libre del disco {unidad}{detalle}."
+    # Por debajo de 10 % se muestra un decimal (truncado) para no contradecir el estado en los umbrales.
+    texto = f"{math.floor(libre_pct * 10 + 1e-6) / 10:.1f}".replace(".", ",") if libre_pct < 10 else f"{libre_pct:.0f}"
+    mensaje = f"Te queda el {texto} % libre del disco {unidad}{detalle}."
     if libre_pct < UMBRAL_SOSPECHA_PCT:
         return "sospecha", mensaje
     if libre_pct < UMBRAL_ADVERTENCIA_PCT:
@@ -126,7 +130,7 @@ def _medir_carpeta(ruta: str, max_seg: float, max_archivos: int):
             with os.scandir(pendientes.pop()) as it:
                 abierta = True
                 for entrada in it:
-                    if archivos >= max_archivos or time.monotonic() > limite:
+                    if archivos >= max_archivos or time.monotonic() >= limite:
                         parcial = True
                         break
                     try:

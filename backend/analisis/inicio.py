@@ -115,10 +115,11 @@ def _leer_run() -> list:
 
 def _leer_carpetas_inicio() -> list:
     sub = r"Microsoft\Windows\Start Menu\Programs\Startup"
-    fuentes = [
-        (os.path.join(os.environ.get("APPDATA", ""), sub), winreg.HKEY_CURRENT_USER, "usuario"),
-        (os.path.join(os.environ.get("ProgramData", ""), sub), winreg.HKEY_LOCAL_MACHINE, "equipo"),
-    ]
+    # Sin la variable de entorno no hay carpeta real: se salta (una ruta relativa leería el directorio actual).
+    fuentes = [(os.path.join(base, sub), raiz, origen)
+               for var, raiz, origen in (("APPDATA", winreg.HKEY_CURRENT_USER, "usuario"),
+                                         ("ProgramData", winreg.HKEY_LOCAL_MACHINE, "equipo"))
+               if (base := os.environ.get(var, "").strip())]
     entradas, fallos = [], 0
     for carpeta, raiz, origen in fuentes:
         try:

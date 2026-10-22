@@ -1486,6 +1486,18 @@ def test_analisis_espacio():
     for libre, esperado in ((4.9, "sospecha"), (5.0, "advertencia"), (9.9, "advertencia"), (10.0, "normal"),
                             (None, "no_determinado")):
         _assert_estado(f"espacio libre {libre}", espacio._clasificar(libre)[0], esperado)
+    # Entradas imposibles (NaN, negativo, > 100) no se clasifican.
+    for raro in (float("nan"), -1.0, 100.5, "7"):
+        _assert_estado(f"espacio libre raro {raro!r}", espacio._clasificar(raro)[0], "no_determinado")
+    # El texto no contradice el estado en los umbrales: un decimal cuando es < 10 %.
+    est, msg = espacio._clasificar(9.9)
+    assert est == "advertencia" and "9,9 %" in msg, msg
+    est, msg = espacio._clasificar(4.9)
+    assert est == "sospecha" and "4,9 %" in msg, msg
+    est, msg = espacio._clasificar(9.99)  # sin redondear a 10 mientras el estado sea advertencia
+    assert est == "advertencia" and "9,9 %" in msg, msg
+    assert "34 %" in espacio._clasificar(34.0)[1]
+    assert "disco C:" not in espacio._RECOMENDACIONES["no_determinado"]
 
     disco = {"unidad": "C:", "total_gb": 476.0, "libre_gb": 33.3, "usado_gb": 442.7, "libre_pct": 7.0}
     carpetas = [{"nombre": "Descargas", "ruta": "C:/Users/x/Downloads", "tamano_gb": 1.5, "archivos": 10}]
@@ -1498,7 +1510,7 @@ def test_analisis_espacio():
         assert r["componente"] == "espacio"
         _assert_estado("espacio simulado 7 %", r["estado"], "advertencia")
         assert r["datos"]["disco_c"]["libre_pct"] == 7.0 and r["datos"]["carpetas"] == carpetas
-        assert "7 %" in r["mensaje"] and "33 GB de 476 GB" in r["mensaje"], r["mensaje"]
+        assert "7,0 %" in r["mensaje"] and "33 GB de 476 GB" in r["mensaje"], r["mensaje"]
         assert r["recomendacion"]
 
         espacio._leer_disco_c = lambda: None
@@ -1514,6 +1526,14 @@ def test_analisis_espacio():
         r = espacio.diagnosticar()
         _assert_estado("espacio sin carpetas", r["estado"], "advertencia")
         assert r["datos"]["carpetas"] == []
+
+        # Un disco mal formado (llaves ausentes, no es dict) degrada, no lanza.
+        espacio._leer_carpetas = lambda: carpetas
+        for malo in ({"libre_pct": 7.0}, "C:", [1, 2], {"unidad": "C:", "libre_pct": 7.0, "libre_gb": "x", "total_gb": 1}):
+            espacio._leer_disco_c = lambda malo=malo: malo
+            r = espacio.diagnosticar()
+            _assert_estado(f"espacio disco mal formado {malo!r}", r["estado"], "no_determinado")
+            assert r["recomendacion"] and r["datos"]["carpetas"] == carpetas
     finally:
         espacio._leer_disco_c, espacio._leer_carpetas = leer_disco, leer_carpetas
 
@@ -1529,6 +1549,17 @@ def test_analisis_espacio():
         assert espacio._medir_carpeta(raiz, 5.0, 1000) == (550, 6, False)
         assert espacio._medir_carpeta(raiz, 5.0, 3)[2] is True
         assert espacio._medir_carpeta(os.path.join(raiz, "no_existe"), 5.0, 10) is None
+        assert espacio._medir_carpeta(raiz, 0, 1000)[2] is True  # sin tiempo: parcial
+
+        # Una junction que apunta a la propia carpeta ni cuenta doble ni entra en bucle.
+        try:
+            hecho = subprocess.run(["cmd", "/c", "mklink", "/J", os.path.join(raiz, "sub", "bucle"), raiz],
+                                   capture_output=True, timeout=10).returncode == 0
+        except Exception:
+            hecho = False
+        if hecho:
+            assert espacio._medir_carpeta(raiz, 5.0, 1000) == (550, 6, False)
+            os.rmdir(os.path.join(raiz, "sub", "bucle"))  # quita la junction sin tocar el destino
 
     t0 = time.perf_counter()
     r = espacio.diagnosticar()
@@ -1600,6 +1631,36 @@ def test_analisis_inicio():
     finally:
         inicio._leer_run, inicio._leer_carpetas_inicio = run, carpetas
         inicio._contar_servicios_automaticos = servicios
+
+    # Sin APPDATA/ProgramData no se arma una ruta relativa: esa fuente se salta.
+    guardado = {k: os.environ.get(k) for k in ("APPDATA", "ProgramData")}
+    import tempfile
+    carpeta_actual = os.getcwd()
+    try:
+        with tempfile.TemporaryDirectory() as raiz:
+            try:
+                os.chdir(raiz)
+                sub = os.path.join(raiz, r"Microsoft\Windows\Start Menu\Programs\Startup")
+                os.makedirs(sub)
+                open(os.path.join(sub, "relativo.lnk"), "w").close()
+                os.environ["APPDATA"] = ""
+                os.environ.pop("ProgramData", None)
+                try:
+                    inicio._leer_carpetas_inicio()
+                    raise AssertionError("sin APPDATA/ProgramData no debe leer ninguna carpeta")
+                except OSError:
+                    pass  # ninguna fuente usable: "no se pudo leer", sin leer la ruta relativa
+                os.environ["APPDATA"] = raiz  # con la variable puesta sí se lee esa fuente
+                assert [e["nombre"] for e in inicio._leer_carpetas_inicio()] == ["relativo.lnk"]
+            finally:
+                os.chdir(carpeta_actual)
+    finally:
+        os.chdir(carpeta_actual)
+        for k, v in guardado.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
     t0 = time.perf_counter()
     r = inicio.diagnosticar()
