@@ -22,6 +22,7 @@ devuelvan lo que se espera en una laptop concreta.
 
 import contextlib
 import datetime
+import winreg
 import io
 import json
 import os
@@ -1694,15 +1695,22 @@ def test_analisis_programas():
             ("3 sin editor pero viejos", [_p(f"V{i}", "", "20250101") for i in range(3)], "normal"),
             ("3 sin editor con fecha futura o ausente", [_p("F", "", "20271010"), _p("G", "", None), _p("H", "", "xx")], "normal"),
             ("ocultos no cuentan (parches de Windows)", _recientes(3, oculto=True), "normal"),
-            ("tienda sin editor ni fecha", [_p(f"T{i}", None, None, origen="tienda") for i in range(5)], "normal")):
+            ("menu Inicio sin editor ni fecha", [_p("Reg", "X", "20200101")] + [_p(f"T{i}", None, None, origen="menu_inicio") for i in range(5)], "normal"),
+            ("solo menu Inicio (registro ilegible)", [_p(f"T{i}", None, None, origen="menu_inicio") for i in range(5)], "no_determinado")):
         _assert_estado(f"programas {nombre}", programas._clasificar(lista, hoy)[0], esperado)
     msg = programas._clasificar(_recientes(3) + [_p("Oc", "x", None, True)], hoy)[1]
     assert "4 programas instalados" in msg and "1 oculto" in msg and "3 programas recientes sin editor" in msg, msg
     assert "ocultos" not in programas._clasificar(_recientes(1, "x"), hoy)[1]
+    # El menú Inicio se cuenta aparte de los instalados.
+    msg = programas._clasificar([_p("A", "X"), _p("B", "X", oculto=True)] + [_p(f"M{i}", None, origen="menu_inicio") for i in range(3)], hoy)[1]
+    assert msg == "Hay 2 programas instalados (1 oculto por Windows) y 3 accesos en el menú Inicio.", msg
+    msg = programas._clasificar([_p("A", "X"), _p("M", None, origen="menu_inicio")], hoy)[1]
+    assert msg == "Hay 1 programa instalado y 1 acceso en el menú Inicio.", msg
+    assert "menú Inicio" not in programas._clasificar([_p("A", "X")], hoy)[1]
 
     registro = [_p("Zeta", "Zeta SA", "20200101"), _p("alfa", "Alfa SA", "20200101"), _p("Beta", "Beta SA", "20200101"),
                 _p("KB123456", "Microsoft", "20261010", oculto=True)]
-    tienda = [_p("Calculadora", None, origen="tienda", version=None), _p("ZETA", None, origen="tienda", version=None)]
+    tienda = [_p("Calculadora", None, origen="menu_inicio", version=None), _p("ZETA", None, origen="menu_inicio", version=None)]
     leer_registro, leer_tienda = programas._leer_registro, programas._leer_aplicaciones_inicio
 
     def _lanza():
@@ -1715,9 +1723,10 @@ def test_analisis_programas():
         assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "programas"
         _assert_estado("programas simulados", r["estado"], "normal")
         assert r["datos"]["total"] == 5 and r["datos"]["ocultos"] == 1, r["datos"]
+        assert r["datos"]["instalados"] == 4 and r["datos"]["en_menu_inicio"] == 1
         nombres = [x["nombre"] for x in r["datos"]["programas"]]
         assert nombres == ["alfa", "Beta", "Calculadora", "Zeta", "KB123456"], nombres  # sin duplicado; oculto al final
-        assert "5 programas instalados" in r["mensaje"] and "1 oculto" in r["mensaje"], r["mensaje"]
+        assert r["mensaje"] == "Hay 4 programas instalados (1 oculto por Windows) y 1 acceso en el menú Inicio.", r["mensaje"]
         assert r["datos"]["recientes_sin_editor"] == [] and r["recomendacion"]
 
         # Review Focus 4: tres recientes sin editor entre otros.
@@ -1739,8 +1748,9 @@ def test_analisis_programas():
         programas._leer_registro = _lanza
         programas._leer_aplicaciones_inicio = lambda: [dict(x) for x in tienda]
         r = programas.diagnosticar()
-        _assert_estado("programas sin registro", r["estado"], "normal")
-        assert r["datos"]["total"] == 2
+        _assert_estado("programas sin registro", r["estado"], "no_determinado")
+        assert r["datos"]["total"] == 2 and r["datos"]["instalados"] == 0 and r["datos"]["en_menu_inicio"] == 2
+        assert "No se pudo leer" in r["mensaje"] and "2 accesos" in r["mensaje"], r["mensaje"]
         programas._leer_registro = lambda: [dict(x) for x in registro]
         programas._leer_aplicaciones_inicio = _lanza
         assert programas.diagnosticar()["datos"]["total"] == 4
@@ -1769,10 +1779,91 @@ def test_analisis_programas():
     finally:
         programas._leer_registro, programas._leer_aplicaciones_inicio = leer_registro, leer_tienda
 
+    # _leer_registro con un winreg simulado: tipos, ocultos, duplicados y claves cerradas.
+    class _Clave:
+        def __init__(self, valores=None, subs=None):
+            self.valores, self.subs, self.abierta = valores or {}, subs or {}, True
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            self.abierta = False
+
+    abiertas = []
+    real_winreg = winreg
+    HKLM, HKCU = real_winreg.HKEY_LOCAL_MACHINE, real_winreg.HKEY_CURRENT_USER
+    arbol = {
+        (HKLM, programas._UNINSTALL): {
+            "a": {"DisplayName": "Normal", "DisplayVersion": "1.0", "Publisher": "Editor SA", "InstallDate": "20261001"},
+            "b": {"DisplayName": "Componente", "SystemComponent": 1},
+            "c": {"DisplayName": "ComponenteTexto", "SystemComponent": "1"},
+            "d": {"DisplayName": "Parche", "ParentKeyName": "OperatingSystem"},
+            "e": {"DisplayName": "ParentVacio", "ParentKeyName": "  "},
+            "f": {"Publisher": "Sin nombre"},
+            "g": {"DisplayName": b"bytes", "DisplayVersion": 7, "InstallDate": 20261001},
+            "i": {"DisplayName": "Fechado", "DisplayVersion": "1"},
+            "h": {"DisplayName": "Basura", "Publisher": b"\x00\x01", "InstallDate": "ayer", "SystemComponent": 0},
+        },
+        (HKLM, programas._CLAVES[1][1]): {
+            "a32": {"DisplayName": "NORMAL", "DisplayVersion": "1.0", "InstallDate": "20261002", "SystemComponent": 1},
+            "i32": {"DisplayName": "fechado", "DisplayVersion": "1", "InstallDate": "20261003"},
+        },
+        (HKCU, programas._UNINSTALL): {
+            "u": {"DisplayName": "Normal", "DisplayVersion": "2.0", "InstallDate": "20260101"},
+        },
+    }
+
+    class _WinregFalso:
+        HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER = HKLM, HKCU
+
+        @staticmethod
+        def OpenKey(base, ruta):
+            if isinstance(base, _Clave):
+                clave = _Clave(base.subs[ruta])
+            elif (base, ruta) in arbol:
+                clave = _Clave(subs=arbol[(base, ruta)])
+            else:
+                raise FileNotFoundError(ruta)
+            abiertas.append(clave)
+            return clave
+
+        @staticmethod
+        def QueryInfoKey(clave):
+            return (len(clave.subs), 0, 0)
+
+        @staticmethod
+        def EnumKey(clave, i):
+            return list(clave.subs)[i]
+
+        @staticmethod
+        def QueryValueEx(clave, nombre):
+            if nombre not in clave.valores:
+                raise FileNotFoundError(nombre)
+            return clave.valores[nombre], 1
+
+    winreg_original = programas.winreg
+    try:
+        programas.winreg = _WinregFalso
+        leido = {(x["nombre"], x["version"]): x for x in programas._leer_registro()}
+    finally:
+        programas.winreg = winreg_original
+    assert not any(k.abierta for k in abiertas) and len(abiertas) == 3 + 12, "todas las claves deben cerrarse"
+    assert set(leido) == {("Normal", "1.0"), ("Componente", None), ("ComponenteTexto", None), ("Parche", None),
+                          ("ParentVacio", None), ("Fechado", "1"), ("Basura", None), ("Normal", "2.0")}, sorted(map(str, leido))
+    assert leido[("Fechado", "1")]["fecha"] == "20261003"  # se conserva la primera fecha no vacía de las copias
+    n1 = leido[("Normal", "1.0")]
+    assert n1["editor"] == "Editor SA" and n1["fecha"] == "20261001" and n1["oculto"] is False  # NORMAL (32 bits) es la misma
+    assert leido[("Componente", None)]["oculto"] is True and leido[("ComponenteTexto", None)]["oculto"] is True
+    assert leido[("Parche", None)]["oculto"] is True and leido[("ParentVacio", None)]["oculto"] is False
+    assert leido[("Basura", None)] == {"nombre": "Basura", "version": None, "editor": None, "fecha": None,
+                                       "oculto": False, "origen": "registro"}
+    json.dumps(list(leido.values()))
+
     # Salida de PowerShell: lista, objeto único (un solo programa), vacía o basura.
     assert programas._parsear_aplicaciones('[{"Name":"Calc","AppID":"x"},{"Name":"Fotos","AppID":"y"}]') == [
-        {"nombre": "Calc", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "tienda"},
-        {"nombre": "Fotos", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "tienda"}]
+        {"nombre": "Calc", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "menu_inicio"},
+        {"nombre": "Fotos", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "menu_inicio"}]
     assert [x["nombre"] for x in programas._parsear_aplicaciones('{"Name":"Unica","AppID":"x"}')] == ["Unica"]
     for basura in ("", "no es json", "null", '"texto"', '[{"AppID":"x"}, 5]', None):
         assert programas._parsear_aplicaciones(basura) == [], basura
@@ -1785,7 +1876,7 @@ def test_analisis_programas():
         programas.shutil.which = lambda _n: "powershell.exe"
 
         def _agota(*a, **k):
-            raise subprocess.TimeoutExpired("powershell", 10)
+            raise subprocess.TimeoutExpired("powershell", 6)
         programas.subprocess.run = _agota
         assert programas._leer_aplicaciones_inicio() == []
 
@@ -1796,7 +1887,8 @@ def test_analisis_programas():
             return subprocess.CompletedProcess(args, 0, stdout='{"Name":"Unica"}', stderr="")
         programas.subprocess.run = _falso
         assert [x["nombre"] for x in programas._leer_aplicaciones_inicio()] == ["Unica"]
-        assert visto["timeout"] == 10 and visto["creationflags"] == subprocess.CREATE_NO_WINDOW
+        assert visto["timeout"] == 6 and visto["creationflags"] == subprocess.CREATE_NO_WINDOW
+        assert visto["stdin"] == subprocess.DEVNULL
         programas.subprocess.run = lambda args, **k: subprocess.CompletedProcess(args, 1, stdout='{"Name":"X"}', stderr="e")
         assert programas._leer_aplicaciones_inicio() == []
     finally:

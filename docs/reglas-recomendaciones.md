@@ -127,7 +127,7 @@ Solo lectura, sin administrador, y nunca emiten CRITICO. No están en `scanner.C
 | `inicio.py` | No se pudo leer ninguna fuente | NO DETERMINADO | Mira la lista en el Administrador de tareas, pestaña Inicio, y repite el análisis. |
 | `programas.py` | 3 o más programas **visibles** de editor vacío o desconocido, instalados en los últimos 30 días | ADVERTENCIA | Revisa en la lista los programas instalados hace poco y sin editor conocido; eso no significa que sean malos. Si no reconoces alguno, búscalo o pregunta a un técnico antes de quitarlo. |
 | `programas.py` | Lista leída y sin esa condición | NORMAL | Recorre la lista de vez en cuando; lo que no uses puedes quitarlo desde Configuración → Aplicaciones. Esta revisión no busca virus. |
-| `programas.py` | No se pudo leer ninguna fuente | NO DETERMINADO | Mira la lista en Configuración → Aplicaciones y repite el análisis. |
+| `programas.py` | No se pudo leer el registro de programas | NO DETERMINADO | Mira la lista en Configuración → Aplicaciones y repite el análisis. |
 
 `espacio` también informa (sin afectar el estado) el tamaño de `%TEMP%`, `Windows\Temp`, Descargas y la Papelera;
 cada recorrido tiene topes de tiempo y de archivos y marca `parcial` si se cortó. `inicio` suma las claves Run
@@ -184,9 +184,14 @@ línea "Disco afectado: <modelo>" por cada disco interno con ese estado. No
 copia el `mensaje` del módulo de almacenamiento, que usa términos técnicos
 ("Salud reducida (Windows Storage Health) en: ...").
 
-`programas` junta el registro de "Desinstalar" (equipo, 32 bits y usuario) con `Get-StartApps` de PowerShell
-(tiempo límite 10 s; sin PowerShell solo usa el registro). "Editor desconocido" = vacío, `unknown` o `desconocido`.
-Una fecha ausente, mal formada o futura nunca cuenta como reciente. Los **ocultos** (`SystemComponent` o
-`ParentKeyName`: parches y componentes que Windows no lista en Configuración) se cuentan y se muestran al final de
-la lista, pero no cuentan para el aviso. La lista se corta en 300 elementos (el total real se informa) y los
-nombres recientes sin editor en 20.
+`programas` junta el registro de "Desinstalar" (equipo, 32 bits y usuario) con los accesos del menú Inicio que
+devuelve `Get-StartApps` de PowerShell (tiempo límite 6 s; sin PowerShell solo usa el registro). Los accesos del
+menú Inicio (aplicaciones de la tienda, herramientas de Windows, atajos a documentos o a «Desinstalar…») **no son
+programas instalados**: el mensaje los cuenta aparte («Hay 74 programas instalados (25 ocultos por Windows) y 102
+accesos en el menú Inicio.»); `datos` trae `instalados`, `en_menu_inicio` y `total` (la suma). Si el registro no se
+pudo leer, el estado es NO DETERMINADO aunque haya accesos del menú Inicio. "Editor desconocido" = vacío,
+`unknown` o `desconocido`. Una fecha ausente, mal formada o futura nunca cuenta como reciente. Los **ocultos**
+(`SystemComponent` = 1, también como texto, o `ParentKeyName` no vacío: parches y componentes que Windows no lista
+en Configuración) se cuentan y se muestran al final de la lista, pero no cuentan para el aviso. Las copias de un
+mismo programa (mismo nombre y versión, sin distinguir mayúsculas) se unifican. La lista se corta en 300 elementos
+(el total real se informa) y los nombres recientes sin editor en 20.
