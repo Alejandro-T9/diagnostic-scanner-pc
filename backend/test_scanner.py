@@ -26,6 +26,7 @@ import socket
 import threading
 
 import app
+import equipo
 import explicador
 import lanzador
 import scanner
@@ -701,6 +702,66 @@ def test_informe():
         informe.generar_informe_html = generar
 
 
+def test_equipo():
+    # (a) clasificación de discos
+    assert equipo.tipo_disco(4, None) == "ssd"
+    assert equipo.tipo_disco(None, 17) == "ssd"
+    assert equipo.tipo_disco(3, 11) == "hdd"
+    assert equipo.tipo_disco(None, None) == "desconocido"
+    assert equipo.tipo_disco(5, 3) == "desconocido"
+
+    # (b) heurística de CPU apta para Windows 11 (solo por nombre)
+    apto = equipo.cpu_apto_windows11
+    assert apto("Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz") is True
+    assert apto("Intel(R) Core(TM) i7-7500U CPU") is False
+    assert apto("11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz") is True
+    assert apto("Intel(R) Core(TM) i3-10110U CPU @ 2.10GHz") is True
+    assert apto("Intel(R) Core(TM) i5-6200U CPU @ 2.30GHz") is False
+    assert apto("AMD Ryzen 7 PRO 5850U with Radeon Graphics") is True
+    assert apto("AMD Ryzen 5 1600 Six-Core Processor") is False
+    assert apto("AMD Ryzen 5 3500U with Radeon Vega Mobile Gfx") is True
+    assert apto("Intel(R) Celeron(R) N4020 CPU @ 1.10GHz") is None
+    assert apto("") is None
+    assert apto(None) is None
+
+    llaves = {"so", "firmware", "secure_boot", "tpm_version", "discos", "disco_sistema_tipo"}
+    lectores = ["_leer_so", "_leer_firmware", "_leer_secure_boot", "_leer_tpm", "_leer_discos", "_leer_disco_sistema"]
+    originales = {n: getattr(equipo, n) for n in lectores}
+
+    def roto(*a, **k):
+        raise RuntimeError("falla simulada")
+
+    try:
+        # (c) todos los lectores rotos: valores de respaldo, sin excepción
+        for n in lectores:
+            setattr(equipo, n, roto)
+        hechos = equipo.leer_hechos()
+        assert set(hechos) == llaves, hechos
+        assert hechos["so"] is None and hechos["firmware"] is None
+        assert hechos["secure_boot"] is None and hechos["tpm_version"] is None
+        assert hechos["discos"] == [] and hechos["disco_sistema_tipo"] == "desconocido", hechos
+
+        # (d) un solo lector roto: los demás conservan su valor
+        for n in lectores:
+            setattr(equipo, n, originales[n])
+        equipo._leer_firmware = lambda: "uefi"
+        equipo._leer_secure_boot = lambda: True
+        equipo._leer_tpm = roto
+        hechos = equipo.leer_hechos()
+        assert hechos["tpm_version"] is None
+        assert hechos["firmware"] == "uefi" and hechos["secure_boot"] is True, hechos
+    finally:
+        for n, f in originales.items():
+            setattr(equipo, n, f)
+
+    # (e) llamada real: no se afirma nada del hardware de la máquina de pruebas
+    hechos = equipo.leer_hechos()
+    assert set(hechos) == llaves, hechos
+    assert hechos["firmware"] in {"uefi", "bios", None}, hechos["firmware"]
+    assert isinstance(hechos["discos"], list)
+    assert hechos["disco_sistema_tipo"] in {"ssd", "hdd", "desconocido"}
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -724,4 +785,5 @@ if __name__ == "__main__":
     test_escaner_adjunta_guia()
     test_guias_endpoint()
     test_informe()
+    test_equipo()
     print("test_scanner.py: todos los casos OK")
