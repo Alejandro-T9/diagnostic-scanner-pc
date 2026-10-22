@@ -1194,7 +1194,41 @@ sugiere, sin que el programa afirme lo que no pudo medir.
   `leer_hechos` baja a ~0,4 s y el escaneo completo a ~5 s, la mayor parte
   del procesador (~3 s, ya existente). `tiempos` trae `hechos` y
   `recomendaciones` por separado.
+- Enmendada por la decisión 38 (sistema operativo actual, textos en lenguaje simple).
 - Endurecimiento: una RAM de 0 GB (lectura sin capacidad) cuenta como dato
   ausente; los textos de Linux dan solo hechos medidos (sin "funciona con
   fluidez"); la recomendación de respaldo nombra el disco afectado en vez de
   copiar el mensaje técnico del módulo.
+
+## 38. El recomendador tiene en cuenta el sistema operativo actual (enmienda a la 37)
+
+**Fecha:** 2026-10-22
+
+**Motivo:** la revisión final de F3 encontró que la regla de sistema operativo
+ignoraba el SO instalado: a un equipo que ya tiene Windows 11 se le podía
+recomendar Windows 10, o "falta confirmar el TPM", o nada de Windows 11 si su
+procesador era nuevo y la heurística no lo conocía. Además, varios textos usaban
+términos sin explicar (firmware, TPM, Secure Boot) y las razones de exclusión de
+Windows 11 afirmaban más de lo que se midió (`GetFirmwareType` dice cómo arrancó
+el SO actual, no lo que el firmware admite).
+
+**Consecuencias:**
+
+- Si el SO actual es Windows 11 en un Windows real, Windows 11 es la opción
+  principal ("Ya lo tienes instalado en este equipo."), sin notas de "falta
+  confirmar" y sin Windows 10; las demás opciones siguen las reglas por RAM.
+- `equipo.leer_hechos()` trae una clave nueva, `entorno` ("windows" | "winpe" |
+  `None`, de `utils.detectar_entorno()`); la regla solo se aplica con
+  `"windows"`, porque WinPE también se anuncia como Windows 11.
+- TPM, Arranque seguro (Secure Boot) y modo de arranque (UEFI/BIOS) se
+  explican en palabras simples; con datos por confirmar, "quién" pasa a ser
+  técnico (sin administrador la persona no puede comprobarlo sola).
+- Las razones de omisión de Windows 11 hablan de lo que el equipo hace "hoy"
+  (solo texto: reglas y umbrales sin cambios).
+- La nota de MiniOS10 dice sin rodeos que no viene de Microsoft, que no se puede
+  verificar y que necesita licencia válida. La nota de Windows 10 ya no fija una fecha.
+- Si algún dato dice ARM, la arquitectura se trata como desconocida y no se da
+  consejo de sistema operativo pensado para x64.
+- Decisiones abiertas del equipo: (1) si MiniOS10 se queda en la lista;
+  (2) si "Arranque seguro desactivado" debe seguir excluyendo a Windows 11
+  (Microsoft exige que el equipo sea "capaz", no que esté "activado").

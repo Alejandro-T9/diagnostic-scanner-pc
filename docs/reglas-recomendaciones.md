@@ -115,11 +115,13 @@ adicionales a las recomendaciones por componente de arriba. Cada regla solo
 corre si existen los datos que usa: lo que no se pudo leer no se afirma. Salida
 ordenada por prioridad (alta, media, baja) y, dentro de cada una, en el orden
 de esta tabla. Datos usados: `ram_gb` = RAM física (si falta o es 0, la que ve el SO; si tampoco hay, no hay recomendación `so`);
-`arq64` = 64 bits si el SO o el procesador lo dicen (32 bits solo si dicen 32/x86).
+`arq64` = 64 bits si el SO o el procesador lo dicen (32 bits solo si dicen 32/x86); si algún dato dice ARM, la
+arquitectura se trata como desconocida y no hay recomendación `so`. `entorno` (`utils.detectar_entorno()`):
+"windows" o "winpe", `None` si no se pudo leer.
 
 | Id | Condición | Recomendación | Prioridad | Quién |
 |---|---|---|---|---|
-| `so` | Hay `ram_gb` y se conoce la arquitectura | Sistema operativo que conviene (opciones abajo) | BAJA | Técnico si la principal es MiniOS10, Linux o Windows 7; si no, Tú mismo |
+| `so` | Hay `ram_gb` y se conoce la arquitectura | Sistema operativo que conviene (opciones abajo) | BAJA | Técnico si la principal es MiniOS10, Linux o Windows 7, o si Windows 11 tiene datos por confirmar (TPM / Arranque seguro: sin administrador la persona no puede comprobarlo sola); si no, Tú mismo |
 | `disco_ssd` | Disco de sistema HDD; o desconocido con todos los discos internos HDD (con un SSD mezclado no se genera) | Pasa tu disco a un SSD | MEDIA | Técnico |
 | `ram_ampliar` | `ram_gb` < 8 y uso de RAM ≥ 80 % (si `ram_gb` ≤ 4, el texto lo destaca) | Amplía la memoria RAM | MEDIA | Técnico |
 | `respaldo` | Almacenamiento en SOSPECHA o CRITICO | Haz hoy una copia de tus archivos importantes | ALTA | Tú mismo |
@@ -132,15 +134,22 @@ medidos y, cuando corresponde, una `nota` con sus límites):
 
 | Opción | Se ofrece si | Nota |
 |---|---|---|
-| Windows 11 | 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Siempre es la principal si se ofrece. Un dato ilegible (TPM o Secure Boot sin permisos) no la descarta: se ofrece con la nota "Falta confirmar…" y el detalle dice "Windows 11 (falta confirmar el TPM 2.0)". Solo se omite por datos realmente leídos (procesador antiguo, BIOS clásica, Secure Boot desactivado, TPM 1.2) o por firmware/procesador no comprobables; `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot: "Falta confirmar el TPM 2.0 (se lee con permisos de administrador): compruébalo antes de instalar." |
-| Windows 10 | 64 bits y `ram_gb` ≥ 4 | Sin actualizaciones de seguridad gratuitas desde octubre de 2025 |
+| Windows 11 | **Si ya está instalado** (`entorno` = "windows" y el nombre del SO actual contiene "Windows 11"; en WinPE no, porque también dice "Windows 11"): siempre es la principal, motivo "Ya lo tienes instalado en este equipo.", `basado_en` con "Sistema actual: <nombre>", detalle "Windows 11 (ya lo tienes instalado)", sin notas de "falta confirmar", sin Windows 10 y sin comprobar procesador/firmware/TPM (aunque el procesador sea desconocido para la heurística); las demás opciones siguen las reglas normales por RAM. **Si no**: 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Siempre es la principal si se ofrece. Un dato ilegible (TPM o Secure Boot sin permisos) no la descarta: se ofrece con la nota "Falta confirmar…" y el detalle dice "Windows 11 (falta confirmar el TPM 2.0)". Solo se omite por datos realmente leídos (procesador antiguo, BIOS clásica, Secure Boot desactivado, TPM 1.2) o por firmware/procesador no comprobables; `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot: explica en palabras simples qué es ("Falta confirmar el TPM 2.0, un chip de seguridad que Windows 11 pide. Se puede leer abriendo el programa como administrador, o un técnico puede revisarlo."; igual para el Arranque seguro) |
+| Windows 10 | 64 bits y `ram_gb` ≥ 4 | "Ya no recibe actualizaciones de seguridad gratuitas en la mayoría de los equipos" (sin fecha concreta) |
 | Ubuntu o Linux Mint | `ram_gb` ≥ 4. Motivo: "Con X GB de RAM tu equipo cumple lo que suelen pedir estas versiones de Linux." (solo el dato medido, sin prometer fluidez) | En 32 bits: pocas versiones compatibles, lo confirma un técnico |
 | Lubuntu o Linux Mint XFCE | `ram_gb` < 4. Motivo: versiones livianas pensadas para equipos con poca memoria, con el dato de RAM | Igual que la anterior |
-| MiniOS10 | 64 bits, `ram_gb` ≥ 2 y (`ram_gb` < 4, o disco de sistema HDD con `ram_gb` < 8) | Versión modificada no oficial de Windows 10; con ayuda de un técnico |
+| MiniOS10 | 64 bits, `ram_gb` ≥ 2 y (`ram_gb` < 4, o disco de sistema HDD con `ram_gb` < 8) | Versión modificada de Windows 10 que no viene de Microsoft: no se puede verificar qué se le quitó, necesita licencia de Windows válida; solo con un técnico de confianza (¿se queda en la lista? decisión del equipo, ver 38) |
 | Windows 7 | Siempre al final; solo si 32 bits o `ram_gb` < 2 | Sin actualizaciones de seguridad desde 2020; solo si el equipo o los programas lo exigen, de preferencia sin internet |
 
-`basado_en` solo lleva líneas con dato real (RAM, procesador, arquitectura,
-firmware, TPM —o "no se pudo leer"—, tipo de disco principal).
+`basado_en` solo lleva líneas con dato real (sistema actual si ya es Windows 11, RAM, procesador,
+arquitectura, "Modo de arranque: UEFI (el moderno)" o "BIOS clásica (el antiguo)",
+"TPM (chip de seguridad)" —o "no se pudo leer"—, tipo de disco principal).
+Las razones por las que se omite Windows 11 hablan de lo que el equipo hace HOY:
+`GetFirmwareType` dice cómo arrancó el SO actual, no lo que el firmware admite, así que se redactan como
+"arranca hoy en modo BIOS clásico" / "el Arranque seguro está desactivado hoy" y remiten a un técnico.
+
+Limitación conocida: con discos mezclados (SSD + HDD) y disco de sistema desconocido no se genera
+`disco_ssd` (no se sabe cuál es el principal).
 
 En `respaldo`, `basado_en` lleva el estado del disco en lenguaje simple y una
 línea "Disco afectado: <modelo>" por cada disco interno con ese estado. No
