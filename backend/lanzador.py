@@ -175,7 +175,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if not sin_navegador:
             exe = elegir_navegador(os.environ)
-            if exe:
+            if utils.es_administrador():
+                # Edge/Chrome/Brave no abren con permisos de administrador: explorer.exe abre la URL con el
+                # navegador predeterminado y los permisos normales del usuario.
+                subprocess.Popen(["explorer.exe", url])
+            elif exe:
                 perfil = tempfile.mkdtemp(prefix="dspc_perfil_")
                 abrir_ventana(exe, url, perfil)
             else:
