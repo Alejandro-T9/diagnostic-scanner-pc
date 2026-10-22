@@ -701,7 +701,7 @@ def test_informe():
     # (b) sin escaneo: página amable, no lanza
     for vacio in (None, {}):
         h = informe.generar_informe_html(vacio, "SIN_DATOS")
-        assert "Aún no hay un escaneo" in h and "Revisar mi PC" in h and "Escanear Sistema" in h, h
+        assert "Aún no hay un escaneo" in h and "Revisar mi PC" in h and "Escanear Sistema" not in h, h
     # (c) preguntas solo de componentes no normales; límites siempre
     g = explicador.guia_para("cpu", "critico")
     assert "Preguntas para tu técnico" in html and html.count(g["pregunta_tecnico"]) == 1
@@ -1287,6 +1287,18 @@ _HTML_PERMITIDO = {"dom.js": ('marco.insertAdjacentHTML("beforeend", svg);',)}
 _INSERTA_HTML = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|createContextualFragment|DOMParser|srcdoc")
 
 
+def _una_llamada_escapar(expr):
+    """True si expr es UNA sola llamada escapar(...) con paréntesis balanceados (no `escapar(a) + g(b)`)."""
+    if not (expr.startswith("escapar(") and expr.endswith(")")):
+        return False
+    prof = 0
+    for i, c in enumerate(expr[7:], 7):
+        prof += (c == "(") - (c == ")")
+        if prof == 0:
+            return i == len(expr) - 1
+    return False
+
+
 def _html_seguro(linea):
     """Asignaciones a innerHTML aceptadas: literal sin ${ ni +; `...${escapar(...)}...` con TODA expresión
     envuelta en escapar(); o `= escapar(...)` completo. Cualquier otra cosa (p. ej. concatenar) es insegura."""
@@ -1294,7 +1306,7 @@ def _html_seguro(linea):
         return True
     m = re.search(r"\.innerHTML\s*=\s*`([^`]*)`\s*;?\s*$", linea)
     if m:
-        return all(e.startswith("escapar(") and e.endswith(")") for e in re.findall(r"\$\{(.*?)\}", m.group(1)))
+        return all(_una_llamada_escapar(e) for e in re.findall(r"\$\{(.*?)\}", m.group(1)))
     return bool(re.search(r"\.innerHTML\s*=\s*escapar\((?:[^()]|\([^()]*\))*\)\s*;?\s*$", linea))
 
 
@@ -1309,6 +1321,9 @@ def test_frontend_sin_innerhtml_inseguro():
     assert not _html_seguro("x.innerHTML = '<b>' + escapar(a) + b;")
     assert not _html_seguro("x.innerHTML = `<b>${a}${escapar(b)}</b>`;")
     assert not _html_seguro("x.innerHTML = escapar(a) + b;")
+    assert _html_seguro("x.innerHTML = `<b>${escapar(f(a))}</b>`;")
+    assert not _html_seguro("x.innerHTML = `<b>${escapar(a) + g(b)}</b>`;")
+    assert not _html_seguro("x.innerHTML = `<b>${escapar(a)) + g(b)}</b>`;")
     malas = []
     for nombre in sorted(os.listdir(carpeta)):
         if not nombre.endswith(".js"):

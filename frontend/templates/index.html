@@ -7,7 +7,7 @@
     <div class="barra-interior">
         <div class="barra-marca">
             <span class="icono" data-icono="comp:cpu"></span>
-            <h1><span class="marca-larga">Diagnostic Scanner PC</span><span class="marca-corta" aria-hidden="true">Scanner PC</span></h1>
+            <h1><span class="marca-larga">Diagnostic Scanner PC</span><span class="marca-corta">Scanner PC</span></h1>
         </div>
         <div class="interruptor-modo" id="interruptor-modo" role="group" aria-label="Modo de la interfaz">
             <button type="button" id="modo-simple-btn" aria-pressed="true">Simple</button>
@@ -63,7 +63,7 @@
         <button type="button" role="tab" id="tab-analisis" aria-controls="panel-analisis" aria-selected="false" tabindex="-1" hidden>Análisis de Windows</button>
     </nav>
 
-    <section role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen">
+    <section role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen" tabindex="0">
         <div class="simple-vacio" id="simple-vacio">
             <p class="simple-vacio-titulo">Todavía no hemos revisado tu PC.</p>
             <button type="button" class="boton-primario boton-grande" id="boton-revisar-vacio">Revisar mi PC</button>
@@ -89,7 +89,7 @@
         </div>
     </section>
 
-    <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" hidden>
+    <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" tabindex="0" hidden>
         <div class="vista-simple" id="simple-contenido">
             <p class="simple-resumen" id="simple-resumen"></p>
             <div class="simple-tarjetas" id="simple-tarjetas"></div>
@@ -100,12 +100,12 @@
         </div>
     </section>
 
-    <section role="tabpanel" id="panel-recomendaciones" aria-labelledby="tab-recomendaciones" hidden>
+    <section role="tabpanel" id="panel-recomendaciones" aria-labelledby="tab-recomendaciones" tabindex="0" hidden>
         <div class="recomendaciones" id="recomendaciones" hidden></div>
         <p class="panel-vacio">Todavía no hay recomendaciones para mostrar. Aparecen después de una revisión real de este equipo.</p>
     </section>
 
-    <section role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis" hidden></section>
+    <section role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis" tabindex="0" hidden></section>
 </main>
 
 <footer class="pie">

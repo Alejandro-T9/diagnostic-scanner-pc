@@ -410,10 +410,11 @@ function marcarOcupado(ocupado) {
         ocupado ? "Revisando…" : (escaneosReales > 0 ? "Volver a revisar" : "Revisar mi PC");
     document.getElementById("barra-progreso-contenedor").classList.toggle("activa", ocupado);
     // Al deshabilitarse el botón que tenía el foco, este se pierde: se devuelve al botón de la barra.
-    if (!ocupado && (teniaFoco || document.activeElement === document.body)) botones[0].focus();
+    if (!ocupado && (teniaFoco || document.activeElement === document.body)) botones[0].focus({ preventScroll: true });
 }
 
 async function escanearSistema() {
+    if (escaneando) return;
     escaneando = true;
     marcarOcupado(true);
     try {

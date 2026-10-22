@@ -18,6 +18,7 @@ function siguientePestana(actual, tecla, habilitadas) {
     const lista = _lista(habilitadas);
     if (!lista.length) return actual;
     const i = lista.indexOf(actual);
+    if (i < 0 && tecla === "ArrowLeft") return lista[lista.length - 1]; // actual desconocida: Izquierda -> última
     if (tecla === "ArrowRight") return lista[(i + 1) % lista.length];
     if (tecla === "ArrowLeft") return lista[(i - 1 + lista.length) % lista.length];
     if (tecla === "Home") return lista[0];

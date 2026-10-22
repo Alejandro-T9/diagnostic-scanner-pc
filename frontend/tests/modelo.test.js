@@ -64,6 +64,8 @@ assert.strictEqual(siguientePestana("resumen", "ArrowRight", ["resumen", "recome
 assert.strictEqual(siguientePestana("resumen", "ArrowLeft", ["resumen", "recomendaciones"]), "recomendaciones");
 assert.strictEqual(siguientePestana("resumen", "ArrowRight", ["resumen"]), "resumen");
 assert.strictEqual(siguientePestana("analisis", "ArrowRight", TRES), "resumen"); // actual fuera de las habilitadas
+assert.strictEqual(siguientePestana("analisis", "ArrowLeft", TRES), "recomendaciones"); // desconocida + Izquierda -> la última
+assert.strictEqual(siguientePestana("zzz", "ArrowRight", TRES), "resumen");             // desconocida + Derecha -> la primera
 
 // (c) temaValido / modoValido
 assert.strictEqual(temaValido("oscuro"), "oscuro");

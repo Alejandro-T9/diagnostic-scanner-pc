@@ -126,7 +126,7 @@ def generar_informe_html(resultado, veredicto):
     if not resultado or not resultado.get("componentes"):
         return _pagina(
             '<h1>Informe de diagnóstico</h1>'
-            '<p>Aún no hay un escaneo. Vuelve al panel y pulsa «Revisar mi PC» (o «Escanear Sistema»).</p>'
+            '<p>Aún no hay un escaneo. Vuelve al panel y pulsa «Revisar mi PC».</p>'
         )
     comps = resultado["componentes"]
     orden = {e: i for i, e in enumerate(scanner._SEVERIDAD)}

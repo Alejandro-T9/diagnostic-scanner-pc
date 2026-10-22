@@ -134,6 +134,9 @@ body {
     border: 1px solid transparent;
 }
 
+/* Relleno claro del botón primario sobre la barra marino: solo 2,39:1; el borde claro marca el límite del control. */
+.barra .boton-primario { border-color: var(--color-sobre-marino); }
+
 .boton-primario:hover:not(:disabled) {
     filter: brightness(1.1);
 }
@@ -636,7 +639,7 @@ body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
 }
 
 .interruptor-modo button {
-    min-height: 38px;
+    min-height: 40px;
     background-color: transparent;
     color: var(--color-sobre-marino);
     border: none;
