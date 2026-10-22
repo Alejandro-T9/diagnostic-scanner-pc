@@ -19,6 +19,7 @@ Una CPU apta por nombre aún puede fallar por TPM/Secure Boot (ver `leer_hechos`
 
 import ctypes
 import re
+import threading
 
 import wmi
 
@@ -59,14 +60,23 @@ def cpu_apto_windows11(nombre) -> "bool | None":
     return None
 
 
-_conexiones = {}  # espacio de nombres -> conexión WMI; la vacía leer_hechos al empezar y al terminar
+_local = threading.local()
+
+
+def _cache() -> dict:
+    """espacio de nombres -> conexión WMI, propia de cada hilo: las conexiones COM pertenecen al hilo que las creó
+    (la app puede atender dos /api/scan a la vez). La vacía leer_hechos al empezar y al terminar."""
+    if not hasattr(_local, "conexiones"):
+        _local.conexiones = {}
+    return _local.conexiones
 
 
 def _conexion(namespace=None):
     """Conectar a WMI cuesta decenas de ms: se hace una vez por espacio de nombres en cada `leer_hechos`."""
-    if namespace not in _conexiones:
-        _conexiones[namespace] = wmi.WMI(namespace=namespace) if namespace else wmi.WMI()
-    return _conexiones[namespace]
+    c = _cache()
+    if namespace not in c:
+        c[namespace] = wmi.WMI(namespace=namespace) if namespace else wmi.WMI()
+    return c[namespace]
 
 
 def _leer_so() -> dict:
@@ -137,7 +147,7 @@ def leer_hechos() -> dict:
         except Exception:
             return respaldo
 
-    _conexiones.clear()
+    _cache().clear()
     # Se buscan por nombre en cada llamada (no por referencia) para que los tests puedan reemplazarlos.
     try:
         return {
@@ -149,4 +159,4 @@ def leer_hechos() -> dict:
             "disco_sistema_tipo": seguro(_leer_disco_sistema, "desconocido"),
         }
     finally:
-        _conexiones.clear()  # no dejar objetos COM de este hilo vivos para el siguiente escaneo
+        _cache().clear()  # no dejar objetos COM de este hilo vivos para el siguiente escaneo

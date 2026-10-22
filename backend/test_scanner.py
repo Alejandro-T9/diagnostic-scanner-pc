@@ -889,6 +889,47 @@ def test_equipo_rendimiento():
         equipo.wmi.WMI, utils.es_administrador = wmi_orig, admin_orig
 
 
+def test_equipo_cache_por_hilo():
+    """Las conexiones WMI/COM son del hilo que las creó: cada hilo tiene su caché y leer_hechos no toca la ajena."""
+    class _Obj:
+        pass
+
+    def _falso(namespace=None, **k):
+        o = _Obj()
+        o.hilo = threading.get_ident()
+        return o
+
+    wmi_orig = equipo.wmi.WMI
+    paso_a, fin_b, res = threading.Event(), threading.Event(), {}
+
+    def hilo_a():
+        res["a1"] = equipo._conexion("ns")
+        paso_a.set()
+        fin_b.wait(5)  # B ya terminó su leer_hechos: la conexión de A debe seguir ahí
+        res["a2"] = equipo._conexion("ns")
+        res["dict_a"] = equipo._cache()
+
+    def hilo_b():
+        paso_a.wait(5)
+        res["b1"] = equipo._conexion("ns")
+        res["dict_b"] = equipo._cache()
+        equipo.leer_hechos()
+        fin_b.set()
+
+    try:
+        equipo.wmi.WMI = _falso
+        ta, tb = threading.Thread(target=hilo_a), threading.Thread(target=hilo_b)
+        ta.start(); tb.start(); ta.join(10); tb.join(10)
+    finally:
+        equipo.wmi.WMI = wmi_orig
+    assert res["a1"] is res["a2"] and res["a1"] is not res["b1"], res
+    assert res["a1"].hilo != res["b1"].hilo
+    assert res["dict_a"] is not res["dict_b"]
+    assert equipo._cache() is equipo._cache()
+    # sin hardware concreto: el valor real siempre es uno de los permitidos
+    assert equipo.leer_hechos()["disco_sistema_tipo"] in {"ssd", "hdd", "desconocido"}
+
+
 def _res_reco(**comps):
     """Resultado mínimo de escaneo: {componente: (estado, datos)} -> {"componentes": {...}}."""
     return {"componentes": {n: {"componente": n, "estado": e, "mensaje": "", "datos": d}
@@ -1111,6 +1152,7 @@ if __name__ == "__main__":
     test_informe_recomendaciones()
     test_equipo()
     test_equipo_rendimiento()
+    test_equipo_cache_por_hilo()
     test_recomendador()
     test_recomendador_endurecimiento()
     print("test_scanner.py: todos los casos OK")
