@@ -594,6 +594,63 @@ def test_guias_endpoint():
     _en_hilo(_peticion)
 
 
+def _escaneo_falso(estado_cpu="critico"):
+    """Escaneo mínimo: mainboard con datos hostiles + cpu en `estado_cpu`."""
+    def comp(nombre, estado, mensaje, datos=None):
+        return {"componente": nombre, "estado": estado, "mensaje": mensaje,
+                "datos": datos or {}, "recomendacion": "r",
+                "guia": explicador.guia_para(nombre, estado)}
+    return {"id_diagnostico": "ID-<i>1", "timestamp": "2026-10-21 10:00:00", "componentes": {
+        "mainboard": comp("mainboard", "normal", "Placa <b>ok</b>",
+                          {"fabricante": "Acme", "modelo": "<script>alert(1)</script> & Co"}),
+        "cpu": comp("cpu", estado_cpu, "CPU caliente"),
+    }}
+
+
+def test_informe():
+    import informe
+    # (a) todo texto del escaneo se escapa
+    html = informe.generar_informe_html(_escaneo_falso(), "CRITICO")
+    assert "<script>alert(1)</script>" not in html and "<b>ok</b>" not in html and "<i>1" not in html, html
+    assert "&lt;script&gt;" in html and "&lt;b&gt;ok" in html, html
+    assert html.lstrip().startswith("<!DOCTYPE html>") and 'lang="es"' in html
+    assert explicador.FRASES_VEREDICTO["CRITICO"] in html
+    assert html.index("Procesador") < html.index("Tarjeta Madre"), "orden por severidad"
+    # (b) sin escaneo: página amable, no lanza
+    for vacio in (None, {}):
+        h = informe.generar_informe_html(vacio, "SIN_DATOS")
+        assert "Aún no hay un escaneo" in h and "Escanear Sistema" in h, h
+    # (c) preguntas solo de componentes no normales; límites siempre
+    g = explicador.guia_para("cpu", "critico")
+    assert "Preguntas para tu técnico" in html and html.count(g["pregunta_tecnico"]) == 1
+    assert "no reemplaza la revisión de un técnico" in html
+    h = informe.generar_informe_html(_escaneo_falso("normal"), "NORMAL")
+    assert "Preguntas para tu técnico" in h and "no hacen falta preguntas" in h.lower(), h
+    assert "no reemplaza la revisión de un técnico" in h
+    # (d) estilos de impresión y sin recursos externos
+    assert "@media print" in html
+    assert "<script" not in html.replace("&lt;script", "") and "http://" not in html and "https://" not in html
+
+    # (e) ruta: sin escaneo responde 200 text/html; con excepción, JSON 500
+    original, generar = app._ultimo_escaneo, informe.generar_informe_html
+
+    def _peticion():
+        cliente = app.app.test_client()
+        r = cliente.get("/api/informe")
+        assert r.status_code == 200 and r.mimetype == "text/html", (r.status_code, r.mimetype)
+        assert "Aún no hay un escaneo" in r.get_data(as_text=True)
+        informe.generar_informe_html = lambda *a: 1 / 0
+        r = cliente.get("/api/informe")
+        assert r.status_code == 500 and r.get_json()["estado"] == "error", r.status_code
+
+    try:
+        app._ultimo_escaneo = None
+        _en_hilo(_peticion)
+    finally:
+        app._ultimo_escaneo = original
+        informe.generar_informe_html = generar
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -616,4 +673,5 @@ if __name__ == "__main__":
     test_explicador()
     test_escaner_adjunta_guia()
     test_guias_endpoint()
+    test_informe()
     print("test_scanner.py: todos los casos OK")

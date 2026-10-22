@@ -27,6 +27,7 @@ import pythoncom
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 import explicador
+import informe
 import scanner
 import utils
 
@@ -137,6 +138,22 @@ def api_reporte():
         return jsonify({
             "estado": "error",
             "mensaje": f"No se pudo generar el reporte: {error}",
+        }), 500
+
+
+@app.route("/api/informe")
+def api_informe():
+    """Informe imprimible (HTML) del último escaneo en memoria."""
+    try:
+        veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
+        return Response(
+            informe.generar_informe_html(_ultimo_escaneo, veredicto),
+            mimetype="text/html",
+        )
+    except Exception as error:
+        return jsonify({
+            "estado": "error",
+            "mensaje": f"No se pudo generar el informe: {error}",
         }), 500
 
 
