@@ -106,3 +106,38 @@ LibreHardwareMonitor expone un sensor confiable (`"GPU Core"` para uso,
 con validación de rango físico en ambos) — si no, el campo queda en
 `null` en vez de mostrar un dato de otro sensor o inventado (decisión
 22).
+
+## Recomendaciones del equipo (F3)
+
+Las calcula `backend/recomendador.py` (`recomendar(resultado, hechos)`) con los
+resultados del análisis y los hechos de `backend/equipo.py`. Son sugerencias
+adicionales a las recomendaciones por componente de arriba. Cada regla solo
+corre si existen los datos que usa: lo que no se pudo leer no se afirma. Salida
+ordenada por prioridad (alta, media, baja) y, dentro de cada una, en el orden
+de esta tabla. Datos usados: `ram_gb` = RAM física (si falta, la que ve el SO);
+`arq64` = 64 bits si el SO o el procesador lo dicen (32 bits solo si dicen 32/x86).
+
+| Id | Condición | Recomendación | Prioridad | Quién |
+|---|---|---|---|---|
+| `so` | Hay `ram_gb` y se conoce la arquitectura | Sistema operativo que conviene (opciones abajo) | BAJA | Técnico si la principal es MiniOS10, Linux o Windows 7; si no, Tú mismo |
+| `disco_ssd` | Disco de sistema HDD; o desconocido con todos los discos internos HDD (con un SSD mezclado no se genera) | Pasa tu disco a un SSD | MEDIA | Técnico |
+| `ram_ampliar` | `ram_gb` < 8 y uso de RAM ≥ 80 % (si `ram_gb` ≤ 4, el texto lo destaca) | Amplía la memoria RAM | MEDIA | Técnico |
+| `respaldo` | Almacenamiento en SOSPECHA o CRITICO | Haz hoy una copia de tus archivos importantes | ALTA | Tú mismo |
+| `refrigeracion` | Procesador en ADVERTENCIA o CRITICO | Revisa la limpieza y la refrigeración | ALTA si CRITICO, MEDIA si ADVERTENCIA | Técnico |
+| `bateria_cambio` | Batería aplica y salud < 70 % | Planea cambiar la batería | MEDIA si salud < 40 %, si no BAJA | Técnico |
+| `bateria_cuidado` | Batería aplica (siempre que aplique) | Cuida tu batería (buenos hábitos; no es una falla) | BAJA | Tú mismo |
+
+Opciones de `so` (la primera es la principal; cada una lleva `motivo` con datos
+medidos y, cuando corresponde, una `nota` con sus límites):
+
+| Opción | Se ofrece si | Nota |
+|---|---|---|
+| Windows 11 | 64 bits, `ram_gb` ≥ 4, procesador apto (heurística de `equipo.cpu_apto_windows11`), firmware UEFI, Secure Boot no desactivado y TPM distinto de 1.2. Es la principal solo con TPM 2.0 y Secure Boot confirmados; si el TPM o Secure Boot no se pudieron leer, va en segundo lugar con la nota "No se pudo confirmar…". Si no se ofrece, `basado_en` dice por qué. | Solo si falta confirmar TPM/Secure Boot |
+| Windows 10 | 64 bits y `ram_gb` ≥ 4 | Sin actualizaciones de seguridad gratuitas desde octubre de 2025 |
+| Ubuntu o Linux Mint | `ram_gb` ≥ 4 | En 32 bits: pocas versiones compatibles, lo confirma un técnico |
+| Lubuntu o Linux Mint XFCE | `ram_gb` < 4 | Igual que la anterior |
+| MiniOS10 | 64 bits, `ram_gb` ≥ 2 y (`ram_gb` < 4, o disco de sistema HDD con `ram_gb` < 8) | Versión modificada no oficial de Windows 10; con ayuda de un técnico |
+| Windows 7 | Siempre al final; solo si 32 bits o `ram_gb` < 2 | Sin actualizaciones de seguridad desde 2020; solo si el equipo o los programas lo exigen, de preferencia sin internet |
+
+`basado_en` solo lleva líneas con dato real (RAM, procesador, arquitectura,
+firmware, TPM —o "no se pudo leer"—, tipo de disco principal).

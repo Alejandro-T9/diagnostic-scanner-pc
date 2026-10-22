@@ -29,6 +29,7 @@ import app
 import equipo
 import explicador
 import lanzador
+import recomendador
 import scanner
 import utils
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
@@ -762,6 +763,146 @@ def test_equipo():
     assert hechos["disco_sistema_tipo"] in {"ssd", "hdd", "desconocido"}
 
 
+def _res_reco(**comps):
+    """Resultado mínimo de escaneo: {componente: (estado, datos)} -> {"componentes": {...}}."""
+    return {"componentes": {n: {"componente": n, "estado": e, "mensaje": "", "datos": d}
+                            for n, (e, d) in comps.items()}}
+
+
+_CPU_MODERNO = "AMD Ryzen 7 PRO 5850U with Radeon Graphics"
+_CPU_VIEJO = "Intel(R) Core(TM) i5-7200U"
+
+
+def _pc(ram_gb=16, cpu_nombre=_CPU_MODERNO, arq="x64", uso=30, **otros):
+    """Resultado con RAM y CPU; `otros` agrega componentes extra (estado, datos)."""
+    return _res_reco(**{"ram": ("normal", {"capacidad_fisica_gb": ram_gb, "porcentaje_uso": uso}),
+                        "cpu": ("normal", {"nombre": cpu_nombre, "arquitectura": arq, "temperatura_c": 50.0}),
+                        **otros})
+
+
+def _hechos_reco(arq="64-bit", firmware="uefi", secure_boot=True, tpm="2.0", discos=(), sistema="ssd"):
+    return {"so": {"nombre": "Windows", "build": "1", "arquitectura": arq}, "firmware": firmware,
+            "secure_boot": secure_boot, "tpm_version": tpm, "discos": list(discos),
+            "disco_sistema_tipo": sistema}
+
+
+def _ids(recs):
+    return [r["id"] for r in recs]
+
+
+def _por_id(recs, id_):
+    return next(r for r in recs if r["id"] == id_)
+
+
+def _nombres(rec):
+    return [o["nombre"] for o in rec["opciones"]]
+
+
+def test_recomendador():
+    # (a) equipo moderno: Windows 11 es la principal
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco()), "so")
+    assert _nombres(r)[0] == "Windows 11", r["opciones"]
+    assert r["detalle"].startswith("Según tus componentes te recomendamos:"), r["detalle"]
+    assert any("16" in linea for linea in r["basado_en"]), r["basado_en"]
+    assert r["prioridad"] == "baja" and r["quien"] == "tu_mismo", r
+
+    # (b) TPM ilegible: Windows 11 sigue, con aviso, y no es la principal
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(tpm=None)), "so")
+    w11 = next(o for o in r["opciones"] if o["nombre"] == "Windows 11")
+    assert "No se pudo confirmar" in w11["nota"], w11
+    assert _nombres(r)[0] != "Windows 11", _nombres(r)
+    assert any("TPM: no se pudo leer" in linea for linea in r["basado_en"]), r["basado_en"]
+
+    # (c) procesador antiguo: Windows 11 no se ofrece y se explica por qué
+    r = _por_id(recomendador.recomendar(_pc(16, _CPU_VIEJO), _hechos_reco()), "so")
+    assert "Windows 11" not in _nombres(r), _nombres(r)
+    assert any("anterior a lo que pide Windows 11" in linea for linea in r["basado_en"]), r["basado_en"]
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(tpm="1.2")), "so")
+    assert "Windows 11" not in _nombres(r)
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(secure_boot=False)), "so")
+    assert "Windows 11" not in _nombres(r)
+
+    # (d) poca RAM: MiniOS10 aparece, Windows 7 nunca es la principal y va al final
+    r = _por_id(recomendador.recomendar(_pc(2, _CPU_VIEJO), _hechos_reco(sistema="hdd")), "so")
+    assert "MiniOS10" in _nombres(r) and _nombres(r)[0] != "Windows 7", _nombres(r)
+    assert r["quien"] == "tecnico", r
+    r = _por_id(recomendador.recomendar(_pc(1, _CPU_VIEJO, "x86"), _hechos_reco(arq="32-bit")), "so")
+    assert _nombres(r)[-1] == "Windows 7", _nombres(r)
+    assert "actualizaciones de seguridad" in r["opciones"][-1]["nota"], r["opciones"][-1]
+    assert any("32 bits" in linea for linea in r["basado_en"]), r["basado_en"]
+
+    # (e) sin datos de firmware/TPM: no falla y Windows 11 no es la principal
+    r = _por_id(recomendador.recomendar(_pc(8), {"so": {"arquitectura": "64-bit"}}), "so")
+    assert _nombres(r)[0] != "Windows 11", _nombres(r)
+
+    # (f) disco duro mecánico -> SSD; con SSD de sistema y un HDD de datos, no
+    assert "disco_ssd" in _ids(recomendador.recomendar(_pc(), _hechos_reco(sistema="hdd")))
+    mixto = _hechos_reco(sistema="ssd", discos=[{"modelo": "a", "tipo": "ssd", "externo": False},
+                                                {"modelo": "b", "tipo": "hdd", "externo": False}])
+    assert "disco_ssd" not in _ids(recomendador.recomendar(_pc(), mixto))
+    solo_hdd = _hechos_reco(sistema="desconocido", discos=[{"modelo": "b", "tipo": "hdd", "externo": False}])
+    assert "disco_ssd" in _ids(recomendador.recomendar(_pc(), solo_hdd))
+    mixto["disco_sistema_tipo"] = "desconocido"
+    assert "disco_ssd" not in _ids(recomendador.recomendar(_pc(), mixto))
+
+    # (g) RAM justa y muy usada -> ampliar; con 16 GB no
+    assert "ram_ampliar" in _ids(recomendador.recomendar(_pc(4, uso=88), _hechos_reco()))
+    assert "ram_ampliar" not in _ids(recomendador.recomendar(_pc(16, uso=95), _hechos_reco()))
+
+    # (h) disco con sospecha -> respaldo urgente
+    r = _por_id(recomendador.recomendar(_pc(almacenamiento=("sospecha", {})), _hechos_reco()), "respaldo")
+    assert r["prioridad"] == "alta" and r["quien"] == "tu_mismo", r
+
+    # (i) procesador caliente
+    crit = _res_reco(cpu=("critico", {"nombre": _CPU_MODERNO, "arquitectura": "x64", "temperatura_c": 96.0}))
+    adv = _res_reco(cpu=("advertencia", {"nombre": _CPU_MODERNO, "arquitectura": "x64", "temperatura_c": 80.0}))
+    assert _por_id(recomendador.recomendar(crit, {}), "refrigeracion")["prioridad"] == "alta"
+    r = _por_id(recomendador.recomendar(adv, {}), "refrigeracion")
+    assert r["prioridad"] == "media" and any("80" in linea for linea in r["basado_en"]), r
+
+    # (j) batería
+    sin = recomendador.recomendar(_pc(bateria=("normal", {"aplica": False})), _hechos_reco())
+    assert not [i for i in _ids(sin) if i.startswith("bateria")], _ids(sin)
+    con = recomendador.recomendar(
+        _pc(bateria=("advertencia", {"aplica": True, "salud_porcentaje": 55, "ciclos_carga": 400})), _hechos_reco())
+    assert "bateria_cambio" in _ids(con) and "bateria_cuidado" in _ids(con), _ids(con)
+    assert _por_id(con, "bateria_cambio")["prioridad"] == "baja"
+
+    # (k) entradas vacías o rotas: [] y sin excepción
+    assert recomendador.recomendar(None, None) == []
+    assert recomendador.recomendar({}, {}) == []
+    assert recomendador.recomendar({"componentes": {"ram": None, "cpu": {"datos": "x"}}}, {"so": 3}) == []
+
+    # (l) forma y orden, con todas las reglas activas a la vez
+    completo = recomendador.recomendar(
+        _pc(4, uso=90, almacenamiento=("sospecha", {}), cpu=("critico", {"nombre": _CPU_VIEJO, "arquitectura": "x64", "temperatura_c": 96.0}),
+            bateria=("critico", {"aplica": True, "salud_porcentaje": 30, "ciclos_carga": 900})),
+        _hechos_reco(sistema="hdd"))
+    assert set(_ids(completo)) == {"so", "disco_ssd", "ram_ampliar", "respaldo", "refrigeracion",
+                                   "bateria_cambio", "bateria_cuidado"}, _ids(completo)
+    rango = {"alta": 0, "media": 1, "baja": 2}
+    for rec in completo:
+        assert isinstance(rec["basado_en"], list) and rec["basado_en"], rec
+        assert all(isinstance(x, str) and x for x in rec["basado_en"]), rec
+        assert rec["prioridad"] in rango and rec["quien"] in {"tu_mismo", "tecnico", "nadie"}, rec
+        assert isinstance(rec["titulo"], str) and isinstance(rec["detalle"], str) and isinstance(rec["opciones"], list)
+    pr = [rango[x["prioridad"]] for x in completo]
+    assert pr == sorted(pr), [(x["id"], x["prioridad"]) for x in completo]
+    assert _por_id(completo, "bateria_cambio")["prioridad"] == "media"
+
+    # (m) vocabulario: sin alarmismo ni afirmaciones de seguridad
+    escenarios = [completo, con,
+                  recomendador.recomendar(_pc(1, _CPU_VIEJO, "x86"), _hechos_reco(arq="32-bit", tpm=None)),
+                  recomendador.recomendar(_pc(16), _hechos_reco(tpm=None))]
+    for recs in escenarios:
+        for rec in recs:
+            textos = [rec["titulo"], rec["detalle"], *rec["basado_en"]]
+            textos += [t for o in rec["opciones"] for t in o.values()]
+            for t in textos:
+                for mala in ("peligro", "infectad", "limpio", "garantiza"):
+                    assert mala not in t.lower(), (mala, t)
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -786,4 +927,5 @@ if __name__ == "__main__":
     test_guias_endpoint()
     test_informe()
     test_equipo()
+    test_recomendador()
     print("test_scanner.py: todos los casos OK")
