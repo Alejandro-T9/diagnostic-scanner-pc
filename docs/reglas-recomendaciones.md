@@ -125,6 +125,9 @@ Solo lectura, sin administrador, y nunca emiten CRITICO. No están en `scanner.C
 | `inicio.py` | 10 o más programas de inicio **habilitados** | ADVERTENCIA | Desactiva en el Administrador de tareas los que no necesites al encender. |
 | `inicio.py` | Menos de 10 habilitados | NORMAL | — |
 | `inicio.py` | No se pudo leer ninguna fuente | NO DETERMINADO | Mira la lista en el Administrador de tareas, pestaña Inicio, y repite el análisis. |
+| `programas.py` | 3 o más programas **visibles** de editor vacío o desconocido, instalados en los últimos 30 días | ADVERTENCIA | Revisa en la lista los programas instalados hace poco y sin editor conocido; eso no significa que sean malos. Si no reconoces alguno, búscalo o pregunta a un técnico antes de quitarlo. |
+| `programas.py` | Lista leída y sin esa condición | NORMAL | Recorre la lista de vez en cuando; lo que no uses puedes quitarlo desde Configuración → Aplicaciones. Esta revisión no busca virus. |
+| `programas.py` | No se pudo leer ninguna fuente | NO DETERMINADO | Mira la lista en Configuración → Aplicaciones y repite el análisis. |
 
 `espacio` también informa (sin afectar el estado) el tamaño de `%TEMP%`, `Windows\Temp`, Descargas y la Papelera;
 cada recorrido tiene topes de tiempo y de archivos y marca `parcial` si se cortó. `inicio` suma las claves Run
@@ -180,3 +183,10 @@ En `respaldo`, `basado_en` lleva el estado del disco en lenguaje simple y una
 línea "Disco afectado: <modelo>" por cada disco interno con ese estado. No
 copia el `mensaje` del módulo de almacenamiento, que usa términos técnicos
 ("Salud reducida (Windows Storage Health) en: ...").
+
+`programas` junta el registro de "Desinstalar" (equipo, 32 bits y usuario) con `Get-StartApps` de PowerShell
+(tiempo límite 10 s; sin PowerShell solo usa el registro). "Editor desconocido" = vacío, `unknown` o `desconocido`.
+Una fecha ausente, mal formada o futura nunca cuenta como reciente. Los **ocultos** (`SystemComponent` o
+`ParentKeyName`: parches y componentes que Windows no lista en Configuración) se cuentan y se muestran al final de
+la lista, pero no cuentan para el aviso. La lista se corta en 300 elementos (el total real se informa) y los
+nombres recientes sin editor en 20.

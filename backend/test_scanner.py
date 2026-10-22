@@ -21,6 +21,7 @@ devuelvan lo que se espera en una laptop concreta.
 """
 
 import contextlib
+import datetime
 import io
 import json
 import os
@@ -38,7 +39,7 @@ import lanzador
 import recomendador
 import scanner
 import utils
-from analisis import espacio, inicio
+from analisis import espacio, inicio, programas
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
@@ -1670,6 +1671,148 @@ def test_analisis_inicio():
     assert dt <= 4.0, f"inicio tardó {dt:.1f} s"
 
 
+def test_analisis_programas():
+    hoy = datetime.date(2026, 10, 22)
+    # Fechas: hasta 30 días atrás es reciente; ausente, mal formada o futura no cuenta (y no lanza).
+    for fecha, esperado in (("20261015", True), ("20260922", True), ("20261022", True), ("20260921", False),
+                            ("20260801", False), ("20261101", False), (None, False), ("", False), ("abc", False),
+                            ("20261340", False), ("2026-10-15", False), (20261015, False)):
+        assert programas._es_reciente(fecha, hoy) is esperado, (fecha, esperado)
+
+    def _p(nombre, editor="", fecha=None, oculto=False, origen="registro", version="1.0"):
+        return {"nombre": nombre, "version": version, "editor": editor, "fecha": fecha, "oculto": oculto, "origen": origen}
+
+    def _recientes(n, editor="", oculto=False):
+        return [_p(f"Prog{i}", editor, "20261010", oculto) for i in range(n)]
+
+    for nombre, lista, esperado in (
+            ("3 recientes sin editor", _recientes(3), "advertencia"),
+            ("2 recientes sin editor", _recientes(2), "normal"),
+            ("3 pero uno con editor", _recientes(2) + [_p("Conocido", "Microsoft Corporation", "20261010")], "normal"),
+            ("editor 'Unknown'/'Desconocido'/espacios",
+             [_p("A", "Unknown", "20261010"), _p("B", "  DESCONOCIDO ", "20261010"), _p("C", "   ", "20261010")], "advertencia"),
+            ("3 sin editor pero viejos", [_p(f"V{i}", "", "20250101") for i in range(3)], "normal"),
+            ("3 sin editor con fecha futura o ausente", [_p("F", "", "20271010"), _p("G", "", None), _p("H", "", "xx")], "normal"),
+            ("ocultos no cuentan (parches de Windows)", _recientes(3, oculto=True), "normal"),
+            ("tienda sin editor ni fecha", [_p(f"T{i}", None, None, origen="tienda") for i in range(5)], "normal")):
+        _assert_estado(f"programas {nombre}", programas._clasificar(lista, hoy)[0], esperado)
+    msg = programas._clasificar(_recientes(3) + [_p("Oc", "x", None, True)], hoy)[1]
+    assert "4 programas instalados" in msg and "1 oculto" in msg and "3 programas recientes sin editor" in msg, msg
+    assert "ocultos" not in programas._clasificar(_recientes(1, "x"), hoy)[1]
+
+    registro = [_p("Zeta", "Zeta SA", "20200101"), _p("alfa", "Alfa SA", "20200101"), _p("Beta", "Beta SA", "20200101"),
+                _p("KB123456", "Microsoft", "20261010", oculto=True)]
+    tienda = [_p("Calculadora", None, origen="tienda", version=None), _p("ZETA", None, origen="tienda", version=None)]
+    leer_registro, leer_tienda = programas._leer_registro, programas._leer_aplicaciones_inicio
+
+    def _lanza():
+        raise OSError("sin acceso")
+
+    try:
+        programas._leer_registro = lambda: [dict(x) for x in registro]
+        programas._leer_aplicaciones_inicio = lambda: [dict(x) for x in tienda]
+        r = programas.diagnosticar()
+        assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "programas"
+        _assert_estado("programas simulados", r["estado"], "normal")
+        assert r["datos"]["total"] == 5 and r["datos"]["ocultos"] == 1, r["datos"]
+        nombres = [x["nombre"] for x in r["datos"]["programas"]]
+        assert nombres == ["alfa", "Beta", "Calculadora", "Zeta", "KB123456"], nombres  # sin duplicado; oculto al final
+        assert "5 programas instalados" in r["mensaje"] and "1 oculto" in r["mensaje"], r["mensaje"]
+        assert r["datos"]["recientes_sin_editor"] == [] and r["recomendacion"]
+
+        # Review Focus 4: tres recientes sin editor entre otros.
+        programas._leer_registro = lambda: registro + _recientes(3)
+        r = programas.diagnosticar()
+        _assert_estado("programas 3 recientes sin editor", r["estado"], "advertencia")
+        assert sorted(r["datos"]["recientes_sin_editor"]) == ["Prog0", "Prog1", "Prog2"]
+        assert "3 programas recientes sin editor" in r["mensaje"] and r["recomendacion"]
+
+        # Review Focus 1: datos hostiles se conservan crudos (el escape se hace al mostrar).
+        programas._leer_registro = lambda: [_p("<img src=x onerror=alert(1)>", "A & B", "20200101")]
+        programas._leer_aplicaciones_inicio = lambda: []
+        r = programas.diagnosticar()
+        assert r["datos"]["programas"][0]["nombre"] == "<img src=x onerror=alert(1)>"
+        assert r["datos"]["programas"][0]["editor"] == "A & B"
+        json.dumps(r)
+
+        # Un lector que lanza se ignora; ambos lanzando o vacíos -> no_determinado.
+        programas._leer_registro = _lanza
+        programas._leer_aplicaciones_inicio = lambda: [dict(x) for x in tienda]
+        r = programas.diagnosticar()
+        _assert_estado("programas sin registro", r["estado"], "normal")
+        assert r["datos"]["total"] == 2
+        programas._leer_registro = lambda: [dict(x) for x in registro]
+        programas._leer_aplicaciones_inicio = _lanza
+        assert programas.diagnosticar()["datos"]["total"] == 4
+        programas._leer_aplicaciones_inicio = _lanza
+        programas._leer_registro = _lanza
+        r = programas.diagnosticar()
+        _assert_estado("programas ambos lanzan", r["estado"], "no_determinado")
+        assert r["datos"]["total"] is None and r["datos"]["programas"] == [] and r["recomendacion"]
+        programas._leer_registro = lambda: []
+        programas._leer_aplicaciones_inicio = lambda: []
+        _assert_estado("programas ambos vacíos", programas.diagnosticar()["estado"], "no_determinado")
+        # Entradas mal formadas de un lector simulado se descartan sin lanzar.
+        programas._leer_registro = lambda: [None, "x", {"version": "1"}, _p("Bien", "X", "20200101")]
+        r = programas.diagnosticar()
+        assert r["datos"]["total"] == 1 and r["datos"]["programas"][0]["nombre"] == "Bien"
+
+        # Review Focus 3: 500 programas -> lista de 300, total real, JSON serializable; recientes acotados a 20.
+        reciente = datetime.date.today().strftime("%Y%m%d")
+        programas._leer_registro = lambda: [_p(f"P{i:03d}", "", reciente) for i in range(500)]
+        r = programas.diagnosticar()
+        assert len(r["datos"]["programas"]) == 300 and r["datos"]["total"] == 500
+        assert len(r["datos"]["recientes_sin_editor"]) == 20
+        _assert_estado("programas 500 recientes", r["estado"], "advertencia")
+        assert "500 programas" in r["mensaje"]
+        json.dumps(r)
+    finally:
+        programas._leer_registro, programas._leer_aplicaciones_inicio = leer_registro, leer_tienda
+
+    # Salida de PowerShell: lista, objeto único (un solo programa), vacía o basura.
+    assert programas._parsear_aplicaciones('[{"Name":"Calc","AppID":"x"},{"Name":"Fotos","AppID":"y"}]') == [
+        {"nombre": "Calc", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "tienda"},
+        {"nombre": "Fotos", "version": None, "editor": None, "fecha": None, "oculto": False, "origen": "tienda"}]
+    assert [x["nombre"] for x in programas._parsear_aplicaciones('{"Name":"Unica","AppID":"x"}')] == ["Unica"]
+    for basura in ("", "no es json", "null", '"texto"', '[{"AppID":"x"}, 5]', None):
+        assert programas._parsear_aplicaciones(basura) == [], basura
+
+    # Sin PowerShell, con tiempo agotado o con error: [] sin lanzar (y sin ventana).
+    which, run = programas.shutil.which, programas.subprocess.run
+    try:
+        programas.shutil.which = lambda _n: None
+        assert programas._leer_aplicaciones_inicio() == []
+        programas.shutil.which = lambda _n: "powershell.exe"
+
+        def _agota(*a, **k):
+            raise subprocess.TimeoutExpired("powershell", 10)
+        programas.subprocess.run = _agota
+        assert programas._leer_aplicaciones_inicio() == []
+
+        visto = {}
+
+        def _falso(args, **k):
+            visto.update(k)
+            return subprocess.CompletedProcess(args, 0, stdout='{"Name":"Unica"}', stderr="")
+        programas.subprocess.run = _falso
+        assert [x["nombre"] for x in programas._leer_aplicaciones_inicio()] == ["Unica"]
+        assert visto["timeout"] == 10 and visto["creationflags"] == subprocess.CREATE_NO_WINDOW
+        programas.subprocess.run = lambda args, **k: subprocess.CompletedProcess(args, 1, stdout='{"Name":"X"}', stderr="e")
+        assert programas._leer_aplicaciones_inicio() == []
+    finally:
+        programas.shutil.which, programas.subprocess.run = which, run
+
+    # Llamada real: contrato, estado válido, serializable y dentro del tiempo.
+    t0 = time.perf_counter()
+    r = programas.diagnosticar()
+    dt = time.perf_counter() - t0
+    assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "programas"
+    assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico"
+    assert r["datos"]["total"] is None or r["datos"]["total"] >= len(r["datos"]["programas"])
+    json.dumps(r)
+    assert dt <= 8.0, f"programas tardó {dt:.1f} s"
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
@@ -1710,4 +1853,5 @@ if __name__ == "__main__":
     test_recomendador_endurecimiento()
     test_analisis_espacio()
     test_analisis_inicio()
+    test_analisis_programas()
     print("test_scanner.py: todos los casos OK")
