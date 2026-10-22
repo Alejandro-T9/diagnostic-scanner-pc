@@ -599,6 +599,49 @@ def test_escaner_adjunta_guia():
     assert explicador.guia_para("cpu", "critico")["quien"] == "tecnico" and "Quién lo hace: Un técnico" in texto, texto
 
 
+def test_escaner_recomendaciones():
+    hechos_falsos = {"ram_gb": 4}
+    recs_falsas = [{"id": "so", "titulo": "Sistema operativo", "detalle": "Detalle X", "basado_en": ["4 GB de RAM"],
+                    "prioridad": "media", "quien": "tecnico",
+                    "opciones": [{"nombre": "Windows 10", "motivo": "Suficiente", "nota": "Soporte limitado"},
+                                 {"nombre": "Lubuntu", "motivo": "Liviano", "nota": ""}]}]
+    llamadas = []
+    COMP_orig, hechos_orig, rec_orig = scanner.COMPONENTES, equipo.leer_hechos, recomendador.recomendar
+    try:
+        scanner.COMPONENTES = []
+        # (a) el escaneo adjunta lo que devuelven las funciones, sin tocar el ID
+        equipo.leer_hechos = lambda: hechos_falsos
+        recomendador.recomendar = lambda resultado, hechos: (llamadas.append((resultado, hechos)), recs_falsas)[1]
+        r = scanner.ejecutar_escaneo_completo()
+        assert r["hechos"] == hechos_falsos and r["recomendaciones"] == recs_falsas, r
+        assert "hechos" in r["tiempos"] and "total" in r["tiempos"], r["tiempos"]
+        assert llamadas and "componentes" in llamadas[0][0] and llamadas[0][1] == hechos_falsos, llamadas
+        # (b) si algo lanza, el escaneo completa igual
+        def _roto():
+            raise RuntimeError("x")
+        equipo.leer_hechos = _roto
+        with contextlib.redirect_stderr(io.StringIO()):
+            r = scanner.ejecutar_escaneo_completo()
+        assert r["hechos"] == {} and r["recomendaciones"] == [], r
+        equipo.leer_hechos = lambda: hechos_falsos
+        recomendador.recomendar = lambda resultado, hechos: _roto()
+        with contextlib.redirect_stderr(io.StringIO()):
+            r = scanner.ejecutar_escaneo_completo()
+        assert r["hechos"] == hechos_falsos and r["recomendaciones"] == [], r
+    finally:
+        scanner.COMPONENTES, equipo.leer_hechos, recomendador.recomendar = COMP_orig, hechos_orig, rec_orig
+        _lhm.invalidar()
+    # (c) reporte de texto
+    texto = utils.generar_reporte_texto({"componentes": {}, "recomendaciones": recs_falsas}, "NORMAL")
+    for esperado in ("--- RECOMENDACIONES ---", "[media] Sistema operativo", "Detalle: Detalle X", "Basado en:\n- 4 GB de RAM",
+                     "Opciones:\n- Windows 10: Suficiente (Soporte limitado)", "- Lubuntu: Liviano\n"):
+        assert esperado in texto, (esperado, texto)
+    assert texto.index("--- RECOMENDACIONES ---") < texto.index("--- LIMITACIONES"), texto
+    assert "RECOMENDACIONES" not in utils.generar_reporte_texto({"componentes": {}}, "NORMAL")
+    for raro in (None, "x", [None, {}, {"titulo": "T"}, 5]):
+        utils.generar_reporte_texto({"componentes": {}, "recomendaciones": raro}, "NORMAL")
+
+
 def test_guias_endpoint():
     def _peticion():
         r = app.app.test_client().get("/api/guias")
@@ -926,6 +969,7 @@ if __name__ == "__main__":
     test_lanzador()
     test_explicador()
     test_escaner_adjunta_guia()
+    test_escaner_recomendaciones()
     test_guias_endpoint()
     test_informe()
     test_equipo()

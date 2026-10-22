@@ -143,6 +143,26 @@ def generar_reporte_texto(resultado, veredicto):
             lineas.append(json.dumps(info["datos"], indent=2, ensure_ascii=False))
         lineas.append("")
 
+    recomendaciones = resultado.get("recomendaciones")
+    if isinstance(recomendaciones, list):
+        recomendaciones = [r for r in recomendaciones if isinstance(r, dict) and r.get("titulo")]
+        if recomendaciones:
+            lineas.append("--- RECOMENDACIONES ---")
+            for rec in recomendaciones:
+                lineas.append(f"[{rec.get('prioridad', '?')}] {rec['titulo']}")
+                lineas.append(f"Detalle: {rec.get('detalle', '')}")
+                lineas.append("Basado en:")
+                lineas.extend(f"- {dato}" for dato in rec.get("basado_en") or [])
+                opciones = [o for o in rec.get("opciones") or [] if isinstance(o, dict) and o.get("nombre")]
+                if opciones:
+                    lineas.append("Opciones:")
+                    for o in opciones:
+                        nota = f" ({o['nota']})" if o.get("nota") else ""
+                        lineas.append(f"- {o['nombre']}: {o.get('motivo', '')}{nota}")
+                if rec.get("quien"):
+                    lineas.append(f"Quién lo hace: {QUIEN_TEXTO.get(rec['quien'], rec['quien'])}")
+                lineas.append("")
+
     sin_datos = [nombre for nombre, info in componentes.items() if info.get("estado") == "no_determinado"]
     lineas.append("--- LIMITACIONES DE ESTE REPORTE ---")
     if sin_datos:

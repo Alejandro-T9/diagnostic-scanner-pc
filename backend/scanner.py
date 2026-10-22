@@ -11,9 +11,12 @@ from datetime import datetime, timezone
 
 import hashlib
 import importlib
+import sys
 import time
 
+import equipo
 import explicador
+import recomendador
 import utils
 from modules import _lhm
 
@@ -74,6 +77,17 @@ def ejecutar_escaneo_completo() -> dict:
         inicio = time.perf_counter()
         componentes[nombre] = _escanear_componente(nombre)
         tiempos[nombre] = round(time.perf_counter() - inicio, 3)
+    # Mismo hilo que el escaneo (COM ya inicializado). Si algo falla el
+    # escaneo igual completa, solo sin hechos/recomendaciones.
+    inicio = time.perf_counter()
+    hechos, recomendaciones = {}, []
+    try:
+        hechos = equipo.leer_hechos()
+        tiempos["hechos"] = round(time.perf_counter() - inicio, 3)
+        recomendaciones = recomendador.recomendar({"componentes": componentes}, hechos)
+    except Exception as error:
+        print(f"[scanner] hechos/recomendaciones no disponibles: {error}", file=sys.stderr)
+    tiempos.setdefault("hechos", round(time.perf_counter() - inicio, 3))
     tiempos["total"] = round(time.perf_counter() - inicio_total, 3)
 
     return {
@@ -81,6 +95,8 @@ def ejecutar_escaneo_completo() -> dict:
         "timestamp": utils.obtener_timestamp(),
         "herramientas_disponibles": utils.verificar_herramientas(),
         "componentes": componentes,
+        "hechos": hechos,
+        "recomendaciones": recomendaciones,
         "resumen": _calcular_resumen(componentes),
         "cobertura": _calcular_cobertura(componentes),
         "tiempos": tiempos,
