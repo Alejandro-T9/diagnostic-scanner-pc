@@ -13,7 +13,40 @@ body {
     color: var(--color-texto);
     font-family: var(--fuente);
     margin: 0;
-    padding: 24px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Foco visible en todo control (sobre la barra marino, en blanco). */
+:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+}
+
+.icono {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.icono svg {
+    width: 20px;
+    height: 20px;
 }
 
 /* Datos técnicos (temperaturas, voltajes, capacidades) en monoespaciada
@@ -22,24 +55,240 @@ body {
     font-family: var(--fuente-mono);
 }
 
-/* --- Cabecera --- */
-.cabecera {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 24px;
+/* --- Barra superior (marino de marca) --- */
+.barra {
+    position: relative;
+    z-index: 20;
+    background-color: var(--color-marino);
+    color: var(--color-sobre-marino);
 }
 
-.cabecera h1 {
+.barra :focus-visible {
+    outline-color: var(--color-sobre-marino);
+}
+
+.barra-interior {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espacio-2) var(--espacio-4);
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: var(--espacio-3) var(--espacio-5);
+}
+
+.barra-marca {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-2);
+    margin-right: auto;
+    min-width: 0;
+}
+
+.barra-marca h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: var(--texto-l);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.marca-corta { display: none; }
+
+.barra-acciones {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-2);
+}
+
+/* Botones de la barra: 40 px de alto mínimo (objetivo táctil). */
+.boton-icono, .boton-mas, .boton-primario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--espacio-2);
+    min-height: 40px;
+    font-family: inherit;
+    font-size: var(--texto-s);
+    font-weight: 600;
+    border-radius: var(--radio-1);
+    cursor: pointer;
+    transition: var(--transicion-color);
+}
+
+.boton-icono, .boton-mas {
+    min-width: 40px;
+    padding: 0 var(--espacio-3);
+    background-color: transparent;
+    color: var(--color-sobre-marino);
+    border: 1px solid currentColor;
+}
+
+.boton-icono:hover, .boton-mas:hover, .boton-mas[aria-expanded="true"] {
+    background-color: var(--color-marino-tenue);
+}
+
+.boton-primario {
+    padding: 0 var(--espacio-4);
+    background-color: var(--color-acento);
+    color: var(--color-sobre-acento);
+    border: 1px solid transparent;
+}
+
+.boton-primario:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+.boton-primario:disabled {
+    opacity: 0.75;
+    cursor: progress;
+}
+
+/* Indicador de ocupado: el ícono gira (con movimiento reducido, solo cambia el texto). */
+.boton-primario.ocupado .icono-girable svg {
+    animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+    to { transform: rotate(360deg); }
+}
+
+.boton-grande { min-height: 52px; padding: 0 var(--espacio-6); font-size: var(--texto-l); }
+
+/* --- Menú "Más" --- */
+.mas {
+    position: relative;
+}
+
+.menu-mas {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--espacio-2));
+    min-width: 260px;
+    padding: var(--espacio-1);
+    background-color: var(--color-tarjeta);
+    color: var(--color-texto);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-1);
+    box-shadow: var(--sombra-2);
+}
+
+.menu-mas [role="menuitem"] {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-3);
+    width: 100%;
+    min-height: 44px;
+    padding: 0 var(--espacio-3);
+    background: none;
+    border: none;
+    border-radius: var(--radio-0);
+    color: inherit;
+    font-family: inherit;
+    font-size: var(--texto-s);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.menu-mas [role="menuitem"]:hover, .menu-mas [role="menuitem"]:focus {
+    background-color: var(--color-acento-suave);
+}
+
+.menu-mas :focus-visible {
+    outline-color: var(--color-acento);
+    outline-offset: -2px;
+}
+
+/* El informe solo existe con un escaneo real (no en demo ni antes del primer escaneo). */
+body.demo #menu-informe, body.sin-escaneo #menu-informe { display: none; }
+
+/* --- Avisos: franja fina bajo la barra, con ícono --- */
+.avisos { display: flex; flex-direction: column; }
+
+.aviso {
+    display: none;
+    align-items: center;
+    gap: var(--espacio-3);
+    padding: var(--espacio-2) var(--espacio-5);
+    color: var(--color-texto);
+    font-size: var(--texto-s);
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.aviso.activo { display: flex; }
+.aviso-error { background-color: var(--color-estado-critico-fondo); }
+.aviso-error .icono { color: var(--color-rojo); }
+.aviso-demo { background-color: var(--color-estado-advertencia-fondo); }
+.aviso-demo .icono { color: var(--color-amarillo); }
+
+/* --- Contenido, pestañas y pie --- */
+.contenido {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: var(--espacio-4) var(--espacio-5) var(--espacio-5);
+}
+
+.contenido > [role="tabpanel"] { min-width: 0; }
+
+.pestanas {
+    display: flex;
+    gap: var(--espacio-1);
+    margin-bottom: var(--espacio-5);
+    border-bottom: 1px solid var(--color-borde);
+    overflow-x: auto; /* en pantallas angostas las pestañas se desplazan, la página no */
+}
+
+.pestanas [role="tab"] {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 var(--espacio-4);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--color-texto-secundario);
+    font-family: inherit;
+    font-size: var(--texto-m);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transicion-color), color 0.2s ease;
+}
+
+.pestanas [role="tab"]:hover:not([aria-disabled="true"]) { color: var(--color-texto); }
+
+.pestanas [role="tab"][aria-selected="true"] {
+    color: var(--color-acento);
+    border-bottom-color: var(--color-acento);
+}
+
+.pestanas [role="tab"][aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.panel-vacio {
+    display: none;
+    color: var(--color-texto-secundario);
+    text-align: center;
+    padding: var(--espacio-6) 0;
+}
+
+#recomendaciones[hidden] + .panel-vacio { display: block; }
+
+.pie {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--espacio-2) var(--espacio-4);
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: var(--espacio-4) var(--espacio-5) var(--espacio-5);
+    border-top: 1px solid var(--color-borde);
+    color: var(--color-texto-secundario);
+    font-size: var(--texto-xs);
 }
 
 .timestamp {
     color: var(--color-texto-secundario);
-    font-size: 14px;
 }
 
 /* --- Panel de diagnóstico: sello de veredicto + mapa físico + ficha --- */
@@ -354,81 +603,11 @@ body {
     border-bottom: none;
 }
 
-/* --- Botones de acción --- */
-.acciones {
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-
-.boton-escanear {
-    background-color: var(--color-acento);
-    color: var(--color-sobre-acento);
-    border: none;
-    border-radius: var(--radio-1);
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.boton-escanear:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-/* Botón de reporte: variante outline, mismo tamaño, para no competir
-   visualmente con la acción principal (escanear). Es un <a>, no un
-   <button>: la descarga la resuelve el navegador solo, vía el header
-   Content-Disposition que ya manda /api/reporte. */
-.boton-reporte {
-    display: inline-flex;
-    align-items: center;
-    background-color: transparent;
-    color: var(--color-acento);
-    border: 1px solid var(--color-acento);
-    border-radius: var(--radio-1);
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: bold;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-/* Botón de modo demo: mismo tamaño que los otros dos, pero con el color
-   neutral (--color-texto-secundario) en vez del acento — es la acción
-   menos importante de las tres, para preparar una sustentación, no para
-   el uso real del técnico. */
-.boton-demo {
-    background-color: transparent;
-    color: var(--color-texto-secundario);
-    border: 1px solid var(--color-borde-control);
-    border-radius: var(--radio-1);
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-/* Botón de tema (provisional: la cabecera se reemplaza en la Tarea 3) */
-.boton-tema {
-    background-color: transparent;
-    color: var(--color-texto);
-    border: 1px solid var(--color-borde-control);
-    border-radius: var(--radio-1);
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-/* --- Barra de progreso --- */
+/* --- Barra de progreso: línea fina al pie de la barra superior --- */
 .barra-progreso-contenedor {
     display: none;
-    height: 6px;
-    background-color: var(--color-tarjeta);
-    border-radius: var(--radio-0);
-    margin-top: 16px;
+    height: 4px;
+    background-color: var(--color-marino-tenue);
     overflow: hidden;
 }
 
@@ -448,65 +627,33 @@ body {
     100% { margin-left: 100%; }
 }
 
-/* --- Estado de error general (backend no responde) --- */
-.aviso-error {
-    display: none;
-    background-color: var(--color-tarjeta);
-    border-left: 4px solid var(--color-rojo);
-    border-radius: var(--radio-borde);
-    padding: 12px 16px;
-    margin-bottom: 24px;
-    color: var(--color-texto);
-}
-
-.aviso-error.activo {
-    display: block;
-}
-
-/* --- Aviso de modo demo (datos simulados) --- */
-.aviso-demo {
-    display: none;
-    background-color: var(--color-tarjeta);
-    border-left: 4px solid var(--color-naranja);
-    border-radius: var(--radio-borde);
-    padding: 12px 16px;
-    margin-bottom: 24px;
-    color: var(--color-naranja);
-    font-weight: bold;
-}
-
-.aviso-demo.activo {
-    display: block;
-}
-
-/* --- Interruptor de modo (simple / técnico) --- */
+/* --- Interruptor de modo (control segmentado en la barra) --- */
 .interruptor-modo {
     display: inline-flex;
-    border: 1px solid var(--color-borde-control);
+    border: 1px solid currentColor;
     border-radius: var(--radio-1);
     overflow: hidden;
 }
 
 .interruptor-modo button {
+    min-height: 38px;
     background-color: transparent;
-    color: var(--color-texto-secundario);
+    color: var(--color-sobre-marino);
     border: none;
-    padding: 8px 16px;
-    font-size: 14px;
-    font-weight: bold;
+    padding: 0 var(--espacio-4);
+    font-family: inherit;
+    font-size: var(--texto-s);
+    font-weight: 600;
     cursor: pointer;
 }
 
 .interruptor-modo button:focus-visible {
-    outline: 2px solid var(--color-texto);
     outline-offset: -3px;
 }
 
-body.demo #boton-informe { display: none; }
-
 .interruptor-modo button[aria-pressed="true"] {
-    background-color: var(--color-acento);
-    color: var(--color-sobre-acento);
+    background-color: var(--color-sobre-marino);
+    color: var(--color-marino);
 }
 
 /* --- Guía dentro del panel de detalle (modo técnico) --- */
@@ -533,7 +680,7 @@ body.demo #boton-informe { display: none; }
 /* --- Modo simple: se oculta el mapa y el detalle técnico --- */
 .vista-simple { display: none; }
 
-body.modo-simple .vista-simple { display: block; margin-bottom: 24px; }
+body.modo-simple:not(.sin-escaneo) .vista-simple { display: block; margin-bottom: 24px; }
 body.modo-simple .panel-diagnostico-cuerpo,
 body.modo-simple .detalle-panel,
 body.modo-simple .resumen-texto { display: none; }
@@ -541,12 +688,9 @@ body.modo-simple .resumen-texto { display: none; }
 /* Sin escaneo todavía: nunca se muestran datos inventados como si fueran reales. */
 .simple-vacio { display: none; text-align: center; padding: 32px 0; }
 body.sin-escaneo .simple-vacio { display: block; }
-body.sin-escaneo #simple-contenido { display: none; }
-body.modo-simple.sin-escaneo .panel-diagnostico,
-body.modo-simple.sin-escaneo #boton-escanear { display: none; }
+body.sin-escaneo .panel-diagnostico { display: none; }
 .simple-vacio-titulo { font-size: 20px; margin: 0 0 20px 0; }
 .simple-vacio-nota { color: var(--color-texto-secundario); font-size: 14px; margin: 16px 0 0 0; }
-.boton-grande { padding: 16px 40px; font-size: 20px; }
 
 .simple-resumen {
     font-size: 16px;
@@ -639,17 +783,25 @@ body.modo-simple.sin-escaneo #boton-escanear { display: none; }
     }
 }
 
-@media (max-width: 480px) {
-    body {
-        padding: 16px;
-    }
+@media (max-width: 700px) {
+    .marca-larga { display: none; }
+    .marca-corta { display: inline; }
+    .barra-interior { padding: var(--espacio-3) var(--espacio-4); }
+    .contenido { padding: var(--espacio-4); }
+    .pie { padding: var(--espacio-4); }
+    .aviso { padding: var(--espacio-2) var(--espacio-4); }
+}
 
-    .cabecera {
-        flex-direction: column;
-        align-items: flex-start;
-    }
+@media (max-width: 560px) {
+    /* El control Simple | Técnico baja a su propia fila; el botón principal sigue en la primera. */
+    .interruptor-modo { order: 3; flex: 1 1 100%; }
+    .interruptor-modo button { flex: 1; }
+    .mas-texto { display: none; }
+}
 
-    .boton-escanear {
-        width: 100%;
-    }
+/* Movimiento reducido: sin transiciones ni giros; la barra de progreso queda fija pero visible. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; }
+    .boton-primario.ocupado .icono-girable svg { animation: none; }
+    .barra-progreso { animation: none; width: 100%; opacity: 0.6; }
 }

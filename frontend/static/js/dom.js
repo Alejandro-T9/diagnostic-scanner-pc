@@ -26,7 +26,7 @@ function crearIcono(svg) {
 
 // Chip de estado: ícono con silueta propia + texto. Estado desconocido -> no_determinado.
 function crearChipEstado(estado) {
-    const e = Object.hasOwn(CHIP_TEXTO, estado) ? estado : "no_determinado";
+    const e = typeof estado === "string" && Object.hasOwn(CHIP_TEXTO, estado) ? estado : "no_determinado";
     const chip = crear("span", `chip-estado chip-estado--${e}`);
     chip.append(crearIcono(iconoEstado(e)), CHIP_TEXTO[e]);
     return chip;

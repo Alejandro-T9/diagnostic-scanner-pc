@@ -16,6 +16,7 @@
     --color-texto-secundario: #566273;
     --color-marino: #0F2A47;          /* barra superior */
     --color-sobre-marino: #FFFFFF;    /* texto sobre la barra */
+    --color-marino-tenue: rgba(255, 255, 255, 0.14);  /* hover y pista de progreso sobre la barra */
     --color-acento: #1F5FBF;
     --color-sobre-acento: #FFFFFF;    /* texto sobre botones de acento */
 
@@ -83,6 +84,7 @@
     --color-texto-secundario: #A3AEBD;
     --color-marino: #0A1B2E;
     --color-sobre-marino: #FFFFFF;
+    --color-marino-tenue: rgba(255, 255, 255, 0.14);
     --color-acento: #6EA8FF;
     --color-sobre-acento: #0F141B;
 

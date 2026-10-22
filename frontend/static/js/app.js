@@ -1,7 +1,8 @@
 // frontend/static/js/app.js — Lógica del dashboard de Diagnostic Scanner PC.
 // Sin dependencias externas. Responsabilidades: polling de /api/status cada
 // 2s (timestamp, salud de conexión), disparo de /api/scan, y el panel de
-// detalle por componente (mapa físico + ficha, enlazados por selección).
+// detalle por componente (mapa físico + ficha, enlazados por selección), y el armazón:
+// pestañas (con hash en la URL), menú "Más" y botón único de revisión.
 
 let componenteSeleccionado = null;
 let ultimoResultado = null; // {componentes, cobertura} del último render, para repintar al cambiar de modo
@@ -11,7 +12,7 @@ let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
 
 function nombreComp(id) {
-    return NOMBRES_COMPONENTES[id] || id;
+    return Object.hasOwn(NOMBRES_COMPONENTES, id) ? NOMBRES_COMPONENTES[id] : id;
 }
 
 function calcularVeredicto(componentes) {
@@ -62,7 +63,7 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
     // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
     // así ninguna clase CSS ni texto sale de un valor no previsto.
     for (const info of Object.values(componentes)) {
-        if (!Object.hasOwn(CHIP_TEXTO, info.estado)) info.estado = "no_determinado";
+        if (typeof info.estado !== "string" || !Object.hasOwn(CHIP_TEXTO, info.estado)) info.estado = "no_determinado";
     }
     const svg = document.getElementById("mapa-svg");
     svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
@@ -81,7 +82,7 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
             grupo.innerHTML = '<circle class="halo" r="16"></circle><circle class="nucleo" r="6"></circle>';
             grupo.addEventListener("mouseenter", () => resaltarComponente(id, true));
             grupo.addEventListener("mouseleave", () => resaltarComponente(id, false));
-            grupo.addEventListener("click", () => seleccionarComponente(id, info));
+            grupo.addEventListener("click", () => abrirComponente(id, info));
             svg.appendChild(grupo);
 
             const etiqueta = document.createElementNS("http://www.w3.org/2000/svg", "text");
@@ -102,7 +103,7 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
         fila.append(crear("div", `franja ${info.estado}`), icono, textos, crearChipEstado(info.estado));
         fila.addEventListener("mouseenter", () => resaltarComponente(id, true));
         fila.addEventListener("mouseleave", () => resaltarComponente(id, false));
-        fila.addEventListener("click", () => seleccionarComponente(id, info));
+        fila.addEventListener("click", () => abrirComponente(id, info));
         filasEl.appendChild(fila);
     }
 
@@ -110,12 +111,19 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
     renderizarResumen(componentes, cobertura);
     renderizarSimple(componentes);
     renderizarRecomendaciones(recomendaciones);
+    actualizarPestanas();
 }
 
 function seleccionarComponente(id, info) {
     componenteSeleccionado = id;
     marcarSeleccionado(id);
     renderizarDetalle(id, info);
+}
+
+// Clic en un punto del mapa o una fila (pestaña Resumen): el detalle vive en Componentes.
+function abrirComponente(id, info) {
+    seleccionarComponente(id, info);
+    activarPestana("componentes", true);
 }
 
 function _etiquetaCampo(clave) {
@@ -211,7 +219,7 @@ function bloqueGuia(guia) {
         titulo.append(crear("strong", "", "Qué hacer:"));
         bloque.append(titulo, lista);
     }
-    bloque.append(rotulado("Quién lo hace:", QUIEN_TEXTO[guia.quien] || guia.quien || ""));
+    bloque.append(rotulado("Quién lo hace:", Object.hasOwn(QUIEN_TEXTO, guia.quien) ? QUIEN_TEXTO[guia.quien] : guia.quien || ""));
     return bloque;
 }
 
@@ -253,7 +261,7 @@ function renderizarSimple(componentes) {
                 tarjeta.append(lista);
             }
             const etiquetas = crear("div", "tarjeta-simple-etiquetas");
-            if (QUIEN_TEXTO[guia.quien]) etiquetas.append(crear("span", `etiqueta-quien ${guia.quien}`, QUIEN_TEXTO[guia.quien]));
+            if (Object.hasOwn(QUIEN_TEXTO, guia.quien)) etiquetas.append(crear("span", `etiqueta-quien ${guia.quien}`, QUIEN_TEXTO[guia.quien]));
             if (["baja", "media", "alta"].includes(guia.urgencia)) {
                 etiquetas.append(crear("span", `etiqueta-urgencia ${guia.urgencia}`, `Urgencia: ${guia.urgencia}`));
             }
@@ -315,6 +323,7 @@ function pintarVacio() {
     document.getElementById("cobertura-texto").textContent = "";
     document.getElementById("filas").replaceChildren();
     document.getElementById("mapa-svg").querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
+    actualizarPestanas();
 }
 
 function repintar() {
@@ -326,7 +335,7 @@ function repintar() {
 }
 
 function aplicarModo(nuevo, guardar) {
-    modo = nuevo === "tecnico" ? "tecnico" : "simple";
+    modo = modoValido(nuevo);
     document.body.classList.toggle("modo-simple", modo === "simple");
     document.getElementById("modo-simple-btn").setAttribute("aria-pressed", String(modo === "simple"));
     document.getElementById("modo-tecnico-btn").setAttribute("aria-pressed", String(modo === "tecnico"));
@@ -336,19 +345,16 @@ function aplicarModo(nuevo, guardar) {
     repintar();
 }
 
-// Tema claro/oscuro. Claro por defecto: solo "oscuro" exacto activa el oscuro
-// (se mueve a modelo.js en la Tarea 3).
-function temaValido(valor) {
-    return valor === "oscuro" ? "oscuro" : "claro";
-}
-
+// Tema claro/oscuro (temaValido vive en modelo.js: claro por defecto).
 function aplicarTema(tema, guardar) {
     const oscuro = temaValido(tema) === "oscuro";
     if (oscuro) document.documentElement.setAttribute("data-theme", "dark");
     else document.documentElement.removeAttribute("data-theme");
     const boton = document.getElementById("boton-tema");
-    // Etiqueta fija ("Tema oscuro"); el estado lo comunica aria-pressed.
+    // Etiqueta fija ("Tema oscuro", solo para lectores de pantalla); el estado lo comunica aria-pressed.
     if (boton) boton.setAttribute("aria-pressed", String(oscuro));
+    const icono = document.getElementById("boton-tema-icono");
+    if (icono) icono.replaceChildren(crearIcono(iconoUi(oscuro ? "tema-claro" : "tema-oscuro")));
     if (guardar) {
         try { localStorage.setItem("tema_interfaz", oscuro ? "oscuro" : "claro"); } catch (e) { /* sin almacenamiento: solo no se recuerda */ }
     }
@@ -368,9 +374,8 @@ async function cargarGuias() {
 }
 
 function mostrarError(mensaje) {
-    const aviso = document.getElementById("aviso-error");
-    aviso.textContent = mensaje;
-    aviso.classList.add("activo");
+    document.getElementById("aviso-error-texto").textContent = mensaje;
+    document.getElementById("aviso-error").classList.add("activo");
 }
 
 function ocultarError() {
@@ -396,14 +401,21 @@ async function actualizarStatus() {
     }
 }
 
+// Botón único de revisión (barra superior + el grande del estado vacío): ocupado mientras corre el escaneo.
+function marcarOcupado(ocupado) {
+    const botones = [document.getElementById("boton-revisar"), document.getElementById("boton-revisar-vacio")];
+    const teniaFoco = botones.includes(document.activeElement);
+    botones.forEach((b) => { b.disabled = ocupado; if (ocupado) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy"); b.classList.toggle("ocupado", ocupado); });
+    document.getElementById("boton-revisar-texto").textContent =
+        ocupado ? "Revisando…" : (escaneosReales > 0 ? "Volver a revisar" : "Revisar mi PC");
+    document.getElementById("barra-progreso-contenedor").classList.toggle("activa", ocupado);
+    // Al deshabilitarse el botón que tenía el foco, este se pierde: se devuelve al botón de la barra.
+    if (!ocupado && (teniaFoco || document.activeElement === document.body)) botones[0].focus();
+}
+
 async function escanearSistema() {
-    const boton = document.getElementById("boton-escanear");
-    const botonRevisar = document.getElementById("boton-revisar");
-    const barra = document.getElementById("barra-progreso-contenedor");
     escaneando = true;
-    boton.disabled = true;
-    botonRevisar.disabled = true;
-    barra.classList.add("activa");
+    marcarOcupado(true);
     try {
         const guias = cargarGuias(); // en paralelo al escaneo: el sello en palabras necesita _veredictos (nunca lanza)
         const respuesta = await fetch("/api/scan");
@@ -423,9 +435,7 @@ async function escanearSistema() {
         mostrarError("No se pudo completar el escaneo. Verifica que el servidor esté corriendo.");
     } finally {
         escaneando = false;
-        boton.disabled = false;
-        botonRevisar.disabled = false;
-        barra.classList.remove("activa");
+        marcarOcupado(false);
     }
 }
 
@@ -461,9 +471,111 @@ async function verModoDemo() {
         crear("p", "detalle-vacio", "Selecciona un componente del mapa o la lista para ver el detalle completo."));
 }
 
-document.getElementById("boton-escanear").addEventListener("click", escanearSistema);
 document.getElementById("boton-revisar").addEventListener("click", escanearSistema);
+document.getElementById("boton-revisar-vacio").addEventListener("click", escanearSistema);
 document.getElementById("boton-demo").addEventListener("click", verModoDemo);
+
+// Íconos de la interfaz: cada [data-icono="tipo:nombre"] recibe su SVG (cadenas constantes de iconos.js).
+const ICONO_POR_TIPO = { ui: iconoUi, comp: iconoComponente, estado: iconoEstado };
+document.querySelectorAll("[data-icono]").forEach((el) => {
+    const [tipo, nombre] = el.dataset.icono.split(":");
+    if (Object.hasOwn(ICONO_POR_TIPO, tipo)) el.append(crearIcono(ICONO_POR_TIPO[tipo](nombre)));
+});
+
+// --- Pestañas: roving tabindex, hash de la URL y teclado (lógica pura en modelo.js) ---
+let pestanaActual = "resumen";
+
+function pestanasHabilitadas() {
+    return habilitadasSegun(!document.body.classList.contains("sin-escaneo"), ANALISIS_DISPONIBLE);
+}
+
+// Estado de las pestañas según haya o no escaneo (sin escaneo solo Resumen es accionable).
+function actualizarPestanas() {
+    const habilitadas = pestanasHabilitadas();
+    PESTANAS.forEach((id) => {
+        const tab = document.getElementById(`tab-${id}`);
+        tab.hidden = id === "analisis" && !ANALISIS_DISPONIBLE;
+        if (habilitadas.includes(id)) tab.removeAttribute("aria-disabled");
+        else tab.setAttribute("aria-disabled", "true");
+    });
+    if (!habilitadas.includes(pestanaActual)) activarPestana("resumen", false);
+}
+
+// historial=true (clic o teclado del usuario): pushState; si no (arranque, hash externo): replaceState.
+function activarPestana(id, historial) {
+    id = pestanaDesdeHash(`#${id}`, pestanasHabilitadas());
+    pestanaActual = id;
+    PESTANAS.forEach((p) => {
+        const seleccionada = p === id;
+        const tab = document.getElementById(`tab-${p}`);
+        tab.setAttribute("aria-selected", String(seleccionada));
+        tab.tabIndex = seleccionada ? 0 : -1;
+        document.getElementById(`panel-${p}`).hidden = !seleccionada;
+    });
+    if (location.hash !== `#${id}`) {
+        try { (historial ? history.pushState : history.replaceState).call(history, null, "", `#${id}`); } catch (e) { /* sin historial: solo no queda el hash */ }
+    }
+}
+
+const idDeTab = (tab) => tab.id.replace("tab-", "");
+const listaPestanas = document.querySelector('[role="tablist"]');
+listaPestanas.addEventListener("click", (evento) => {
+    const tab = evento.target.closest('[role="tab"]');
+    if (!tab || tab.getAttribute("aria-disabled") === "true") return;
+    activarPestana(idDeTab(tab), true);
+});
+listaPestanas.addEventListener("keydown", (evento) => {
+    const tab = evento.target.closest('[role="tab"]');
+    if (!tab) return;
+    const destino = siguientePestana(idDeTab(tab), evento.key, pestanasHabilitadas());
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(evento.key)) return;
+    evento.preventDefault();
+    activarPestana(destino, true);
+    document.getElementById(`tab-${destino}`).focus();
+});
+const desdeHash = () => activarPestana(pestanaDesdeHash(location.hash, pestanasHabilitadas()), false);
+window.addEventListener("hashchange", desdeHash);
+window.addEventListener("popstate", desdeHash);
+
+// --- Menú "Más": clic, Enter/Espacio, flechas, Escape (devuelve el foco), Tab y clic fuera ---
+const botonMas = document.getElementById("boton-mas");
+const menuMas = document.getElementById("menu-mas");
+// Los ítems ocultos por CSS (informe sin escaneo real o en demo) no cuentan.
+const itemsMenu = () => [...menuMas.querySelectorAll('[role="menuitem"]')].filter((el) => el.offsetParent !== null);
+
+function abrirMenu(posicion) {
+    menuMas.hidden = false;
+    botonMas.setAttribute("aria-expanded", "true");
+    const items = itemsMenu();
+    (posicion === "ultimo" ? items[items.length - 1] : items[0]).focus();
+}
+
+function cerrarMenu(devolverFoco) {
+    menuMas.hidden = true;
+    botonMas.setAttribute("aria-expanded", "false");
+    if (devolverFoco) botonMas.focus();
+}
+
+botonMas.addEventListener("click", () => (menuMas.hidden ? abrirMenu("primero") : cerrarMenu(true)));
+botonMas.addEventListener("keydown", (evento) => {
+    if (evento.key === "Escape" && !menuMas.hidden) { evento.preventDefault(); cerrarMenu(true); return; }
+    if (evento.key !== "ArrowDown" && evento.key !== "ArrowUp") return;
+    evento.preventDefault();
+    abrirMenu(evento.key === "ArrowUp" ? "ultimo" : "primero");
+});
+menuMas.addEventListener("keydown", (evento) => {
+    const items = itemsMenu();
+    const i = items.indexOf(document.activeElement);
+    const mover = { ArrowDown: (i + 1) % items.length, ArrowUp: (i - 1 + items.length) % items.length, Home: 0, End: items.length - 1 };
+    if (Object.hasOwn(mover, evento.key)) { evento.preventDefault(); items[mover[evento.key]].focus(); }
+    else if (evento.key === "Escape") { evento.preventDefault(); cerrarMenu(true); }
+    else if (evento.key === "Tab") { botonMas.focus(); cerrarMenu(false); } // el Tab sigue desde el botón
+    else if (evento.key === " " && evento.target.tagName === "A") { evento.preventDefault(); evento.target.click(); }
+});
+menuMas.addEventListener("click", () => cerrarMenu(true)); // elegir un ítem cierra el menú
+document.addEventListener("click", (evento) => {
+    if (!menuMas.hidden && !evento.target.closest(".mas")) cerrarMenu(false);
+});
 
 // Sin menú contextual: el dashboard corre en un kiosk sin teclado/mouse
 // de uso general, y el clic derecho de Chromium expone "Inspeccionar"
@@ -484,7 +596,8 @@ let modoGuardado = null;
 try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* almacenamiento bloqueado: se usa el modo simple */ }
 aplicarModo(modoGuardado, false);
 
-// Arranque: sin datos hasta el primer escaneo (DATOS_MOCK solo sale con "Ver Modo Demostración").
+// Arranque: sin datos hasta el primer escaneo (DATOS_MOCK solo sale con "Ver demostración").
+desdeHash();
 
 // Frases de veredicto para el sello; al llegar se repinta (si falla, queda el texto de siempre).
 cargarGuias().then((t) => { if (t) repintar(); });

@@ -48,7 +48,7 @@ const _ICONOS_UI = {
 };
 
 function iconoEstado(estado) {
-    return _ICONOS_ESTADO[Object.hasOwn(_ICONOS_ESTADO, estado) ? estado : "no_determinado"];
+    return _ICONOS_ESTADO[typeof estado === "string" && Object.hasOwn(_ICONOS_ESTADO, estado) ? estado : "no_determinado"];
 }
 
 function iconoComponente(id) {

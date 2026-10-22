@@ -1267,6 +1267,9 @@ def test_paleta():
         for e, t in colores.items():
             r = _contraste(v[t], v[f"--color-estado-{e}-fondo"])
             assert r >= 4.5, (tema, e, r)
+            # (f2) franja de avisos: texto normal sobre el fondo teñido del estado
+            r = _contraste(v["--color-texto"], v[f"--color-estado-{e}-fondo"])
+            assert r >= 4.5, (tema, e, "texto", r)
 
 
 def test_frontend_node():
@@ -1279,35 +1282,80 @@ def test_frontend_node():
     assert r.returncode == 0, r.stdout + r.stderr
 
 
-# Líneas que insertan HTML y están permitidas por nombre: solo reciben cadenas constantes de iconos.js.
-_HTML_PERMITIDO = ('marco.insertAdjacentHTML("beforeend", svg);',)
+# Única inserción de HTML permitida por nombre: cadenas CONSTANTES de iconos.js, y solo en dom.js.
+_HTML_PERMITIDO = {"dom.js": ('marco.insertAdjacentHTML("beforeend", svg);',)}
+_INSERTA_HTML = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|createContextualFragment|DOMParser|srcdoc")
+
+
+def _html_seguro(linea):
+    """Asignaciones a innerHTML aceptadas: literal sin ${ ni +; `...${escapar(...)}...` con TODA expresión
+    envuelta en escapar(); o `= escapar(...)` completo. Cualquier otra cosa (p. ej. concatenar) es insegura."""
+    if re.search(r"""\.innerHTML\s*=\s*("[^"$+]*"|'[^'$+]*')\s*;?\s*$""", linea):
+        return True
+    m = re.search(r"\.innerHTML\s*=\s*`([^`]*)`\s*;?\s*$", linea)
+    if m:
+        return all(e.startswith("escapar(") and e.endswith(")") for e in re.findall(r"\$\{(.*?)\}", m.group(1)))
+    return bool(re.search(r"\.innerHTML\s*=\s*escapar\((?:[^()]|\([^()]*\))*\)\s*;?\s*$", linea))
 
 
 def test_frontend_sin_innerhtml_inseguro():
-    """Toda línea que inserta HTML en frontend/static/js/*.js: (i) asigna un literal sin ${ ni +,
-    (ii) pasa por escapar(, o (iii) está en la lista blanca _HTML_PERMITIDO (íconos constantes)."""
+    """Toda línea de frontend/static/js/*.js que inserta HTML pasa _html_seguro, o es la inserción
+    de íconos constantes de dom.js (lista blanca por archivo)."""
     carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend", "static", "js")
-    literal = re.compile(r"""\.innerHTML\s*=\s*("[^"$+]*"|'[^'$+]*')\s*;?\s*$""")
+    # La propia regla rechaza lo que debe rechazar.
+    assert _html_seguro("x.innerHTML = `<b>${escapar(a)}</b>`;")
+    assert _html_seguro("x.innerHTML = escapar(a);")
+    assert _html_seguro("x.innerHTML = '<br>';")
+    assert not _html_seguro("x.innerHTML = '<b>' + escapar(a) + b;")
+    assert not _html_seguro("x.innerHTML = `<b>${a}${escapar(b)}</b>`;")
+    assert not _html_seguro("x.innerHTML = escapar(a) + b;")
     malas = []
     for nombre in sorted(os.listdir(carpeta)):
         if not nombre.endswith(".js"):
             continue
         with open(os.path.join(carpeta, nombre), encoding="utf-8") as f:
             for n, linea in enumerate(f, 1):
-                if not re.search(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write", linea):
+                if not _INSERTA_HTML.search(linea) or linea.lstrip().startswith("//"):
                     continue
-                if linea.lstrip().startswith("//"):
-                    continue
-                if literal.search(linea) or "escapar(" in linea or linea.strip() in _HTML_PERMITIDO:
+                if _html_seguro(linea) or linea.strip() in _HTML_PERMITIDO.get(nombre, ()):
                     continue
                 malas.append(f"{nombre}:{n}: {linea.strip()}")
     assert not malas, "HTML sin escapar:\n" + "\n".join(malas)
+
+
+_IDS_ARMAZON = ("boton-revisar", "menu-mas", "boton-mas", "panel-resumen", "panel-componentes",
+                "panel-recomendaciones", "panel-analisis", "aviso-error", "aviso-demo", "aviso-admin")
+
+
+def test_indice_estructura():
+    """GET / entrega el armazón nuevo: pestañas, botón único, menú Más, avisos y el script anti-parpadeo del tema."""
+    def _peticiones():
+        cliente = app.app.test_client()
+        r = cliente.get("/")
+        assert r.status_code == 200, r.status_code
+        html = r.get_data(as_text=True)
+        assert 'role="tablist"' in html
+        for i in _IDS_ARMAZON:
+            assert f'id="{i}"' in html, i
+        assert 'id="boton-escanear"' not in html
+        # Script anti-parpadeo: en <head>, antes de la hoja de estilos.
+        cabeza = html.split("</head>")[0]
+        guion = re.search(r"<script>[^<]*tema_interfaz[^<]*</script>", cabeza)
+        assert guion, "falta el script inline del tema en <head>"
+        assert guion.start() < cabeza.index('<link rel="stylesheet"'), "el script del tema va antes de la hoja de estilos"
+        # modelo.js se carga después de dom.js y antes de app.js.
+        orden = [html.index(f"js/{n}.js") for n in ("estado", "iconos", "dom", "modelo", "app")]
+        assert orden == sorted(orden), orden
+        assert cliente.get("/static/js/modelo.js").status_code == 200
+
+    _en_hilo(_peticiones)
 
 
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
     test_frontend_sin_innerhtml_inseguro()
+    test_indice_estructura()
     test_ram()
     test_bateria()
     test_almacenamiento()

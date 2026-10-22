@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Diagnostic Scanner PC{% endblock %}</title>
+    <script>
+        /* Antes de la hoja de estilos: evita el parpadeo del tema claro cuando el guardado es oscuro.
+           La ruta canónica sigue siendo aplicarTema() en app.js. */
+        try { if (localStorage.getItem("tema_interfaz") === "oscuro") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) { /* sin almacenamiento: tema claro */ }
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block head_extra %}{% endblock %}
 </head>
@@ -13,6 +18,7 @@
     <script src="{{ url_for('static', filename='js/estado.js') }}"></script>
     <script src="{{ url_for('static', filename='js/iconos.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dom.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modelo.js') }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts_extra %}{% endblock %}
 </body>

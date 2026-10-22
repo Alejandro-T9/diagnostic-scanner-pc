@@ -3,63 +3,113 @@
 {% block title %}Diagnostic Scanner PC — Panel{% endblock %}
 
 {% block content %}
-<div class="cabecera">
-    <h1>Diagnostic Scanner PC</h1>
-    <div class="interruptor-modo" id="interruptor-modo" role="group" aria-label="Modo de la interfaz">
-        <button type="button" id="modo-simple-btn" aria-pressed="true">Modo simple</button>
-        <button type="button" id="modo-tecnico-btn" aria-pressed="false">Modo técnico</button>
-    </div>
-    <button type="button" class="boton-tema" id="boton-tema" aria-pressed="false">Tema oscuro</button>
-    <span class="timestamp" id="timestamp">Sin datos aún</span>
-</div>
-
-<div class="aviso-error" id="aviso-error"></div>
-<div class="aviso-demo" id="aviso-demo">⚠ Datos simulados — no es un diagnóstico real</div>
-<div class="aviso-demo" id="aviso-admin">Sin permisos de administrador: algunos sensores (temperaturas, voltajes, S.M.A.R.T.) no se podrán leer. Cierra y abre de nuevo aceptando el aviso de Windows.</div>
-
-<div class="panel-diagnostico">
-    <div class="panel-diagnostico-cabecera">
-        <span class="sello" id="sello">Sin escaneo todavía</span>
-        <span class="resumen-texto" id="resumen-texto"></span>
-        <span class="cobertura-texto" id="cobertura-texto"></span>
-    </div>
-    <div class="panel-diagnostico-cuerpo">
-        <div class="mapa-svg-wrap">
-            <svg id="mapa-svg" viewBox="0 0 300 260" width="300" height="260">
-                <rect class="mapa-silueta" x="10" y="20" width="280" height="200" rx="14"></rect>
-                <rect class="mapa-silueta" x="30" y="40" width="240" height="160" rx="4"></rect>
-                <rect class="mapa-silueta" x="0" y="220" width="300" height="14" rx="4"></rect>
-            </svg>
+<header class="barra">
+    <div class="barra-interior">
+        <div class="barra-marca">
+            <span class="icono" data-icono="comp:cpu"></span>
+            <h1><span class="marca-larga">Diagnostic Scanner PC</span><span class="marca-corta" aria-hidden="true">Scanner PC</span></h1>
         </div>
-        <div class="filas" id="filas"></div>
+        <div class="interruptor-modo" id="interruptor-modo" role="group" aria-label="Modo de la interfaz">
+            <button type="button" id="modo-simple-btn" aria-pressed="true">Simple</button>
+            <button type="button" id="modo-tecnico-btn" aria-pressed="false">Técnico</button>
+        </div>
+        <div class="barra-acciones">
+            <button type="button" class="boton-icono" id="boton-tema" aria-pressed="false">
+                <span class="icono" id="boton-tema-icono"></span><span class="sr-only">Tema oscuro</span>
+            </button>
+            <button type="button" class="boton-primario" id="boton-revisar">
+                <span class="icono icono-girable" data-icono="ui:revisar"></span><span id="boton-revisar-texto">Revisar mi PC</span>
+            </button>
+            <div class="mas">
+                <button type="button" class="boton-mas" id="boton-mas" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">
+                    <span class="icono" data-icono="ui:menu"></span><span class="mas-texto">Más</span>
+                </button>
+                <div class="menu-mas" id="menu-mas" role="menu" aria-label="Más opciones" hidden>
+                    <a role="menuitem" id="menu-informe" href="/api/informe" target="_blank" rel="noopener" tabindex="-1">
+                        <span class="icono" data-icono="ui:informe"></span>Informe para el técnico
+                    </a>
+                    <a role="menuitem" id="menu-reporte" href="/api/reporte" tabindex="-1">
+                        <span class="icono" data-icono="ui:descargar"></span>Descargar reporte (.txt)
+                    </a>
+                    <button type="button" role="menuitem" id="boton-demo" tabindex="-1">
+                        <span class="icono" data-icono="ui:demo"></span>Ver demostración
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="barra-progreso-contenedor" id="barra-progreso-contenedor">
+        <div class="barra-progreso"></div>
+    </div>
+</header>
+
+<div class="avisos">
+    <div class="aviso aviso-error" id="aviso-error" role="alert">
+        <span class="icono" data-icono="estado:critico"></span><span id="aviso-error-texto"></span>
+    </div>
+    <div class="aviso aviso-demo" id="aviso-demo" role="status">
+        <span class="icono" data-icono="estado:advertencia"></span><span>Datos simulados — no es un diagnóstico real</span>
+    </div>
+    <div class="aviso aviso-demo" id="aviso-admin" role="status">
+        <span class="icono" data-icono="estado:advertencia"></span><span>Sin permisos de administrador: algunos sensores (temperaturas, voltajes, S.M.A.R.T.) no se podrán leer. Cierra y abre de nuevo aceptando el aviso de Windows.</span>
     </div>
 </div>
 
-<div class="vista-simple" id="vista-simple">
-    <div class="simple-vacio" id="simple-vacio">
-        <p class="simple-vacio-titulo">Todavía no hemos revisado tu PC.</p>
-        <button class="boton-escanear boton-grande" id="boton-revisar">Revisar mi PC</button>
-        <p class="simple-vacio-nota">Suele tardar alrededor de un minuto. Solo lee información: no borra ni cambia tus archivos ni tu configuración.</p>
-    </div>
-    <div id="simple-contenido">
-        <p class="simple-resumen" id="simple-resumen"></p>
-        <div class="simple-tarjetas" id="simple-tarjetas"></div>
-        <a class="boton-reporte" id="boton-informe" href="/api/informe" target="_blank" rel="noopener">Informe para el técnico</a>
-    </div>
-</div>
+<main class="contenido">
+    <nav class="pestanas" role="tablist" aria-label="Secciones">
+        <button type="button" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" tabindex="0">Resumen</button>
+        <button type="button" role="tab" id="tab-componentes" aria-controls="panel-componentes" aria-selected="false" tabindex="-1">Componentes</button>
+        <button type="button" role="tab" id="tab-recomendaciones" aria-controls="panel-recomendaciones" aria-selected="false" tabindex="-1">Recomendaciones</button>
+        <button type="button" role="tab" id="tab-analisis" aria-controls="panel-analisis" aria-selected="false" tabindex="-1" hidden>Análisis de Windows</button>
+    </nav>
 
-<div class="detalle-panel" id="detalle-panel">
-    <p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>
-</div>
+    <section role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen">
+        <div class="simple-vacio" id="simple-vacio">
+            <p class="simple-vacio-titulo">Todavía no hemos revisado tu PC.</p>
+            <button type="button" class="boton-primario boton-grande" id="boton-revisar-vacio">Revisar mi PC</button>
+            <p class="simple-vacio-nota">Suele tardar alrededor de un minuto. Solo lee información: no borra ni cambia tus archivos ni tu configuración.</p>
+        </div>
 
-<div class="recomendaciones" id="recomendaciones" hidden></div>
+        <div class="panel-diagnostico">
+            <div class="panel-diagnostico-cabecera">
+                <span class="sello" id="sello">Sin escaneo todavía</span>
+                <span class="resumen-texto" id="resumen-texto"></span>
+                <span class="cobertura-texto" id="cobertura-texto"></span>
+            </div>
+            <div class="panel-diagnostico-cuerpo">
+                <div class="mapa-svg-wrap">
+                    <svg id="mapa-svg" viewBox="0 0 300 260" width="300" height="260">
+                        <rect class="mapa-silueta" x="10" y="20" width="280" height="200" rx="14"></rect>
+                        <rect class="mapa-silueta" x="30" y="40" width="240" height="160" rx="4"></rect>
+                        <rect class="mapa-silueta" x="0" y="220" width="300" height="14" rx="4"></rect>
+                    </svg>
+                </div>
+                <div class="filas" id="filas"></div>
+            </div>
+        </div>
+    </section>
 
-<div class="acciones">
-    <button class="boton-escanear" id="boton-escanear">Escanear Sistema</button>
-    <button class="boton-demo" id="boton-demo">Ver Modo Demostración</button>
-    <a class="boton-reporte" href="/api/reporte">Descargar Reporte</a>
-</div>
-<div class="barra-progreso-contenedor" id="barra-progreso-contenedor">
-    <div class="barra-progreso"></div>
-</div>
+    <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" hidden>
+        <div class="vista-simple" id="simple-contenido">
+            <p class="simple-resumen" id="simple-resumen"></p>
+            <div class="simple-tarjetas" id="simple-tarjetas"></div>
+        </div>
+
+        <div class="detalle-panel" id="detalle-panel">
+            <p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>
+        </div>
+    </section>
+
+    <section role="tabpanel" id="panel-recomendaciones" aria-labelledby="tab-recomendaciones" hidden>
+        <div class="recomendaciones" id="recomendaciones" hidden></div>
+        <p class="panel-vacio">Todavía no hay recomendaciones para mostrar. Aparecen después de una revisión real de este equipo.</p>
+    </section>
+
+    <section role="tabpanel" id="panel-analisis" aria-labelledby="tab-analisis" hidden></section>
+</main>
+
+<footer class="pie">
+    <span>Todo se procesa en este equipo; no se envía nada por internet.</span>
+    <span class="timestamp" id="timestamp">Sin datos aún</span>
+</footer>
 {% endblock %}
