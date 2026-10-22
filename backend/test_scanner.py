@@ -832,6 +832,40 @@ def test_equipo():
     assert hechos["disco_sistema_tipo"] in {"ssd", "hdd", "desconocido"}
 
 
+def test_equipo_rendimiento():
+    """Sin administrador no se intenta el TPM (5 s de espera y acceso denegado); un solo WMI de almacenamiento por lectura."""
+    conexiones = []
+
+    class _FalsoWMI:
+        def __init__(self, namespace=None, **k):
+            conexiones.append(namespace)
+            self.ns = namespace
+
+        def Win32_Tpm(self):
+            raise AssertionError("no debe consultar el TPM")
+
+        def query(self, wql):
+            return []
+
+        def MSFT_PhysicalDisk(self, **k):
+            return []
+
+        def MSFT_Partition(self, **k):
+            return []
+
+    wmi_orig, admin_orig = equipo.wmi.WMI, utils.es_administrador
+    try:
+        equipo.wmi.WMI = _FalsoWMI
+        utils.es_administrador = lambda: False
+        assert equipo._leer_tpm() is None and conexiones == [], conexiones
+        equipo.leer_hechos()
+        # una conexión por namespace (cimv2 + almacenamiento), nunca el TPM
+        assert conexiones.count(equipo._NS_ALMACENAMIENTO) == 1 and len(conexiones) <= 2, conexiones
+        assert not any("MicrosoftTpm" in str(n) for n in conexiones), conexiones
+    finally:
+        equipo.wmi.WMI, utils.es_administrador = wmi_orig, admin_orig
+
+
 def _res_reco(**comps):
     """Resultado mínimo de escaneo: {componente: (estado, datos)} -> {"componentes": {...}}."""
     return {"componentes": {n: {"componente": n, "estado": e, "mensaje": "", "datos": d}
@@ -1000,5 +1034,6 @@ if __name__ == "__main__":
     test_informe()
     test_informe_recomendaciones()
     test_equipo()
+    test_equipo_rendimiento()
     test_recomendador()
     print("test_scanner.py: todos los casos OK")

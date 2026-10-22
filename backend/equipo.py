@@ -5,9 +5,11 @@ No es un componente de diagnóstico (no entra en scanner.COMPONENTES): reúne
 hechos del equipo que los módulos no leen — SO, firmware UEFI/BIOS, Secure
 Boot, versión de TPM y tipo de cada disco — para decidir qué recomendar.
 
-Ningún lector requiere administrador. El TPM (Win32_Tpm) da acceso denegado
-sin elevación y degrada a None; `leer_hechos` nunca lanza: cada lector falla
-por separado con su valor de respaldo.
+Ningún lector es obligatorio como administrador. El TPM (Win32_Tpm) solo se
+puede leer con esos permisos: sin ellos ni se intenta y queda en None.
+`leer_hechos` nunca lanza: cada lector falla por separado con su valor de
+respaldo. Rendimiento: una sola conexión WMI por espacio de nombres y por
+llamada a `leer_hechos`, y consultas filtradas (ver `_conexion`).
 
 LÍMITES de `cpu_apto_windows11`: es una heurística por nombre, NO la lista
 oficial de Microsoft. Solo reconoce Intel Core iN-XXXX y AMD Ryzen N XXXX;
@@ -19,6 +21,8 @@ import ctypes
 import re
 
 import wmi
+
+import utils
 
 _NS_ALMACENAMIENTO = "root/Microsoft/Windows/Storage"
 _BUS_USB = 7
@@ -55,8 +59,18 @@ def cpu_apto_windows11(nombre) -> "bool | None":
     return None
 
 
+_conexiones = {}  # espacio de nombres -> conexión WMI; la vacía leer_hechos al empezar y al terminar
+
+
+def _conexion(namespace=None):
+    """Conectar a WMI cuesta decenas de ms: se hace una vez por espacio de nombres en cada `leer_hechos`."""
+    if namespace not in _conexiones:
+        _conexiones[namespace] = wmi.WMI(namespace=namespace) if namespace else wmi.WMI()
+    return _conexiones[namespace]
+
+
 def _leer_so() -> dict:
-    so = wmi.WMI().Win32_OperatingSystem()[0]
+    so = _conexion().Win32_OperatingSystem()[0]
     return {"nombre": so.Caption, "build": so.BuildNumber, "arquitectura": so.OSArchitecture}
 
 
@@ -78,8 +92,11 @@ def _leer_secure_boot():
 
 
 def _leer_tpm():
-    """Win32_Tpm.SpecVersion ("2.0, 0, 1.38"): primer número. Sin administrador -> x_wmi (lo atrapa leer_hechos)."""
-    tpm = wmi.WMI(namespace="root/cimv2/Security/MicrosoftTpm").Win32_Tpm()
+    """Win32_Tpm.SpecVersion ("2.0, 0, 1.38"): primer número. Sin administrador -> None."""
+    # Sin administrador la consulta siempre da acceso denegado, pero tarda ~5 s en fallar: ni se intenta.
+    if not utils.es_administrador():
+        return None
+    tpm = _conexion("root/cimv2/Security/MicrosoftTpm").Win32_Tpm()
     if not tpm:
         return None
     version = re.match(r"\s*(\d+\.\d+)", tpm[0].SpecVersion or "")
@@ -87,7 +104,7 @@ def _leer_tpm():
 
 
 def _discos_fisicos() -> list:
-    return wmi.WMI(namespace=_NS_ALMACENAMIENTO).MSFT_PhysicalDisk()
+    return _conexion(_NS_ALMACENAMIENTO).MSFT_PhysicalDisk()
 
 
 def _leer_discos() -> list:
@@ -105,13 +122,10 @@ def _leer_discos() -> list:
 
 def _leer_disco_sistema() -> str:
     """Tipo del disco físico que aloja C: (MSFT_Partition.DiskNumber == MSFT_PhysicalDisk.DeviceId)."""
-    storage = wmi.WMI(namespace=_NS_ALMACENAMIENTO)
-    for p in storage.MSFT_Partition():
-        letra = p.DriveLetter
-        if (chr(letra) if isinstance(letra, int) else str(letra or "")).upper() == "C":
-            for d in storage.MSFT_PhysicalDisk():
-                if str(d.DeviceId) == str(p.DiskNumber):
-                    return tipo_disco(d.MediaType, d.BusType)
+    storage = _conexion(_NS_ALMACENAMIENTO)
+    for p in storage.MSFT_Partition(DriveLetter="C"):
+        for d in storage.MSFT_PhysicalDisk(DeviceId=str(p.DiskNumber)):
+            return tipo_disco(d.MediaType, d.BusType)
     return "desconocido"
 
 
@@ -123,12 +137,16 @@ def leer_hechos() -> dict:
         except Exception:
             return respaldo
 
+    _conexiones.clear()
     # Se buscan por nombre en cada llamada (no por referencia) para que los tests puedan reemplazarlos.
-    return {
-        "so": seguro(_leer_so, None),
-        "firmware": seguro(_leer_firmware, None),
-        "secure_boot": seguro(_leer_secure_boot, None),
-        "tpm_version": seguro(_leer_tpm, None),
-        "discos": seguro(_leer_discos, []),
-        "disco_sistema_tipo": seguro(_leer_disco_sistema, "desconocido"),
-    }
+    try:
+        return {
+            "so": seguro(_leer_so, None),
+            "firmware": seguro(_leer_firmware, None),
+            "secure_boot": seguro(_leer_secure_boot, None),
+            "tpm_version": seguro(_leer_tpm, None),
+            "discos": seguro(_leer_discos, []),
+            "disco_sistema_tipo": seguro(_leer_disco_sistema, "desconocido"),
+        }
+    finally:
+        _conexiones.clear()  # no dejar objetos COM de este hilo vivos para el siguiente escaneo
