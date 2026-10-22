@@ -335,7 +335,8 @@ function renderizarSimple(componentes) {
     const atencion = ids.filter((id) => !["normal", "no_determinado"].includes(componentes[id].estado)).map(nombreComp);
     const noRevisados = sinDatos.length ? `No se pudieron revisar: ${sinDatos.join(", ")}.` : "";
     let linea;
-    if (!atencion.length) linea = ["Todo lo que pudimos revisar está bien.", noRevisados].filter(Boolean).join(" ");
+    if (!bien.length && !atencion.length) linea = `No pudimos leer ningún componente de tu PC: ${sinDatos.join(", ")}. Prueba cerrar y abrir de nuevo aceptando el aviso de Windows.`;
+    else if (!atencion.length) linea = ["Todo lo que pudimos revisar está bien.", noRevisados].filter(Boolean).join(" ");
     else linea = [bien.length && `Están bien: ${bien.join(", ")}.`, `Necesitan atención: ${atencion.join(", ")}.`, noRevisados].filter(Boolean).join(" ");
     document.getElementById("simple-resumen").textContent = linea;
 
