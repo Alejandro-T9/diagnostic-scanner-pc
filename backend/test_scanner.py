@@ -40,7 +40,7 @@ import lanzador
 import recomendador
 import scanner
 import utils
-from analisis import espacio, inicio, programas
+from analisis import espacio, inicio, programas, rendimiento
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
@@ -1905,6 +1905,128 @@ def test_analisis_programas():
     assert dt <= 8.0, f"programas tardó {dt:.1f} s"
 
 
+def test_analisis_rendimiento():
+    sano = {"ram_uso": 50.0, "ram_total_gb": 16.0, "disco_c_libre_pct": 40.0, "disco_tipo": "ssd",
+            "disco_ocupado_pct": 5.0, "cpu_uso": 20.0, "procesos": [], "inicio_total": 4}
+
+    def ids(**cambios):
+        return [c["id"] for c in rendimiento._causas({**sano, **cambios})]
+
+    # (a) cada causa con su condición y sus números en la evidencia
+    assert rendimiento._causas(sano) == []
+    c = rendimiento._causas({**sano, "ram_uso": 93.0})
+    assert [x["id"] for x in c] == ["ram"] and any("93" in e for e in c[0]["evidencia"]), c
+    assert set(c[0]) == {"id", "titulo", "evidencia"} and c[0]["titulo"]
+    assert ids(ram_uso=89.9) == [] and ids(ram_uso=90) == ["ram"]
+    c = rendimiento._causas({**sano, "disco_c_libre_pct": 8.0})
+    assert [x["id"] for x in c] == ["espacio"] and any("8" in e for e in c[0]["evidencia"]), c
+    assert ids(disco_c_libre_pct=10.0) == [] and ids(disco_c_libre_pct=9.9) == ["espacio"]
+    c = rendimiento._causas({**sano, "disco_tipo": "hdd", "disco_ocupado_pct": 95.0})
+    assert [x["id"] for x in c] == ["disco_lento"] and any("95" in e for e in c[0]["evidencia"]), c
+    assert ids(disco_tipo="ssd", disco_ocupado_pct=95.0) == []
+    assert ids(disco_tipo="desconocido", disco_ocupado_pct=95.0) == []
+    assert ids(disco_tipo="hdd", disco_ocupado_pct=89.0) == []
+
+    def proc(cpu):
+        return [{"nombre": "chrome.exe", "cpu": cpu, "ram_mb": 300.0}]
+
+    c = rendimiento._causas({**sano, "cpu_uso": 95.0, "procesos": proc(60.0)})
+    assert [x["id"] for x in c] == ["cpu"] and any("chrome.exe" in e for e in c[0]["evidencia"]), c
+    assert ids(cpu_uso=95.0, procesos=proc(49.0)) == [] and ids(cpu_uso=95.0, procesos=[]) == []
+    assert ids(cpu_uso=89.0, procesos=proc(60.0)) == []
+    c = rendimiento._causas({**sano, "inicio_total": 12})
+    assert [x["id"] for x in c] == ["inicio"] and any("12" in e for e in c[0]["evidencia"]), c
+    assert ids(inicio_total=9) == []
+    # Dato ausente, mal tipado o NaN: no se afirma nada.
+    vacio = {"ram_uso": None, "disco_c_libre_pct": None, "disco_tipo": "hdd", "disco_ocupado_pct": None,
+             "cpu_uso": None, "procesos": [{"nombre": "x", "cpu": 99.0, "ram_mb": 1.0}], "inicio_total": None}
+    assert rendimiento._causas(vacio) == [] and rendimiento._causas({}) == []
+    assert rendimiento._causas({"ram_uso": "alto", "disco_c_libre_pct": float("nan"), "inicio_total": True,
+                                "cpu_uso": float("nan"), "procesos": "no"}) == []
+    # (b) orden de prioridad con varias causas
+    todo = {"ram_uso": 95.0, "disco_c_libre_pct": 5.0, "disco_tipo": "hdd", "disco_ocupado_pct": 99.0,
+            "cpu_uso": 97.0, "procesos": proc(70.0), "inicio_total": 15}
+    assert [x["id"] for x in rendimiento._causas(todo)] == ["ram", "espacio", "disco_lento", "cpu", "inicio"]
+    # (c) clasificación
+    assert rendimiento._clasificar([], True)[0] == "normal"
+    assert "foto del momento" in rendimiento._clasificar([], True)[1]
+    assert rendimiento._clasificar([], False)[0] == "no_determinado"
+    uno = rendimiento._causas({**sano, "ram_uso": 93.0})
+    e, m = rendimiento._clasificar(uno, True)
+    assert e == "advertencia" and uno[0]["titulo"] in m and "Hay otra" not in m, m
+    dos = rendimiento._causas({**sano, "ram_uso": 93.0, "inicio_total": 12})
+    e, m = rendimiento._clasificar(dos, True)
+    assert e == "advertencia" and dos[0]["titulo"] in m and "Hay otra posible." in m, m
+    cinco = rendimiento._causas(todo)
+    e, m = rendimiento._clasificar(cinco, True)
+    assert e == "advertencia" and cinco[0]["titulo"] in m and "Hay otras 4 posibles." in m, m
+
+    # (d) diagnosticar con _medir simulado
+    def medicion(**cambios):
+        return {**sano, "procesos_cpu": [], "procesos_ram": [], **cambios}
+
+    original = rendimiento._medir
+    try:
+        rendimiento._medir = lambda: medicion(ram_uso=93.0, inicio_total=12,
+                                             procesos_cpu=[{"nombre": "a.exe", "cpu": 10.0, "ram_mb": 5.0}],
+                                             procesos_ram=[{"nombre": "b.exe", "cpu": 1.0, "ram_mb": 900.0}])
+        r = rendimiento.diagnosticar()
+        assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "rendimiento"
+        _assert_estado("rendimiento 2 causas", r["estado"], "advertencia")
+        assert [x["id"] for x in r["datos"]["causas"]] == ["ram", "inicio"] and "Hay otra posible." in r["mensaje"], r["mensaje"]
+        assert set(r["datos"]) == {"causas", "medicion", "procesos_cpu", "procesos_ram"}
+        assert r["datos"]["procesos_cpu"][0]["nombre"] == "a.exe" and r["datos"]["procesos_ram"][0]["ram_mb"] == 900.0
+        assert r["datos"]["medicion"]["ram_uso"] == 93.0 and "procesos_cpu" not in r["datos"]["medicion"]
+        assert r["recomendacion"]
+        json.dumps(r)
+        rendimiento._medir = lambda: medicion()
+        r = rendimiento.diagnosticar()
+        _assert_estado("rendimiento sano", r["estado"], "normal")
+        assert r["datos"]["causas"] == [] and r["recomendacion"]
+        # Ni RAM ni CPU: no se midió lo esencial.
+        rendimiento._medir = lambda: medicion(ram_uso=None, cpu_uso=None)
+        _assert_estado("rendimiento sin ram ni cpu", rendimiento.diagnosticar()["estado"], "no_determinado")
+        # Solo falta la CPU: lo demás se evalúa.
+        rendimiento._medir = lambda: medicion(cpu_uso=None, ram_uso=95.0)
+        _assert_estado("rendimiento sin cpu", rendimiento.diagnosticar()["estado"], "advertencia")
+
+        def _lanza():
+            raise OSError("sin acceso")
+
+        rendimiento._medir = _lanza
+        r = rendimiento.diagnosticar()
+        _assert_estado("rendimiento _medir lanza", r["estado"], "no_determinado")
+        assert r["datos"]["causas"] == [] and "No se pudo medir" in r["mensaje"] and r["recomendacion"]
+        json.dumps(r)
+        rendimiento._medir = lambda: "basura"
+        _assert_estado("rendimiento _medir mal formado", rendimiento.diagnosticar()["estado"], "no_determinado")
+
+        # (e) nombre de proceso hostil: se conserva crudo (el escape se hace al mostrar), en causa y en listas.
+        hostil = [{"nombre": "<b>x</b>", "cpu": 80.0, "ram_mb": 10.0}]
+        rendimiento._medir = lambda: medicion(cpu_uso=96.0, procesos=hostil, procesos_cpu=hostil, procesos_ram=hostil)
+        r = rendimiento.diagnosticar()
+        assert r["datos"]["procesos_cpu"][0]["nombre"] == "<b>x</b>"
+        assert r["datos"]["causas"][0]["id"] == "cpu" and any("<b>x</b>" in e for e in r["datos"]["causas"][0]["evidencia"])
+        json.dumps(r)
+        # Listas acotadas a 5.
+        muchos = [{"nombre": f"p{i}", "cpu": 1.0, "ram_mb": 1.0} for i in range(20)]
+        rendimiento._medir = lambda: medicion(procesos_cpu=muchos, procesos_ram=muchos)
+        r = rendimiento.diagnosticar()
+        assert len(r["datos"]["procesos_cpu"]) == 5 and len(r["datos"]["procesos_ram"]) == 5
+    finally:
+        rendimiento._medir = original
+
+    # (f) llamada real: contrato, estado válido, serializable y dentro del tiempo.
+    t0 = time.perf_counter()
+    r = rendimiento.diagnosticar()
+    dt = time.perf_counter() - t0
+    assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "rendimiento"
+    assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico"
+    assert len(r["datos"]["procesos_cpu"]) <= 5 and len(r["datos"]["procesos_ram"]) <= 5
+    json.dumps(r)
+    assert dt <= 8.0, f"rendimiento tardó {dt:.1f} s"
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
@@ -1946,4 +2068,5 @@ if __name__ == "__main__":
     test_analisis_espacio()
     test_analisis_inicio()
     test_analisis_programas()
+    test_analisis_rendimiento()
     print("test_scanner.py: todos los casos OK")
