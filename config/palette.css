@@ -7,6 +7,8 @@
    con los contrastes WCAG: texto >= 4,5:1, bordes de controles >= 3:1). */
 
 :root {
+    color-scheme: light;
+
     /* Colores base */
     --color-fondo: #F4F6F9;
     --color-tarjeta: #FFFFFF;
@@ -21,7 +23,7 @@
        --color-naranja es "sospecha" (sistema de 5 niveles, ver
        docs/DECISIONES.md); "no determinado" usa --color-texto-secundario. */
     --color-verde: #1A7F4B;
-    --color-amarillo: #9A6700;
+    --color-amarillo: #946200;
     --color-naranja: #B54708;
     --color-rojo: #B42318;
 
@@ -34,7 +36,7 @@
 
     /* Bordes */
     --color-borde: #D5DBE3;
-    --color-borde-control: #8793A3;   /* botones, campos, chips: >= 3:1 sobre tarjeta */
+    --color-borde-control: #7B8797;   /* botones, campos, chips: >= 3:1 sobre tarjeta y fondo */
 
     /* Realces basados en el acento (grilla del mapa, fila resaltada/seleccionada) */
     --color-grilla: rgba(31, 95, 191, 0.07);
@@ -73,6 +75,8 @@
 }
 
 :root[data-theme="dark"] {
+    color-scheme: dark;
+
     --color-fondo: #0F141B;
     --color-tarjeta: #171E27;
     --color-texto: #E8EDF3;

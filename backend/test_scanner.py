@@ -1231,6 +1231,12 @@ def test_paleta():
     for tema, v in temas.items():
         assert usadas <= set(v), (tema, sorted(usadas - set(v)))
 
+    # (i) color-scheme declarado en cada tema (controles y barras de desplazamiento nativos)
+    sin_comentarios = re.sub(r"/\*.*?\*/", "", paleta, flags=re.S)
+    for selector, esquema in ((":root", "light"), (':root[data-theme="dark"]', "dark")):
+        bloque = re.search(re.escape(selector) + r"\s*\{(.*?)\}", sin_comentarios, flags=re.S).group(1)
+        assert re.search(r"(?<![\w-])color-scheme\s*:\s*" + esquema + r"\s*;", bloque), (selector, esquema)
+
     for tema, v in temas.items():
         # (a) tokens presentes
         faltan = [t for t in _TOKENS_PALETA if t not in v]
@@ -1247,8 +1253,12 @@ def test_paleta():
         assert _contraste(v["--color-sobre-marino"], v["--color-marino"]) >= 4.5, tema
         # (d2) texto de los botones de acento
         assert _contraste(v["--color-sobre-acento"], v["--color-acento"]) >= 4.5, tema
-        # (e) borde de controles
-        assert _contraste(v["--color-borde-control"], tarjeta) >= 3.0, (tema, _contraste(v["--color-borde-control"], tarjeta))
+        # (c2) estados y acento también sobre el fondo de la página
+        for t in ("--color-verde", "--color-amarillo", "--color-naranja", "--color-rojo", "--color-acento"):
+            assert _contraste(v[t], fondo) >= 4.5, (tema, t, "fondo", _contraste(v[t], fondo))
+        # (e) borde de controles (sobre tarjeta y sobre el fondo de la página)
+        for base in (tarjeta, fondo):
+            assert _contraste(v["--color-borde-control"], base) >= 3.0, (tema, base, _contraste(v["--color-borde-control"], base))
         # (f) chip: color de estado sobre su fondo teñido ("no determinado" usa el texto secundario)
         colores = {"normal": "--color-verde", "advertencia": "--color-amarillo", "sospecha": "--color-naranja",
                    "critico": "--color-rojo", "nodeterminado": "--color-texto-secundario"}

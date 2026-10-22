@@ -459,9 +459,8 @@ function aplicarTema(tema, guardar) {
     if (oscuro) document.documentElement.setAttribute("data-theme", "dark");
     else document.documentElement.removeAttribute("data-theme");
     const boton = document.getElementById("boton-tema");
-    boton.setAttribute("aria-pressed", String(oscuro));
-    boton.setAttribute("aria-label", oscuro ? "Cambiar a tema claro" : "Cambiar a tema oscuro");
-    boton.textContent = oscuro ? "Tema claro" : "Tema oscuro";
+    // Etiqueta fija ("Tema oscuro"); el estado lo comunica aria-pressed.
+    if (boton) boton.setAttribute("aria-pressed", String(oscuro));
     if (guardar) {
         try { localStorage.setItem("tema_interfaz", oscuro ? "oscuro" : "claro"); } catch (e) { /* sin almacenamiento: solo no se recuerda */ }
     }
@@ -586,7 +585,8 @@ document.addEventListener("contextmenu", (evento) => evento.preventDefault());
 document.getElementById("modo-simple-btn").addEventListener("click", () => aplicarModo("simple", true));
 document.getElementById("modo-tecnico-btn").addEventListener("click", () => aplicarModo("tecnico", true));
 
-document.getElementById("boton-tema").addEventListener("click", () =>
+const botonTema = document.getElementById("boton-tema");
+if (botonTema) botonTema.addEventListener("click", () =>
     aplicarTema(document.documentElement.getAttribute("data-theme") === "dark" ? "claro" : "oscuro", true));
 let temaGuardado = null;
 try { temaGuardado = localStorage.getItem("tema_interfaz"); } catch (e) { /* almacenamiento bloqueado: tema claro */ }
