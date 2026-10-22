@@ -388,6 +388,16 @@ def test_lanzador():
     assert lanzador.elegir_navegador(variables, lambda ruta: ruta in (edge86, chrome_pf)) == edge86
     # Variables de entorno ausentes: se saltan, sin romper.
     assert lanzador.elegir_navegador({}, lambda ruta: True) is None
+    # Brave (Chromium) va después de Edge y Chrome, en ProgramFiles, x86 y LocalAppData.
+    brave = "BraveSoftware\\Brave-Browser\\Application\\brave.exe"
+    brave_pf, brave86, brave_local = (f"C:\\PF\\{brave}", f"C:\\PF86\\{brave}", f"C:\\Local\\{brave}")
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta == brave_pf) == brave_pf
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta == brave86) == brave86
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta == brave_local) == brave_local
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta in (brave_pf, brave86, brave_local)) == brave_pf
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta in (edge86, brave_pf)) == edge86
+    assert lanzador.elegir_navegador(variables, lambda ruta: ruta in (chrome_pf, brave_pf)) == chrome_pf
+    assert lanzador.elegir_navegador({"ProgramFiles": "C:\\PF"}, lambda ruta: ruta == brave86) is None
 
     # (b) comando_app: ventana tipo aplicación con perfil propio.
     comando = lanzador.comando_app("C:\\e.exe", "http://127.0.0.1:5000", "C:\\tmp\\p")

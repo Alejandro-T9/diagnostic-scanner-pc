@@ -2,7 +2,7 @@
 backend/lanzador.py — Arranque de Diagnostic Scanner PC en una ventana propia.
 
 Levanta el servidor Flask en un puerto libre de 127.0.0.1, abre la app en
-una ventana de Edge/Chrome sin barra de direcciones (modo --app) y apaga
+una ventana de Edge/Chrome/Brave sin barra de direcciones (modo --app) y apaga
 todo cuando la ventana se cierra. Para saber que la ventana sigue abierta
 usa como latido el polling de /api/status que hace el frontend cada 2 s:
 si deja de llegar, el lanzador termina solo.
@@ -36,20 +36,25 @@ PUERTO_PREFERIDO = 5000
 ESPERA_SERVIDOR_S = 30.0
 
 # Rutas relativas de cada navegador, y de qué variables de entorno cuelgan,
-# en orden de preferencia (Edge viene con Windows, así que va primero).
+# en orden de preferencia (Edge viene con Windows, así que va primero; Brave, Chromium
+# también, va al final).
 _EDGE = os.path.join("Microsoft", "Edge", "Application", "msedge.exe")
 _CHROME = os.path.join("Google", "Chrome", "Application", "chrome.exe")
+_BRAVE = os.path.join("BraveSoftware", "Brave-Browser", "Application", "brave.exe")
 _CANDIDATOS = (
     ("ProgramFiles(x86)", _EDGE),
     ("ProgramFiles", _EDGE),
     ("ProgramFiles", _CHROME),
     ("ProgramFiles(x86)", _CHROME),
     ("LocalAppData", _CHROME),
+    ("ProgramFiles", _BRAVE),
+    ("ProgramFiles(x86)", _BRAVE),
+    ("LocalAppData", _BRAVE),
 )
 
 
 def elegir_navegador(variables: Mapping[str, str], existe=os.path.exists) -> str | None:
-    """Devuelve la ruta del primer Edge/Chrome instalado, o None si no hay.
+    """Devuelve la ruta del primer Edge/Chrome/Brave instalado, o None si no hay.
 
     `variables` es un mapeo tipo os.environ y `existe` se inyecta para
     poder probar sin tocar el disco. Variables ausentes se saltan.
