@@ -2132,7 +2132,79 @@ def test_analisis_f4b():
         assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
 
 
+def test_registro_y_postinstalacion():
+    import os
+    import tempfile
+    import postinstalacion
+    import registro
+    # --- registro (F5): opt-in, validación, CSV seguro y borrado ---
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["DSPC_REGISTRO"] = os.path.join(tmp, "sub", "registro.db")
+        try:
+            assert registro.listar() == []
+            for malo in (None, {}, {"componentes": {}}):
+                try:
+                    registro.guardar(malo, None, "NORMAL", "PC1")
+                    assert False, "debía rechazar un escaneo vacío"
+                except ValueError:
+                    pass
+            try:
+                registro.guardar(_escaneo_falso(), None, "NORMAL", "   ")
+                assert False, "debía exigir etiqueta"
+            except ValueError:
+                pass
+            n = registro.guardar(_escaneo_falso(), {"analisis": {}}, "CRITICO", "=HYPERLINK(x)", "Ana", "n" * 5000)
+            fila = registro.listar()[0]
+            assert fila["id"] == n and fila["veredicto"] == "CRITICO" and fila["estados"]["cpu"] == "critico", fila
+            assert len(fila["notas"]) == 1000 and fila["equipo"] == "Acme <script>alert(1)</script> & Co", fila
+            assert registro.obtener(n)["escaneo"]["componentes"]["cpu"]["estado"] == "critico" and registro.obtener(999) is None
+            texto = registro.csv_texto()
+            assert texto.startswith("﻿id,fecha") and "'=HYPERLINK(x)" in texto and ",=HYPERLINK" not in texto, texto
+            # rutas
+            def _peticion():
+                c = app.app.test_client()
+                app._ultimo_escaneo = None
+                assert c.post("/api/registro", json={"etiqueta": "X"}).status_code == 400  # sin escaneo
+                assert c.post("/api/registro", data="etiqueta=X", content_type="text/plain").status_code == 400
+                app._ultimo_escaneo = _escaneo_falso()
+                r = c.post("/api/registro", json={"etiqueta": "Sala 1 - PC 3", "responsable": "Luis"})
+                assert r.status_code == 201, r.get_data(as_text=True)
+                assert len(c.get("/api/registro").get_json()["equipos"]) == 2
+                h = c.get(f"/api/registro/{r.get_json()['id']}/informe").get_data(as_text=True)
+                assert "&lt;script&gt;alert(1)&lt;/script&gt;" in h and "<script>alert(1)" not in h
+                assert c.get("/api/registro/csv").mimetype == "text/csv"
+                assert c.get("/api/registro/9999/informe").status_code == 404
+                assert c.delete(f"/api/registro/{r.get_json()['id']}").status_code == 200
+                assert c.delete(f"/api/registro/{r.get_json()['id']}").status_code == 404
+            try:
+                _en_hilo(_peticion)
+            finally:
+                app._ultimo_escaneo = None
+            assert registro.borrar(n) and registro.listar() == []
+        finally:
+            os.environ.pop("DSPC_REGISTRO", None)
+    # --- post-instalación (F6): lectura pura, con lectores simulados ---
+    assert postinstalacion._nombre("DESKTOP-ABC1234")["estado"] == "advertencia"
+    assert postinstalacion._nombre("PC-SALA1-03")["estado"] == "normal"
+    assert [postinstalacion._licencia(v)["estado"] for v in (True, False, None)] == ["normal", "advertencia", "no_determinado"]
+    assert "activador" in postinstalacion._licencia(False)["que_hacer"].lower()
+    b = {i["titulo"]: i["estado"] for i in postinstalacion._basicos(["Google Chrome", "7-Zip 23", "Foxit Reader"])}
+    assert b["Navegador (además de Edge)"] == b["Compresor de archivos"] == b["Lector de PDF"] == "normal" and b["Suite de oficina"] == "advertencia", b
+    originales = (postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._nombres_programas)
+    def falla():
+        raise OSError("x")
+    try:
+        postinstalacion._nombre_equipo = postinstalacion._windows_activado = postinstalacion._nombres_programas = falla
+        r = postinstalacion.revisar()  # ningún lector rompe la revisión
+        assert all(i["estado"] in scanner.ESTADOS_VALIDOS for i in r["items"]), r["items"]
+        assert sum(1 for i in r["items"] if i["manual"]) == 3 and "[A MANO]" in r["acta"], r["acta"]
+    finally:
+        postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._nombres_programas = originales
+    _en_hilo(lambda: [None for c in [app.app.test_client().get("/api/postinstalacion")] if (c.status_code == 200 and c.get_json()["acta"]) or (_ for _ in ()).throw(AssertionError(c.status_code))])
+
+
 if __name__ == "__main__":
+    test_registro_y_postinstalacion()
     test_analisis_f4b()
     test_paleta()
     test_frontend_node()

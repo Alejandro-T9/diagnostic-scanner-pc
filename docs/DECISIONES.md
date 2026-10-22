@@ -1343,3 +1343,25 @@ Tres análisis más en `backend/analisis/`, solo lectura y sin administrador, a 
 **Motivo:** reemplazar el uso de herramientas sueltas (visor de eventos, administrador de dispositivos, Seguridad de Windows) con una lectura en lenguaje claro.
 
 **Consecuencias:** ninguno emite `critico`. No es un antivirus ni detecta rootkits; si hay otro antivirus instalado el de Windows aparece apagado (se explica en la guía). La protección en tiempo real puede quedar sin leer sin administrador (Defender WMI). Las vistas vistas técnicas tipo HWiNFO/CrystalDiskInfo quedan fuera de F4b (decisión pendiente).
+
+
+## 42. Registro de equipos opcional en SQLite (F5)
+
+**Fecha:** 2026-10-22
+
+Nueva pestaña «Equipos» y módulo `backend/registro.py` (biblioteca estándar `sqlite3`). **Solo guarda cuando el usuario pulsa «Guardar este equipo»**: etiqueta (obligatoria), responsable y notas, más el último escaneo y análisis en memoria. Archivo `registros/registro.db` junto a `backend/` (o la ruta de la variable `DSPC_REGISTRO`); no se envía nada por internet. Rutas: `GET/POST /api/registro`, `GET /api/registro/csv`, `DELETE /api/registro/<id>`, `GET /api/registro/<id>/informe`.
+
+**Modifica las decisiones 4 y 29 («stateless»):** el escaneo y el análisis siguen sin persistirse por sí solos; lo único que persiste es lo que el usuario guarda de forma explícita. Para borrar todo basta con borrar el archivo.
+
+**Consecuencias:** el CSV sale en UTF-8 con BOM (abre bien en Excel) y neutraliza celdas que empiezan por `= + - @`; todo texto del sistema se escapa en el informe guardado y en la tabla (`textContent`). Los POST exigen JSON (un formulario de otra página no puede guardar). `registros/` está en `.gitignore` porque contiene datos personales (nombres de responsables). Sin cifrado ni contraseña: quien tenga el USB puede abrir el archivo.
+
+
+## 43. Ayuda posterior a la instalación (F6)
+
+**Fecha:** 2026-10-22
+
+Nueva pestaña «Post-instalación» y módulo `backend/postinstalacion.py`: lista de revisión de solo lectura (controladores, protección de Windows, espacio, nombre del equipo de fábrica, activación de Windows, programas básicos como navegador, lector de PDF, compresor y suite de oficina) más tres tareas a mano (buscar actualizaciones, confirmar copia de los archivos del dueño, probar sonido/cámara/Wi-Fi/USB). Genera un texto para pegar en la hoja de SOPORTE TÉCNICO (`/api/postinstalacion`).
+
+**Política que se mantiene:** la app **no instala, no activa, no apaga el antivirus y no modifica nada**. La activación solo se lee; si Windows no está activado se recomienda una licencia legítima y no se menciona ningún activador. Instalar programas faltantes (winget o carpeta de instaladores del USB, con confirmación) queda **fuera de F6** y es una decisión pendiente.
+
+**Consecuencias:** reusa `analisis/controladores`, `seguridad`, `espacio` y `programas`; un lector que falle deja ese ítem «sin datos» sin tumbar la lista; tarda unos 2 s.

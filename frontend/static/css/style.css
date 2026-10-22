@@ -1069,3 +1069,13 @@ body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin e
     .boton-primario.ocupado .icono-girable svg { animation: none; }
     .barra-progreso { animation: none; width: 100%; opacity: 0.6; }
 }
+
+/* Equipos (F5) y Post-instalación (F6) */
+.form-registro { display: grid; gap: var(--espacio-3); max-width: 520px; margin: var(--espacio-4) 0; }
+.campo-registro { display: grid; gap: var(--espacio-1); font-size: var(--texto-s); font-weight: 600; }
+.campo-registro input, .campo-registro textarea, .acta-texto {
+    font: inherit; font-weight: 400; padding: var(--espacio-2) var(--espacio-3);
+    border: 1px solid var(--color-borde); border-radius: var(--radio-2);
+    background-color: var(--color-tarjeta); color: var(--color-texto);
+}
+.acta-texto { display: block; width: 100%; max-width: 760px; margin: var(--espacio-3) 0; font-family: Consolas, monospace; font-size: var(--texto-s); }

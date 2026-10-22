@@ -43,7 +43,7 @@ ESTADOS.forEach((e) => assert(typeof CHIP_TEXTO[e] === "string" && CHIP_TEXTO[e]
 
 // --- modelo.js: pestañas, tema, modo ---
 const TRES = ["resumen", "componentes", "recomendaciones"];
-assert.deepStrictEqual(PESTANAS, ["resumen", "componentes", "recomendaciones", "analisis"]);
+assert.deepStrictEqual(PESTANAS, ["resumen", "componentes", "recomendaciones", "analisis", "equipos", "postinstalacion"]);
 
 // (a) pestanaDesdeHash
 assert.strictEqual(pestanaDesdeHash("#componentes", ["resumen", "componentes"]), "componentes");
@@ -76,8 +76,8 @@ assert.strictEqual(modoValido("tecnico"), "tecnico");
 ["x", undefined, null, {}, "Tecnico"].forEach((v) => assert.strictEqual(modoValido(v), "simple"));
 
 // (d) habilitadasSegun
-assert.deepStrictEqual(habilitadasSegun(false, true), ["resumen"]);
-assert.deepStrictEqual(habilitadasSegun(true, false), TRES);
+assert.deepStrictEqual(habilitadasSegun(false, true), ["resumen", "equipos", "postinstalacion"]);
+assert.deepStrictEqual(habilitadasSegun(true, false), [...TRES, "equipos", "postinstalacion"]);
 assert.deepStrictEqual(habilitadasSegun(true, true), PESTANAS);
 
 // Análisis de Windows llega en F4a: hasta entonces la constante es false (la fase la cambia a true)

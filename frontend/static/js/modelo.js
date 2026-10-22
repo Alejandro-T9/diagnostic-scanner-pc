@@ -1,7 +1,8 @@
 // frontend/static/js/modelo.js — Lógica pura (pestañas, tema, modo y datos del Resumen). Sin DOM ni window:
 // se prueba con Node (frontend/tests/modelo.test.js). Script clásico: las funciones quedan globales.
 
-const PESTANAS = ["resumen", "componentes", "recomendaciones", "analisis"];
+const PESTANAS = ["resumen", "componentes", "recomendaciones", "analisis", "equipos", "postinstalacion"];
+const SIEMPRE = ["resumen", "equipos", "postinstalacion"]; // no dependen de un escaneo de hardware
 
 function _lista(habilitadas) {
     return Array.isArray(habilitadas) ? habilitadas.filter((p) => PESTANAS.includes(p)) : [];
@@ -38,7 +39,7 @@ function modoValido(valor) {
 
 // Sin escaneo solo Resumen; "analisis" únicamente cuando la función existe (F4a).
 function habilitadasSegun(tieneEscaneo, analisisDisponible) {
-    if (!tieneEscaneo) return ["resumen"];
+    if (!tieneEscaneo) return PESTANAS.filter((p) => SIEMPRE.includes(p));
     return PESTANAS.filter((p) => p !== "analisis" || analisisDisponible);
 }
 

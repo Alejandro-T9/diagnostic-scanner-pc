@@ -13,3 +13,6 @@ __pycache__/
 .superpowers/
 .claude/settings.local.json
 _archivo_obsoleto/.claude/
+
+# Registro de equipos (datos personales, opt-in; decision 42)
+registros/

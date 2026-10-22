@@ -28,6 +28,8 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 
 import explicador
 import informe
+import postinstalacion
+import registro
 import scanner
 import utils
 
@@ -174,6 +176,69 @@ def api_informe():
             "estado": "error",
             "mensaje": f"No se pudo generar el informe: {error}",
         }), 500
+
+
+def _error_json(mensaje, codigo):
+    return jsonify({"estado": "error", "mensaje": mensaje}), codigo
+
+
+@app.route("/api/postinstalacion")
+def api_postinstalacion():
+    """Lista de revisión de un equipo recién instalado (solo lectura, decisión 43)."""
+    try:
+        return jsonify(postinstalacion.revisar())
+    except Exception as error:
+        return _error_json(f"No se pudo completar la revisión: {error}", 500)
+
+
+@app.route("/api/registro", methods=["GET", "POST"])
+def api_registro():
+    """Registro opcional de equipos (SQLite local, decisión 42). POST guarda el último escaneo en memoria."""
+    try:
+        if request.method == "GET":
+            return jsonify({"equipos": registro.listar(), "archivo": os.path.abspath(registro.ruta_db())})
+        datos = request.get_json(silent=True)
+        if not isinstance(datos, dict):
+            return _error_json("Faltan los datos del equipo.", 400)
+        veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
+        nuevo = registro.guardar(_ultimo_escaneo, _ultimo_analisis, veredicto, datos.get("etiqueta"),
+                                 datos.get("responsable", ""), datos.get("notas", ""))
+        return jsonify({"estado": "ok", "id": nuevo}), 201
+    except ValueError as error:
+        return _error_json(str(error), 400)
+    except Exception as error:
+        return _error_json(f"No se pudo usar el registro de equipos: {error}", 500)
+
+
+@app.route("/api/registro/csv")
+def api_registro_csv():
+    try:
+        return Response(registro.csv_texto(), mimetype="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=registro_equipos.csv"})
+    except Exception as error:
+        return _error_json(f"No se pudo exportar el registro: {error}", 500)
+
+
+@app.route("/api/registro/<int:id_equipo>", methods=["DELETE"])
+def api_registro_borrar(id_equipo):
+    try:
+        return jsonify({"estado": "ok"}) if registro.borrar(id_equipo) else _error_json("Ese equipo no está en el registro.", 404)
+    except Exception as error:
+        return _error_json(f"No se pudo borrar del registro: {error}", 500)
+
+
+@app.route("/api/registro/<int:id_equipo>/informe")
+def api_registro_informe(id_equipo):
+    """Informe imprimible de un equipo guardado (el mismo formato que /api/informe)."""
+    try:
+        detalle = registro.obtener(id_equipo)
+        if not detalle:
+            return _error_json("Ese equipo no está en el registro.", 404)
+        escaneo = detalle.get("escaneo")
+        veredicto = scanner.clasificar_equipo(escaneo) if escaneo else "SIN_DATOS"
+        return Response(informe.generar_informe_html(escaneo, veredicto, detalle.get("analisis")), mimetype="text/html")
+    except Exception as error:
+        return _error_json(f"No se pudo generar el informe: {error}", 500)
 
 
 _PLANTILLA_ERROR_HTML = """<!DOCTYPE html>

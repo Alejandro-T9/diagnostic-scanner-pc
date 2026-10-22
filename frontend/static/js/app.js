@@ -34,6 +34,7 @@ function renderizarDiagnostico(resultado) {
     if (document.body.classList.contains("demo")) dibujarInvitacionRecomendaciones(vistaRecs);
     else dibujarRecomendaciones(recomendaciones, vistaRecs);
     dibujarPanelAnalisis();
+    if (typeof dibujarPanelEquipos === "function") dibujarPanelEquipos(); // puede llamarse antes de que se defina (arranque)
     if (escaneando) marcarOcupado(true); // los botones de invitación acaban de recrearse
     actualizarPestanas();
 }
@@ -381,6 +382,86 @@ try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* alm
 aplicarModo(modoGuardado, false);
 
 // Arranque: sin datos hasta el primer escaneo (DATOS_MOCK solo sale con "Ver demostración").
+
+// --- Equipos (F5, registro opcional) y Post-instalación (F6) ---
+let datosRegistro = null;      // respuesta de /api/registro
+let mensajeRegistro = "";
+let datosPostinstalacion = null;
+let revisandoPost = false;
+
+function puedeGuardarEquipo() {
+    return !document.body.classList.contains("sin-escaneo") && !document.body.classList.contains("demo");
+}
+
+function dibujarPanelEquipos() {
+    dibujarEquipos(datosRegistro, puedeGuardarEquipo(), document.getElementById("equipos-vista"), {
+        alGuardar: guardarEquipo, alBorrar: borrarEquipo, mensaje: mensajeRegistro,
+    });
+}
+
+async function cargarRegistro() {
+    try {
+        const respuesta = await fetch("/api/registro");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        datosRegistro = await respuesta.json();
+    } catch (error) {
+        datosRegistro = { equipos: [] };
+        mensajeRegistro = "No se pudo leer el registro de equipos.";
+    }
+    dibujarPanelEquipos();
+}
+
+async function guardarEquipo(campos) {
+    try {
+        const respuesta = await fetch("/api/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campos) });
+        const cuerpo = await respuesta.json().catch(() => ({}));
+        mensajeRegistro = respuesta.ok ? "Equipo guardado en el registro." : (cuerpo.mensaje || "No se pudo guardar el equipo.");
+    } catch (error) {
+        mensajeRegistro = "No se pudo guardar el equipo.";
+    }
+    anunciar(mensajeRegistro);
+    await cargarRegistro();
+}
+
+async function borrarEquipo(equipo) {
+    if (!window.confirm(`¿Borrar «${equipo.etiqueta}» del registro? No se puede deshacer.`)) return;
+    try {
+        const respuesta = await fetch(`/api/registro/${encodeURIComponent(equipo.id)}`, { method: "DELETE" });
+        mensajeRegistro = respuesta.ok ? "Equipo borrado del registro." : "No se pudo borrar el equipo.";
+    } catch (error) {
+        mensajeRegistro = "No se pudo borrar el equipo.";
+    }
+    anunciar(mensajeRegistro);
+    await cargarRegistro();
+}
+
+function dibujarPanelPostinstalacion() {
+    dibujarPostinstalacion(datosPostinstalacion, revisandoPost, document.getElementById("postinstalacion-vista"), { alRevisar: revisarPostinstalacion });
+}
+
+async function revisarPostinstalacion() {
+    if (revisandoPost) return;
+    revisandoPost = true;
+    dibujarPanelPostinstalacion();
+    anunciar("Revisando el equipo…");
+    try {
+        const respuesta = await fetch("/api/postinstalacion");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        datosPostinstalacion = await respuesta.json();
+        anunciar("Revisión terminada.");
+    } catch (error) {
+        mostrarError("No se pudo completar la revisión del equipo.", "escaneo");
+    } finally {
+        revisandoPost = false;
+        dibujarPanelPostinstalacion();
+        const boton = document.getElementById("boton-postinstalacion");
+        if (boton) boton.focus({ preventScroll: true });
+    }
+}
+
+dibujarPanelPostinstalacion();
+cargarRegistro();
+
 desdeHash();
 
 // Frases de veredicto del Resumen; al llegar se repinta (si falla, queda el texto de siempre).

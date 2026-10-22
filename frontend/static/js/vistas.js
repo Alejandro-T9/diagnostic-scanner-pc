@@ -490,3 +490,125 @@ function dibujarAnalisis(vista, analisis, contenedor, { alAnalizar, ocupado } = 
     }
     contenedor.replaceChildren(bloque);
 }
+
+
+// Pestaña "Equipos" (F5, opt-in): formulario para guardar el último escaneo + inventario. datos = {equipos, archivo} o null.
+function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, mensaje } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Equipos revisados"));
+    bloque.append(crear("p", "recomendaciones-nota", "Es opcional: solo se guarda lo que tú pides, en un archivo de tu USB. No se envía nada por internet."));
+    if (puedeGuardar) {
+        const form = crear("form", "form-registro");
+        [["etiqueta", "Nombre o etiqueta del equipo (obligatorio)", "input"], ["responsable", "Responsable o dueño", "input"], ["notas", "Notas", "textarea"]].forEach(([id, texto, tipo]) => {
+            const campo = crear("label", "campo-registro", texto);
+            const entrada = crear(tipo);
+            entrada.name = id;
+            entrada.maxLength = id === "notas" ? 1000 : 80;
+            if (id === "etiqueta") entrada.required = true;
+            campo.append(entrada);
+            form.append(campo);
+        });
+        const guardar = crear("button", "boton-primario", "Guardar este equipo");
+        guardar.type = "submit";
+        form.append(guardar);
+        form.addEventListener("submit", (e) => { e.preventDefault(); if (alGuardar) alGuardar(Object.fromEntries(new FormData(form))); });
+        bloque.append(form);
+    } else {
+        bloque.append(crear("p", "", "Para guardar un equipo, primero revisa tu PC de verdad con «Revisar mi PC»."));
+    }
+    if (mensaje) bloque.append(crear("p", "recomendaciones-nota", mensaje));
+    const equipos = datos && Array.isArray(datos.equipos) ? datos.equipos.filter(_esDict) : null;
+    if (!equipos) bloque.append(crear("p", "", "Cargando el registro…"));
+    else if (!equipos.length) bloque.append(crear("p", "", "Aún no hay equipos guardados."));
+    else {
+        const acciones = crear("p", "recomendaciones-nota");
+        const csv = crear("a", "", "Exportar a Excel (CSV)");
+        csv.href = "/api/registro/csv";
+        acciones.append(`${equipos.length} equipo(s) guardados. `, csv);
+        bloque.append(acciones);
+        const envoltura = crear("div", "tabla-comp-envoltura");
+        const tabla = crear("table", "tabla-comp");
+        const cab = crear("tr");
+        ["Fecha", "Etiqueta", "Responsable", "Equipo", "Resultado", "Acciones"].forEach((t) => cab.append(crear("th", "", t)));
+        const encabezado = crear("thead");
+        encabezado.append(cab);
+        tabla.append(encabezado);
+        const cuerpo = crear("tbody");
+        equipos.forEach((e) => {
+            const fila = crear("tr");
+            [String(e.fecha || "").replace("T", " "), e.etiqueta, e.responsable, [e.equipo, e.sistema].filter(Boolean).join(" · ")].forEach((t) => fila.append(crear("td", "", t || "—")));
+            const resultado = crear("td");
+            resultado.append(crearChipEstado(String(e.veredicto || "").toLowerCase()));
+            fila.append(resultado);
+            const celda = crear("td");
+            const informe = crear("a", "", "Ver informe");
+            informe.href = `/api/registro/${encodeURIComponent(e.id)}/informe`;
+            informe.target = "_blank";
+            informe.rel = "noopener";
+            const borrar = crear("button", "boton-mas", "Borrar");
+            borrar.type = "button";
+            borrar.addEventListener("click", () => { if (alBorrar) alBorrar(e); });
+            celda.append(informe, " ", borrar);
+            fila.append(celda);
+            cuerpo.append(fila);
+        });
+        tabla.append(cuerpo);
+        envoltura.append(tabla);
+        bloque.append(envoltura);
+    }
+    contenedor.replaceChildren(bloque);
+}
+
+// Pestaña "Post-instalación" (F6): lista de revisión de un equipo recién instalado. datos = respuesta de /api/postinstalacion o null.
+function dibujarPostinstalacion(datos, ocupado, contenedor, { alRevisar } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Equipo recién instalado"));
+    bloque.append(crear("p", "recomendaciones-nota", "Revisa lo básico después de instalar o formatear. Solo lee: no instala, no activa y no cambia nada."));
+    const boton = crear("button", "boton-primario", ocupado ? "Revisando…" : (datos ? "Volver a revisar" : "Revisar este equipo"));
+    boton.type = "button";
+    boton.id = "boton-postinstalacion";
+    boton.disabled = !!ocupado;
+    boton.setAttribute("aria-busy", String(!!ocupado));
+    if (alRevisar) boton.addEventListener("click", alRevisar);
+    bloque.append(boton);
+    const items = datos && Array.isArray(datos.items) ? datos.items.filter((i) => _esDict(i) && typeof i.titulo === "string") : [];
+    if (items.length) {
+        const lista = crear("div", "analisis-tarjetas");
+        items.forEach((i) => {
+            const tarjeta = crear("article", "tarjeta-comp");
+            const cab = crear("div", "tarjeta-comp-cabecera");
+            if (i.manual) {
+                const titulo = crear("h3");
+                const etiqueta = crear("label");
+                const marca = crear("input");
+                marca.type = "checkbox";
+                etiqueta.append(marca, ` ${i.titulo}`);
+                titulo.append(etiqueta);
+                cab.append(titulo);
+            } else {
+                cab.append(crear("h3", "", i.titulo), crearChipEstado(normalizarEstado(i.estado)));
+            }
+            tarjeta.append(cab);
+            if (!i.manual && i.detalle) tarjeta.append(crear("p", "tarjeta-comp-mensaje", i.detalle));
+            if (i.que_hacer) tarjeta.append(crear("p", "tarjeta-comp-significa", i.que_hacer));
+            lista.append(tarjeta);
+        });
+        bloque.append(lista);
+        if (typeof datos.acta === "string") {
+            bloque.append(crear("h3", "", "Texto para la hoja de SOPORTE TÉCNICO"));
+            const area = crear("textarea", "acta-texto");
+            area.readOnly = true;
+            area.rows = Math.min(16, datos.acta.split("\n").length + 1);
+            area.value = datos.acta;
+            area.setAttribute("aria-label", "Texto de la revisión para copiar");
+            const copiar = crear("button", "boton-mas", "Copiar texto");
+            copiar.type = "button";
+            copiar.addEventListener("click", () => {
+                area.select();
+                try { navigator.clipboard.writeText(datos.acta); copiar.textContent = "Copiado"; } catch (e) { document.execCommand("copy"); }
+            });
+            bloque.append(area, copiar);
+        }
+    }
+    contenedor.replaceChildren(bloque);
+}
