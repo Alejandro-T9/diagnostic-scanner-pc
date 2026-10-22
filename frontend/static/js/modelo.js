@@ -227,8 +227,39 @@ function resultadoValido(resultado) {
     return _obj(_obj(resultado)?.componentes) !== null;
 }
 
+const _MAX_FILAS_ANALISIS = 30;
+
+function resultadoAnalisisValido(r) {
+    return _obj(_obj(r)?.analisis) !== null;
+}
+
+// Listas de detalle de cada análisis: [{titulo, items: [texto crudo], mas}] (sin escapar; la vista usa textContent).
+function detalleAnalisis(nombre, info) {
+    const datos = _obj(_obj(info)?.datos) || {};
+    const lista = (k) => (Array.isArray(datos[k]) ? datos[k] : []);
+    const nombres = (a) => a.filter((x) => _obj(x) && typeof x.nombre === "string").map((x) => x.nombre);
+    let grupos = [];
+    if (nombre === "inicio") grupos = [["Se abren al encender", nombres(lista("entradas").filter((e) => _obj(e) && e.habilitado !== false))]];
+    else if (nombre === "programas") grupos = [
+        ["Recientes sin editor conocido", lista("recientes_sin_editor").filter((n) => typeof n === "string")],
+        ["Ocultos por Windows", nombres(lista("programas").filter((p) => _obj(p) && p.oculto))],
+    ];
+    else if (nombre === "rendimiento") grupos = [
+        ["Posibles causas", lista("causas").filter((c) => _obj(c) && typeof c.titulo === "string")
+            .map((c) => c.titulo + (Array.isArray(c.evidencia) ? " — " + c.evidencia.filter((e) => typeof e === "string").join("; ") : ""))],
+        ["Procesos que más procesador usan", lista("procesos_cpu").filter((p) => _obj(p) && typeof p.nombre === "string" && Number.isFinite(p.cpu))
+            .map((p) => `${p.nombre} (${Math.round(p.cpu)} % CPU)`)],
+    ];
+    else if (nombre === "espacio") grupos = [["Dónde se va el espacio", lista("carpetas")
+        .filter((c) => _obj(c) && typeof c.nombre === "string" && Number.isFinite(c.tamano_gb)).map((c) => `${c.nombre}: ${c.tamano_gb} GB`)]];
+    return grupos.filter(([, items]) => items.length).map(([titulo, items]) => ({
+        titulo, items: items.slice(0, _MAX_FILAS_ANALISIS), mas: Math.max(0, items.length - _MAX_FILAS_ANALISIS),
+    }));
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
+        resultadoAnalisisValido, detalleAnalisis,
         PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
         nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad, seleccionValida, resultadoValido,
     };

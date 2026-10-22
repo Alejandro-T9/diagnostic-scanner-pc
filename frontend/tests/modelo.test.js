@@ -81,9 +81,9 @@ assert.deepStrictEqual(habilitadasSegun(true, false), TRES);
 assert.deepStrictEqual(habilitadasSegun(true, true), PESTANAS);
 
 // Análisis de Windows llega en F4a: hasta entonces la constante es false (la fase la cambia a true)
-assert.strictEqual(ANALISIS_DISPONIBLE, false);
-assert(!habilitadasSegun(true, ANALISIS_DISPONIBLE).includes("analisis"));
-assert(/^const ANALISIS_DISPONIBLE = false;$/m.test(require("fs").readFileSync(require("path").join(__dirname, "../static/js/estado.js"), "utf8")));
+assert.strictEqual(ANALISIS_DISPONIBLE, true);
+assert(habilitadasSegun(true, ANALISIS_DISPONIBLE).includes("analisis"));
+assert(/^const ANALISIS_DISPONIBLE = true;$/m.test(require("fs").readFileSync(require("path").join(__dirname, "../static/js/estado.js"), "utf8")));
 
 // --- modelo.js: resumen (veredicto, línea, medida clave, datos del equipo, lo primero) ---
 const comp = (id, estado, extra = {}) => ({ componente: id, estado, mensaje: `mensaje ${id}`, datos: null, ...extra });
@@ -263,3 +263,18 @@ assert.strictEqual(resultadoValido({ componentes: { cpu: null } }), true); // la
     .forEach((v) => assert.strictEqual(resultadoValido(v), false, JSON.stringify(v)));
 
 console.log("modelo.test.js: OK");
+
+// --- Análisis de Windows (F4a) ---
+{
+    const { resultadoAnalisisValido, detalleAnalisis } = require("../static/js/modelo.js");
+    assert(resultadoAnalisisValido({ analisis: {} }));
+    for (const malo of [null, undefined, 5, "x", [], { analisis: null }, { analisis: [] }, {}]) assert(!resultadoAnalisisValido(malo));
+    const g = detalleAnalisis("inicio", { datos: { entradas: Array.from({ length: 80 }, (_, i) => ({ nombre: `p${i}`, habilitado: true })).concat([{ nombre: "off", habilitado: false }]) } });
+    assert.strictEqual(g.length, 1); assert.strictEqual(g[0].items.length, 30); assert.strictEqual(g[0].mas, 50);
+    assert(!g[0].items.includes("off"));
+    const r = detalleAnalisis("rendimiento", { datos: { causas: [{ titulo: "RAM <b>", evidencia: ["93 %"] }], procesos_cpu: [{ nombre: "<x>.exe", cpu: 62.4 }, { nombre: 5 }] } });
+    assert.strictEqual(r[0].items[0], "RAM <b> — 93 %"); assert.strictEqual(r[1].items[0], "<x>.exe (62 % CPU)"); assert.strictEqual(r[1].items.length, 1);
+    assert.deepStrictEqual(detalleAnalisis("espacio", { datos: null }), []);
+    assert.deepStrictEqual(detalleAnalisis("zzz", undefined), []);
+    assert.strictEqual(detalleAnalisis("programas", { datos: { recientes_sin_editor: ["A", 3], programas: [{ nombre: "H", oculto: true }, { nombre: "V" }] } }).length, 2);
+}

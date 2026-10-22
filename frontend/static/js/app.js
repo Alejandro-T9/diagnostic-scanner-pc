@@ -10,6 +10,8 @@ let tablaGuias = null;      // respuesta de /api/guias (guías por componente/es
 let modo = "simple";
 let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
+let ultimoAnalisis = null;  // resultado de /api/analisis (se conserva entre escaneos de hardware)
+let analizando = false;
 let errorVisible = null;    // "conexion" | "escaneo" | null: tipo del aviso de error visible (el sondeo solo borra el de conexión)
 
 // resultado = {componentes, hechos?, cobertura?, recomendaciones?}. Cada vista se dibuja en vistas.js.
@@ -31,8 +33,41 @@ function renderizarDiagnostico(resultado) {
     const vistaRecs = document.getElementById("recomendaciones-vista");
     if (document.body.classList.contains("demo")) dibujarInvitacionRecomendaciones(vistaRecs);
     else dibujarRecomendaciones(recomendaciones, vistaRecs);
+    dibujarPanelAnalisis();
     if (escaneando) marcarOcupado(true); // los botones de invitación acaban de recrearse
     actualizarPestanas();
+}
+
+function dibujarPanelAnalisis() {
+    const contenedor = document.getElementById("analisis-vista");
+    if (document.body.classList.contains("sin-escaneo")) dibujarAnalisis("vacio", null, contenedor);
+    else if (document.body.classList.contains("demo")) dibujarAnalisis("demo", null, contenedor);
+    else dibujarAnalisis(ultimoAnalisis ? "resultado" : "cta", ultimoAnalisis, contenedor, { alAnalizar: analizarWindows, ocupado: analizando });
+}
+
+async function analizarWindows() {
+    if (analizando || escaneando) return;
+    analizando = true;
+    dibujarPanelAnalisis();
+    ocultarError("escaneo");
+    anunciar("Analizando Windows…");
+    try {
+        const respuesta = await fetch("/api/analisis");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        const resultado = await respuesta.json();
+        if (!resultadoAnalisisValido(resultado)) throw new Error("respuesta sin análisis");
+        ultimoAnalisis = resultado;
+        anunciar("Análisis de Windows terminado.");
+    } catch (error) {
+        const mensaje = "No se pudo completar el análisis de Windows.";
+        mostrarError(mensaje, "escaneo");
+        anunciar(mensaje);
+    } finally {
+        analizando = false;
+        dibujarPanelAnalisis();
+        const boton = document.getElementById("boton-analizar");
+        if (boton) boton.focus({ preventScroll: true });
+    }
 }
 
 function redibujarComponentes() {
@@ -57,6 +92,7 @@ function pintarVacio() {
     dibujarInvitacionRecomendaciones(document.getElementById("recomendaciones-vista"));
     dibujarResumen(null, document.getElementById("resumen-vista"));
     dibujarComponentes(null, modo, null, document.getElementById("componentes-vista"));
+    dibujarPanelAnalisis();
     if (escaneando) marcarOcupado(true); // los botones del estado vacío acaban de recrearse
     actualizarPestanas();
 }

@@ -1321,3 +1321,14 @@ el SO actual, no lo que el firmware admite).
   informe en pantalla y en vista de impresión; captura en escala de grises con los
   cinco estados distinguibles.
 - `prefers-color-scheme` intencionalmente no se sigue (ver arriba).
+
+
+## 40. Análisis de Windows (F4a): módulos aparte del hardware, a demanda
+
+**Fecha:** 2026-10-23
+
+Se agregan cuatro análisis de solo lectura sobre el Windows instalado: `espacio` (espacio libre del disco del sistema y dónde se va), `inicio` (programas que arrancan solos, descontando los deshabilitados en el Administrador de tareas vía `StartupApproved`), `programas` (instalados, ocultos por Windows y accesos del menú Inicio, contados por separado) y `rendimiento` ("¿por qué va lento?": causas con evidencia medida; foto del momento). Viven en `backend/analisis/`, con el mismo contrato de 5 llaves y guía, pero **fuera de `scanner.COMPONENTES`**: no cambian el veredicto, la cobertura ni los 7 componentes del proyecto. Se piden con `GET /api/analisis` (botón "Analizar mi Windows" en su pestaña, tras un escaneo real) y se incluyen en el informe y en el reporte de texto.
+
+**Motivo:** responde la idea del equipo y del jurado de que la app ayude a entender por qué un equipo va lento, sin alargar el escaneo normal ni mezclar hardware con software.
+
+**Consecuencias:** ningún módulo requiere administrador ni modifica nada; ninguno emite `critico`; `Get-StartApps` (PowerShell, 6 s) es opcional y degrada a `[]`. Ya no se usa subagentes para el desarrollo (preferencia del equipo desde 2026-10-23): las piezas de F4a (tareas 5 a 7) se verificaron con pruebas automáticas y revisión en el navegador, sin revisor independiente. Pendiente: pruebas en un Windows 10 real y copiar todo al USB.

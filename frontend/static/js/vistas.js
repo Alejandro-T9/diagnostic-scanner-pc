@@ -219,12 +219,12 @@ function bloqueGuia(guia) {
 }
 
 // Modo simple: una tarjeta por componente con icono, estado, mensaje y la guía (qué significa, qué hacer, quién, urgencia).
-function _tarjetaComponente(id, info) {
+function _tarjetaComponente(id, info, nombre = nombreComp(id)) {
     const estado = normalizarEstado(info.estado);
     const icono = crear("span", "tarjeta-comp-icono");
     icono.append(crearIcono(iconoComponente(id)));
     const cabecera = crear("header", "tarjeta-comp-cabecera");
-    cabecera.append(icono, crear("h3", "", nombreComp(id)), crearChipEstado(estado));
+    cabecera.append(icono, crear("h3", "", nombre), crearChipEstado(estado));
     const tarjeta = crear("article", `tarjeta-comp estado--${estado}`);
     tarjeta.tabIndex = -1; // enfocable por programa: al llegar desde el Resumen el foco cae en la tarjeta elegida
     tarjeta.append(cabecera, crear("p", "tarjeta-comp-mensaje", info.mensaje));
@@ -450,5 +450,43 @@ function dibujarRecomendaciones(recomendaciones, contenedor) {
         if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
         bloque.append(tarjeta);
     });
+    contenedor.replaceChildren(bloque);
+}
+
+// Pestaña "Análisis de Windows". vista: "vacio" | "demo" (invitan a revisar; nada se inventa) | "cta" | "resultado".
+function dibujarAnalisis(vista, analisis, contenedor, { alAnalizar, ocupado } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Análisis de Windows"));
+    bloque.append(crear("p", "recomendaciones-nota", "Es una foto del momento, solo lee información y no cambia nada en tu equipo."));
+    if (vista === "vacio" || vista === "demo") {
+        bloque.append(crear("p", "", vista === "demo"
+            ? "Estás viendo una demostración. Pulsa «Volver a revisar» para revisar tu PC de verdad y luego analiza Windows."
+            : "Primero revisa tu PC con el botón «Revisar mi PC»."));
+    } else {
+        const boton = crear("button", "boton-primario", ocupado ? "Analizando…" : (analisis ? "Volver a analizar" : "Analizar mi Windows"));
+        boton.type = "button";
+        boton.id = "boton-analizar";
+        boton.disabled = !!ocupado;
+        boton.setAttribute("aria-busy", String(!!ocupado));
+        if (alAnalizar) boton.addEventListener("click", alAnalizar);
+        bloque.append(boton);
+    }
+    if (vista === "resultado" && analisis) {
+        const items = analisis.analisis;
+        const lista = crear("div", "analisis-tarjetas");
+        ["espacio", "inicio", "programas", "rendimiento"].filter((id) => _esDict(items[id])).forEach((id) => {
+            const info = { ...items[id], estado: normalizarEstado(items[id].estado) };
+            const tarjeta = _tarjetaComponente(id, info, NOMBRES_ANALISIS[id]);
+            detalleAnalisis(id, info).forEach((g) => {
+                tarjeta.append(crear("h4", "tarjeta-comp-subtitulo", g.titulo));
+                const ul = crear("ul", "tarjeta-simple-pasos");
+                g.items.forEach((t) => ul.append(crear("li", "", t)));
+                if (g.mas) ul.append(crear("li", "", `y ${g.mas} más`));
+                tarjeta.append(ul);
+            });
+            lista.append(tarjeta);
+        });
+        bloque.append(lista);
+    }
     contenedor.replaceChildren(bloque);
 }

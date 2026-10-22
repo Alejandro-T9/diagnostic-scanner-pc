@@ -76,9 +76,13 @@ const QUIEN_TEXTO = {
     nadie: "No necesita acción",
 };
 
-// "Análisis de Windows" llega en F4a: hasta entonces su pestaña y su panel están ocultos.
-const ANALISIS_DISPONIBLE = false;
+// Pestaña "Análisis de Windows" (F4a): disponible tras un escaneo real.
+const ANALISIS_DISPONIBLE = true;
+const NOMBRES_ANALISIS = {
+    espacio: "Espacio en disco", inicio: "Programas de inicio",
+    programas: "Programas instalados", rendimiento: "¿Por qué va lento?",
+};
 
 if (typeof module !== "undefined") {
-    module.exports = { ANALISIS_DISPONIBLE, NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
+    module.exports = { ANALISIS_DISPONIBLE, NOMBRES_ANALISIS, NOMBRES_COMPONENTES, CHIP_TEXTO, SEVERIDAD, QUIEN_TEXTO, ETIQUETAS_CAMPOS, DATOS_MOCK };
 }
