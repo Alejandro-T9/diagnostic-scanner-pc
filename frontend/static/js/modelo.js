@@ -222,9 +222,14 @@ function seleccionValida(id, componentes) {
     return typeof id === "string" && comps && Object.hasOwn(comps, id) && _obj(comps[id]) ? id : null;
 }
 
+// Respuesta de /api/scan aprovechable: un objeto con `componentes` objeto. Se valida ANTES de tocar la pantalla.
+function resultadoValido(resultado) {
+    return _obj(_obj(resultado)?.componentes) !== null;
+}
+
 if (typeof module !== "undefined") {
     module.exports = {
         PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
-        nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad, seleccionValida,
+        nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad, seleccionValida, resultadoValido,
     };
 }

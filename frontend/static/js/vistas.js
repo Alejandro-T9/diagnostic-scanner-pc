@@ -58,12 +58,12 @@ function _resumenEquipo(resultado) {
     return bloque;
 }
 
-// Va a la pestaña del destino ("componentes:<id>" o "recomendaciones") y deja el foco dentro de ella.
+// Va a la pestaña del destino ("componentes:<id>" o "recomendaciones") y deja el foco en el componente elegido (seleccionarComponente) o, si no hay, en el panel.
 function _irA(destino, componentes) {
     const [pestana, id] = destino.split(/:(.*)/s);
     window.scrollTo(0, 0); // antes de cambiar: la tarjeta o fila elegida se desplaza a la vista después
-    if (seleccionValida(id, componentes)) seleccionarComponente(id); // activa Componentes y resalta ese componente
-    else activarPestana(pestana, true);
+    if (seleccionValida(id, componentes)) { seleccionarComponente(id); return; } // activa Componentes, resalta y enfoca ese componente
+    activarPestana(pestana, true);
     const panel = document.getElementById(`panel-${pestana}`);
     if (panel && !panel.hidden) panel.focus({ preventScroll: true });
 }
@@ -226,6 +226,7 @@ function _tarjetaComponente(id, info) {
     const cabecera = crear("header", "tarjeta-comp-cabecera");
     cabecera.append(icono, crear("h3", "", nombreComp(id)), crearChipEstado(estado));
     const tarjeta = crear("article", `tarjeta-comp estado--${estado}`);
+    tarjeta.tabIndex = -1; // enfocable por programa: al llegar desde el Resumen el foco cae en la tarjeta elegida
     tarjeta.append(cabecera, crear("p", "tarjeta-comp-mensaje", info.mensaje));
     const guia = _esDict(info.guia) ? info.guia : null;
     if (!guia) return tarjeta;

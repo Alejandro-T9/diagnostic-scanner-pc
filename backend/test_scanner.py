@@ -817,7 +817,7 @@ def test_informe_estados_con_forma():
     # (a) por tarjeta: <svg aria-hidden> + texto del estado dentro del chip, ícono primero; los 5 son distintos
     chips = re.findall(r'<span class="chip [^"]*">(<svg.*?</svg>)([^<]+)</span>', html, flags=re.S)
     assert [t for _, t in chips].count("Normal") == 1 and len(chips) == 5, chips
-    assert {t for _, t in chips} == {"Normal", "Advertencia", "Sospecha", "Crítico", "No determinado"}, chips
+    assert {t for _, t in chips} == {"Normal", "Advertencia", "Sospecha", "Crítico", "Sin datos"}, chips
     assert len({svg for svg, _ in chips}) == 5, "los 5 íconos de estado deben ser distintos"
     for svg, _ in chips:
         assert 'aria-hidden="true"' in svg and 'stroke="currentColor"' in svg and "<script" not in svg, svg
@@ -831,7 +831,7 @@ def test_informe_estados_con_forma():
               "critico": "M8.06 2.5h7.88L21.5 8.06v7.88l-5.56 5.56H8.06L2.5 15.94V8.06z", "no_determinado": 'stroke-dasharray="3 3.2"'}
     por_texto = {t: svg for svg, t in chips}
     etiquetas = {"normal": "Normal", "advertencia": "Advertencia", "sospecha": "Sospecha", "critico": "Crítico",
-                 "no_determinado": "No determinado"}
+                 "no_determinado": "Sin datos"}
     for e, forma in formas.items():
         assert forma in js and forma in por_texto[etiquetas[e]], (e, forma)
 
@@ -1416,6 +1416,9 @@ def test_indice_estructura():
         for i in _IDS_ARMAZON:
             assert f'id="{i}"' in html, i
         assert 'id="boton-escanear"' not in html
+        # Lectores de pantalla: región de estado del escaneo y nombre accesible del botón "Más" (el texto se oculta en pantallas angostas).
+        assert re.search(r'<p[^>]*id="estado-escaneo"[^>]*role="status"|<p[^>]*role="status"[^>]*id="estado-escaneo"', html), "falta #estado-escaneo con role=status"
+        assert re.search(r'<button[^>]*id="boton-mas"[^>]*aria-label="Más opciones"', html), "#boton-mas sin aria-label"
         # Script anti-parpadeo: en <head>, antes de la hoja de estilos.
         cabeza = html.split("</head>")[0]
         guion = re.search(r"<script>[^<]*tema_interfaz[^<]*</script>", cabeza)

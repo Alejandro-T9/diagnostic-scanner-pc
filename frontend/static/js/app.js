@@ -10,10 +10,14 @@ let tablaGuias = null;      // respuesta de /api/guias (guías por componente/es
 let modo = "simple";
 let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
+let errorVisible = null;    // "conexion" | "escaneo" | null: tipo del aviso de error visible (el sondeo solo borra el de conexión)
 
 // resultado = {componentes, hechos?, cobertura?, recomendaciones?}. Cada vista se dibuja en vistas.js.
 function renderizarDiagnostico(resultado) {
-    const { componentes, recomendaciones } = resultado;
+    // Una entrada que no es objeto (null, número...) se omite: ninguna vista la dibuja ni la cuenta.
+    const componentes = Object.fromEntries(Object.entries(resultado.componentes).filter(([, info]) => info !== null && typeof info === "object" && !Array.isArray(info)));
+    resultado = { ...resultado, componentes };
+    const { recomendaciones } = resultado;
     document.body.classList.remove("sin-escaneo");
     // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
     // así ninguna clase CSS ni texto sale de un valor no previsto.
@@ -40,6 +44,11 @@ function seleccionarComponente(id) {
     componenteSeleccionado = id;
     activarPestana("componentes", true); // antes de dibujar: scrollIntoView necesita el panel visible
     redibujarComponentes();
+    // El foco va al componente elegido (no al panel); preventScroll porque _aVista ya lo desplazó a la vista.
+    const elegido = (modo === "tecnico"
+        ? [...document.querySelectorAll(".fila-comp")].find((f) => f.dataset.id === id)?.querySelector(".fila-comp-boton")
+        : document.querySelector('.tarjeta-comp[aria-current="true"]'));
+    if (elegido) elegido.focus({ preventScroll: true });
 }
 
 // Estado inicial (y tras cambiar de modo sin escaneo): sin datos inventados.
@@ -95,13 +104,27 @@ async function cargarGuias() {
     return tablaGuias;
 }
 
-function mostrarError(mensaje) {
-    document.getElementById("aviso-error-texto").textContent = mensaje;
-    document.getElementById("aviso-error").classList.add("activo");
+// Región role="status" para lectores de pantalla (#estado-escaneo): solo se escribe si el texto cambió.
+function anunciar(texto) {
+    const region = document.getElementById("estado-escaneo");
+    if (region.textContent !== texto) region.textContent = texto;
 }
 
-function ocultarError() {
+// tipo: "conexion" (la sondea /api/status y se borra sola al volver) o "escaneo" (queda hasta el próximo escaneo).
+// Es un role="alert": solo se toca el DOM si algo cambió, para que no se relea cada 2 s.
+function mostrarError(mensaje, tipo) {
+    const texto = document.getElementById("aviso-error-texto");
+    if (texto.textContent !== mensaje) texto.textContent = mensaje;
+    const aviso = document.getElementById("aviso-error");
+    if (!aviso.classList.contains("activo")) aviso.classList.add("activo");
+    errorVisible = tipo;
+}
+
+// Sin `tipo` borra cualquier error; con `tipo` solo si el visible es de ese tipo.
+function ocultarError(tipo) {
+    if (tipo && errorVisible !== tipo) return;
     document.getElementById("aviso-error").classList.remove("activo");
+    errorVisible = null;
 }
 
 // Polling liviano: solo confirma que el backend sigue vivo y refresca el
@@ -117,9 +140,9 @@ async function actualizarStatus() {
         // normal (WinPE ya corre con todos los permisos).
         const sinAdmin = datos.administrador === false && datos.entorno === "windows";
         document.getElementById("aviso-admin").classList.toggle("activo", sinAdmin);
-        ocultarError();
+        ocultarError("conexion"); // un error de escaneo no lo borra el sondeo
     } catch (error) {
-        mostrarError("No se pudo conectar con el backend. Verifica que el servidor esté corriendo.");
+        mostrarError("No se pudo conectar con el backend. Verifica que el servidor esté corriendo.", "conexion");
     }
 }
 
@@ -139,18 +162,27 @@ async function escanearSistema() {
     if (escaneando) return;
     escaneando = true;
     marcarOcupado(true);
+    ocultarError("escaneo");
+    anunciar("Revisando tu PC…");
     try {
         const guias = cargarGuias(); // en paralelo al escaneo: el titular en palabras necesita _veredictos (nunca lanza)
         const respuesta = await fetch("/api/scan");
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
         const resultado = await respuesta.json();
         await guias;
+        if (!resultadoValido(resultado)) throw new Error("respuesta sin componentes"); // antes de tocar la pantalla: nada queda a medias
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
         escaneosReales++;
         renderizarDiagnostico(resultado); // conserva la selección si el componente sigue existiendo
         ocultarError();
+        const veredicto = calcularVeredicto(resultado.componentes);
+        const frase = tablaGuias && tablaGuias._veredictos && tablaGuias._veredictos[veredicto];
+        const titular = typeof frase === "string" && frase ? frase : CHIP_TEXTO[veredicto.toLowerCase()];
+        anunciar(`${titular}${/[.!?]$/.test(titular) ? "" : "."} ${lineaResumen(resultado.componentes)}`.trim());
     } catch (error) {
-        mostrarError("No se pudo completar el escaneo. Verifica que el servidor esté corriendo.");
+        const mensaje = "No se pudo completar el escaneo. Verifica que el servidor esté corriendo.";
+        mostrarError(mensaje, "escaneo");
+        anunciar(mensaje);
     } finally {
         escaneando = false;
         marcarOcupado(false);
@@ -185,6 +217,7 @@ async function verModoDemo() {
     }
     componenteSeleccionado = null; // la demo empieza sin selección
     renderizarDiagnostico(DATOS_MOCK);
+    anunciar("Mostrando una demostración con datos simulados.");
 }
 
 document.getElementById("boton-revisar").addEventListener("click", escanearSistema);

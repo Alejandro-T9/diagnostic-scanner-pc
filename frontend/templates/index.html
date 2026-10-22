@@ -21,7 +21,7 @@
                 <span class="icono icono-girable" data-icono="ui:revisar"></span><span id="boton-revisar-texto">Revisar mi PC</span>
             </button>
             <div class="mas">
-                <button type="button" class="boton-mas" id="boton-mas" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">
+                <button type="button" class="boton-mas" id="boton-mas" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" aria-controls="menu-mas">
                     <span class="icono" data-icono="ui:menu"></span><span class="mas-texto">Más</span>
                 </button>
                 <div class="menu-mas" id="menu-mas" role="menu" aria-label="Más opciones" hidden>
@@ -56,6 +56,7 @@
 </div>
 
 <main class="contenido">
+    <p id="estado-escaneo" class="sr-only" role="status" aria-live="polite"></p>
     <nav class="pestanas" role="tablist" aria-label="Secciones">
         <button type="button" role="tab" id="tab-resumen" aria-controls="panel-resumen" aria-selected="true" tabindex="0">Resumen</button>
         <button type="button" role="tab" id="tab-componentes" aria-controls="panel-componentes" aria-selected="false" tabindex="-1">Componentes</button>

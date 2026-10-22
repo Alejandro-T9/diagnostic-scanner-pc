@@ -4,7 +4,7 @@ const assert = require("assert");
 const { iconoEstado, iconoComponente, iconoUi } = require("../static/js/iconos.js");
 const { CHIP_TEXTO, ANALISIS_DISPONIBLE } = require("../static/js/estado.js");
 const { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
-    calcularVeredicto, normalizarEstado, nombreComp, seleccionValida, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
+    calcularVeredicto, normalizarEstado, nombreComp, seleccionValida, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad, resultadoValido } = require("../static/js/modelo.js");
 
 const ESTADOS = ["normal", "advertencia", "sospecha", "critico", "no_determinado"];
 const COMPONENTES = ["mainboard", "cpu", "ram", "almacenamiento", "fuente_poder", "bateria", "red"];
@@ -254,5 +254,12 @@ assert.strictEqual(seleccionValida("a", ord), "a");
 ["zzz", "constructor", "__proto__", "toString", "", null, undefined, 5, {}, ["a"]].forEach((v) => assert.strictEqual(seleccionValida(v, ord), null, String(v)));
 [null, undefined, 5, "a", [], { a: null }, { a: 5 }].forEach((c) => assert.strictEqual(seleccionValida("a", c), null, JSON.stringify(c)));
 assert.strictEqual(seleccionValida("__proto__", JSON.parse('{"__proto__":{"estado":"normal"}}')), "__proto__"); // propio -> vale
+
+// (g) resultadoValido: solo un objeto con `componentes` objeto vale como respuesta de /api/scan
+assert.strictEqual(resultadoValido({ componentes: {} }), true);
+assert.strictEqual(resultadoValido({ componentes: { cpu: comp("cpu", "normal") }, recomendaciones: [] }), true);
+assert.strictEqual(resultadoValido({ componentes: { cpu: null } }), true); // la entrada rara se omite al dibujar, no invalida el resultado
+[null, undefined, 5, "x", [], {}, { componentes: null }, { componentes: 5 }, { componentes: "x" }, { componentes: [] }, [{ componentes: {} }]]
+    .forEach((v) => assert.strictEqual(resultadoValido(v), false, JSON.stringify(v)));
 
 console.log("modelo.test.js: OK");

@@ -20,7 +20,7 @@ NOMBRES = {
 }
 ESTADOS = {
     "normal": "Normal", "advertencia": "Advertencia", "sospecha": "Sospecha",
-    "critico": "Crítico", "no_determinado": "No determinado",
+    "critico": "Crítico", "no_determinado": "Sin datos",
 }
 
 # Íconos de estado: mismas siluetas y atributos que frontend/static/js/iconos.js (una forma distinta por estado,
