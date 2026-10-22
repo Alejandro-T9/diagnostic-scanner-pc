@@ -474,7 +474,7 @@ function dibujarAnalisis(vista, analisis, contenedor, { alAnalizar, ocupado } = 
     if (vista === "resultado" && analisis) {
         const items = analisis.analisis;
         const lista = crear("div", "analisis-tarjetas");
-        ["espacio", "inicio", "programas", "rendimiento"].filter((id) => _esDict(items[id])).forEach((id) => {
+        Object.keys(NOMBRES_ANALISIS).filter((id) => _esDict(items[id])).forEach((id) => {
             const info = { ...items[id], estado: normalizarEstado(items[id].estado) };
             const tarjeta = _tarjetaComponente(id, info, NOMBRES_ANALISIS[id]);
             detalleAnalisis(id, info).forEach((g) => {

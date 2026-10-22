@@ -252,6 +252,15 @@ function detalleAnalisis(nombre, info) {
     ];
     else if (nombre === "espacio") grupos = [["Dónde se va el espacio", lista("carpetas")
         .filter((c) => _obj(c) && typeof c.nombre === "string" && Number.isFinite(c.tamano_gb)).map((c) => `${c.nombre}: ${c.tamano_gb} GB`)]];
+    else if (nombre === "estabilidad") grupos = [["Lo que Windows anotó (últimos 30 días)", [
+        ["pantallazos_azules", "Pantallazos azules"], ["apagados_inesperados", "Apagados inesperados"], ["errores_disco", "Errores de disco"],
+    ].filter(([k]) => Number.isFinite(datos[k])).map(([k, t]) => `${t}: ${datos[k]}`)]];
+    else if (nombre === "controladores") grupos = [["Dispositivos con problema", nombres(lista("dispositivos"))]];
+    else if (nombre === "seguridad") grupos = [
+        ["Programas que corren desde Temp o Descargas", nombres(lista("procesos_en_carpetas_temporales"))],
+        ["Líneas extra en el archivo hosts", lista("hosts_extra").filter((h) => typeof h === "string")],
+        ["Otros avisos", datos.proxy_activo === true ? ["Hay un proxy configurado en Windows"] : []],
+    ];
     return grupos.filter(([, items]) => items.length).map(([titulo, items]) => ({
         titulo, items: items.slice(0, _MAX_FILAS_ANALISIS), mas: Math.max(0, items.length - _MAX_FILAS_ANALISIS),
     }));

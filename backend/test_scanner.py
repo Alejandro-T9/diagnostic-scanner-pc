@@ -529,7 +529,7 @@ def test_explicador():
     llaves = {"que_significa", "que_hacer", "quien", "urgencia", "pregunta_tecnico"}
     prohibidas = ("peligro", "infectad", "limpio", "garantiza")
     # F4a: los 4 análisis viven aparte de COMPONENTES pero tienen las mismas guías
-    assert scanner.ANALISIS == ["espacio", "inicio", "programas", "rendimiento"], scanner.ANALISIS
+    assert scanner.ANALISIS == ["espacio", "inicio", "programas", "rendimiento", "estabilidad", "controladores", "seguridad"], scanner.ANALISIS
     assert set(scanner.ANALISIS).isdisjoint(scanner.COMPONENTES)
     assert set(explicador.NOMBRES_ANALISIS) == set(scanner.ANALISIS), explicador.NOMBRES_ANALISIS
     assert all(v.strip() for v in explicador.NOMBRES_ANALISIS.values())
@@ -2054,7 +2054,7 @@ def test_analisis_orquestador_api_informe():
         assert list(r["analisis"]) == scanner.ANALISIS and "total" in r["tiempos"], r
         assert all("guia" in v for v in r["analisis"].values()), r
         assert r["analisis"]["inicio"]["estado"] == "no_determinado" and r["analisis"]["programas"]["estado"] == "no_determinado"
-        assert r["resumen"]["total_componentes"] == 4 and r["resumen"]["no_determinado"] == 2 and r["resumen"]["advertencia"] == 1, r["resumen"]
+        assert r["resumen"]["total_componentes"] == 7 and r["resumen"]["no_determinado"] == 2 and r["resumen"]["advertencia"] == 1, r["resumen"]
 
         # informe: escapado, topes de filas y ausencia sin análisis
         h = informe.generar_informe_html(_escaneo_falso(), "CRITICO", r)
@@ -2099,7 +2099,41 @@ def test_analisis_orquestador_api_informe():
         scanner.importlib = importlib_orig
 
 
+def test_analisis_f4b():
+    from analisis import estabilidad, controladores, seguridad
+    # estabilidad: solo la evidencia leída decide; None = no se pudo leer
+    cl = estabilidad._clasificar
+    assert cl({"pantallazos_azules": None, "apagados_inesperados": None, "errores_disco": None})[0] == "no_determinado"
+    assert cl({"pantallazos_azules": 0, "apagados_inesperados": 1, "errores_disco": 0})[0] == "normal"
+    assert cl({"pantallazos_azules": 1, "apagados_inesperados": 0, "errores_disco": 0})[0] == "advertencia"
+    assert cl({"pantallazos_azules": 0, "apagados_inesperados": 2, "errores_disco": 0})[0] == "advertencia"
+    assert cl({"pantallazos_azules": 0, "apagados_inesperados": 0, "errores_disco": 1})[0] == "sospecha"
+    assert cl({"pantallazos_azules": 3, "apagados_inesperados": 0, "errores_disco": 0})[0] == "sospecha"
+    # controladores
+    assert [controladores._clasificar(n)[0] for n in (None, 0, 1, 2, 3)] == ["no_determinado", "normal", "advertencia", "advertencia", "sospecha"]
+    # seguridad: solo la protección leída decide el estado; las señales no
+    assert seguridad._clasificar({"antivirus_tiempo_real": None, "firewall": None, "uac": None})[0] == "no_determinado"
+    assert seguridad._clasificar({"antivirus_tiempo_real": True, "firewall": True, "uac": None})[0] == "normal"
+    assert seguridad._clasificar({"antivirus_tiempo_real": True, "firewall": False, "uac": True})[0] == "advertencia"
+    # nunca lanzan ni producen critico aunque los lectores fallen
+    def falla():
+        raise OSError("x")
+    o = (estabilidad._leer_eventos, controladores._leer_dispositivos, seguridad._leer_proteccion, seguridad._leer_senales)
+    try:
+        estabilidad._leer_eventos = controladores._leer_dispositivos = seguridad._leer_proteccion = seguridad._leer_senales = falla
+        for m in (estabilidad, controladores, seguridad):
+            r = m.diagnosticar()
+            assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["estado"] == "no_determinado", r
+    finally:
+        estabilidad._leer_eventos, controladores._leer_dispositivos, seguridad._leer_proteccion, seguridad._leer_senales = o
+    # reales: contrato y sin critico
+    for m in (estabilidad, controladores, seguridad):
+        r = m.diagnosticar()
+        assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
+
+
 if __name__ == "__main__":
+    test_analisis_f4b()
     test_paleta()
     test_frontend_node()
     test_frontend_sin_innerhtml_inseguro()

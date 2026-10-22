@@ -207,6 +207,19 @@ def _detalle_analisis(nombre, comp):
             if isinstance(c, dict) and isinstance(c.get("nombre"), str) and isinstance(c.get("tamano_gb"), (int, float))
         ]
         return "<p><strong>Dónde se va el espacio:</strong></p>" + _lista_corta(carpetas) if carpetas else ""
+    if nombre == "estabilidad":
+        filas = [f"{t}: {datos[k]}" for k, t in (("pantallazos_azules", "Pantallazos azules"), ("apagados_inesperados", "Apagados inesperados"),
+                                                 ("errores_disco", "Errores de disco")) if isinstance(datos.get(k), int)]
+        return "<p><strong>Lo que Windows anotó (últimos 30 días):</strong></p>" + _lista_corta(filas) if filas else ""
+    if nombre == "controladores":
+        nombres = _nombres(lista("dispositivos"), "nombre")
+        return "<p><strong>Dispositivos con problema:</strong></p>" + _lista_corta(nombres) if nombres else ""
+    if nombre == "seguridad":
+        hosts = [escape(h) for h in lista("hosts_extra") if isinstance(h, str)]
+        return (("<p><strong>Programas que corren desde Temp o Descargas:</strong></p>" + _lista_corta(_nombres(lista("procesos_en_carpetas_temporales"), "nombre"))
+                 if lista("procesos_en_carpetas_temporales") else "")
+                + ("<p><strong>Líneas extra en el archivo hosts:</strong></p>" + _lista_corta(hosts) if hosts else "")
+                + ("<p>Hay un proxy configurado en Windows.</p>" if datos.get("proxy_activo") is True else ""))
     return ""
 
 

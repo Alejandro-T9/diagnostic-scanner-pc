@@ -1332,3 +1332,14 @@ Se agregan cuatro análisis de solo lectura sobre el Windows instalado: `espacio
 **Motivo:** responde la idea del equipo y del jurado de que la app ayude a entender por qué un equipo va lento, sin alargar el escaneo normal ni mezclar hardware con software.
 
 **Consecuencias:** ningún módulo requiere administrador ni modifica nada; ninguno emite `critico`; `Get-StartApps` (PowerShell, 6 s) es opcional y degrada a `[]`. Ya no se usa subagentes para el desarrollo (preferencia del equipo desde 2026-10-23): las piezas de F4a (tareas 5 a 7) se verificaron con pruebas automáticas y revisión en el navegador, sin revisor independiente. Pendiente: pruebas en un Windows 10 real y copiar todo al USB.
+
+
+## 41. Análisis de Windows (F4b): estabilidad, controladores y seguridad básica
+
+**Fecha:** 2026-10-22
+
+Tres análisis más en `backend/analisis/`, solo lectura y sin administrador, a demanda como los de F4a: `estabilidad` (cuenta con `wevtutil` los pantallazos azules, apagados inesperados y errores de disco de los últimos 30 días; ≥1 error de disco o ≥3 pantallazos → sospecha, ≥1 pantallazo o ≥2 apagados → advertencia), `controladores` (WMI Win32_PnPEntity con código de error ≠ 0, ignorando deshabilitados a propósito; 1-2 → advertencia, ≥3 → sospecha) y `seguridad` (antivirus de Windows, firewall y UAC apagados → advertencia; "señales de alerta" tipo GMER-lite —procesos desde Temp/Descargas, líneas extra en hosts, proxy— se muestran en el detalle pero NO cambian el estado).
+
+**Motivo:** reemplazar el uso de herramientas sueltas (visor de eventos, administrador de dispositivos, Seguridad de Windows) con una lectura en lenguaje claro.
+
+**Consecuencias:** ninguno emite `critico`. No es un antivirus ni detecta rootkits; si hay otro antivirus instalado el de Windows aparece apagado (se explica en la guía). La protección en tiempo real puede quedar sin leer sin administrador (Defender WMI). Las vistas vistas técnicas tipo HWiNFO/CrystalDiskInfo quedan fuera de F4b (decisión pendiente).

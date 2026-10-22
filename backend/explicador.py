@@ -469,6 +469,121 @@ GUIAS = {
             "pregunta_tecnico": "¿Puedes medir qué hace lento el equipo, ya que esta herramienta no pudo hacerlo?",
         },
     },
+    # --- Análisis de Windows (F4b). Solo lectura; nunca producen "critico". ---
+    # Estabilidad: cuenta pantallazos azules, apagados inesperados y errores de disco de los últimos 30 días.
+    "estabilidad": {
+        "normal": {
+            "que_significa": "En los últimos 30 días Windows no anotó fallas graves: ni pantallazos azules, ni apagados inesperados, ni errores de disco. Es solo lo que Windows registró.",
+            "que_hacer": ["No hace falta hacer nada."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "Windows anotó algún pantallazo azul o varios apagados inesperados en los últimos 30 días. Puede ser un caso aislado, pero conviene vigilarlo.",
+            "que_hacer": ["Anota cuándo se traba o se apaga solo y qué estabas haciendo.", "Haz copia de tus archivos importantes por precaución."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Qué causó los cierres inesperados que Windows registró y cómo lo confirmo?",
+        },
+        "sospecha": {
+            "que_significa": "Windows anotó varios pantallazos azules o errores de disco en los últimos 30 días. Es un indicio de un posible problema de disco, memoria o controladores; aún no es un diagnóstico.",
+            "que_hacer": ["Haz primero una copia de tus archivos importantes.", "Pide a un técnico que revise el disco y la memoria RAM."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Puedes revisar el estado del disco y probar la memoria RAM, dado que Windows registró estos fallos?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión solo cuenta lo que Windows anotó y no llega a nivel crítico. Si ves este resultado, trátalo como un error del análisis.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué registro concreto respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer el registro de eventos de Windows. No significa que haya fallas: solo que el dato no se obtuvo.",
+            "que_hacer": ["Repite el análisis.", "Si quieres mirarlo tú, abre el Visor de eventos y busca errores recientes en «Sistema»."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes revisar el Visor de eventos, ya que esta herramienta no pudo leerlo?",
+        },
+    },
+    # Controladores: dispositivos con driver faltante o con error (WMI, código de error distinto de 0).
+    "controladores": {
+        "normal": {
+            "que_significa": "Windows no marca ningún dispositivo con problema de controlador (el programa que permite que una pieza funcione). No revisa si hay versiones más nuevas.",
+            "que_hacer": ["No hace falta hacer nada."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "Windows marca uno o dos dispositivos con problema de controlador. Esa pieza puede no funcionar bien (sonido, red, video...).",
+            "que_hacer": ["Abre el Administrador de dispositivos y mira cuáles tienen un signo de advertencia.", "Busca el controlador en la página del fabricante de tu equipo."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Qué controlador falta o falla en la lista de dispositivos y de dónde lo instalo?",
+        },
+        "sospecha": {
+            "que_significa": "Windows marca tres o más dispositivos con problema de controlador. Es normal justo después de instalar Windows; si no es así, conviene arreglarlo.",
+            "que_hacer": ["Instala los controladores desde la página del fabricante del equipo.", "Si no sabes cuáles, pide ayuda a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Puedes instalar los controladores que faltan y confirmar que no queden dispositivos con error?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no llega a nivel crítico en controladores. Si ves este resultado, trátalo como un error del análisis.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué dispositivo concreto respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer la lista de dispositivos de Windows. No significa que haya problemas: solo que el dato no se obtuvo.",
+            "que_hacer": ["Repite el análisis.", "Mientras tanto, abre el Administrador de dispositivos y busca signos amarillos de advertencia."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes revisar el Administrador de dispositivos, ya que esta herramienta no pudo leerlo?",
+        },
+    },
+    # Seguridad básica: antivirus de Windows, firewall y control de cuentas (solo lectura; no es un antivirus).
+    "seguridad": {
+        "normal": {
+            "que_significa": "La protección básica de Windows que se pudo leer está activada. Esto no es un escaneo de virus: solo mira si las defensas de Windows están encendidas.",
+            "que_hacer": ["Mantén Windows actualizado."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "Aparece apagada alguna defensa de Windows (antivirus, firewall o control de cuentas). Si usas otro antivirus, el de Windows se apaga solo y es normal.",
+            "que_hacer": ["Abre Seguridad de Windows y mira qué aparece desactivado.", "Si no usas otro antivirus, activa la protección."],
+            "quien": "tu_mismo",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Por qué está desactivada esta protección y hay otro antivirus que la reemplace?",
+        },
+        "sospecha": {
+            "que_significa": "Para la protección básica esta revisión solo marca advertencia. Si ves este resultado, es un error al interpretar los datos.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Qué dato de la protección respalda este resultado?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no llega a nivel crítico en seguridad. Si ves este resultado, trátalo como un error del análisis.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué dato de la protección respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer el estado de la protección de Windows. No significa que esté apagada: solo que el dato no se obtuvo.",
+            "que_hacer": ["Abre Seguridad de Windows para ver el estado.", "Repite el análisis."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes revisar el estado del antivirus y el firewall, ya que esta herramienta no pudo leerlos?",
+        },
+    },
 }
 
 # Nombres legibles de los análisis de Windows (los de hardware ya tienen los suyos en la interfaz).
@@ -477,6 +592,9 @@ NOMBRES_ANALISIS = {
     "inicio": "Programas de inicio",
     "programas": "Programas instalados",
     "rendimiento": "¿Por qué va lento?",
+    "estabilidad": "Estabilidad del equipo",
+    "controladores": "Controladores",
+    "seguridad": "Seguridad básica",
 }
 
 

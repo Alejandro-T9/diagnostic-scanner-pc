@@ -81,6 +81,7 @@ const ANALISIS_DISPONIBLE = true;
 const NOMBRES_ANALISIS = {
     espacio: "Espacio en disco", inicio: "Programas de inicio",
     programas: "Programas instalados", rendimiento: "¿Por qué va lento?",
+    estabilidad: "Estabilidad del equipo", controladores: "Controladores", seguridad: "Seguridad básica",
 };
 
 if (typeof module !== "undefined") {
