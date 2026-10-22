@@ -1228,8 +1228,10 @@ def test_paleta():
     # (h) mismos nombres en ambos temas
     assert set(temas["claro"]) == set(temas["oscuro"]), set(temas["claro"]) ^ set(temas["oscuro"])
 
-    # (g) toda var(--x) de style.css (sin contar el respaldo) está definida en ambos temas
-    usadas = set(re.findall(r"var\(\s*(--[\w-]+)", re.sub(r"/\*.*?\*/", "", estilos, flags=re.S)))
+    # (g) toda var(--x) de style.css (sin contar el respaldo) está definida en ambos temas, salvo las
+    # propiedades locales que la propia hoja declara (p. ej. --estado-color), cuyo valor sí sale de la paleta
+    sin_coment = re.sub(r"/\*.*?\*/", "", estilos, flags=re.S)
+    usadas = set(re.findall(r"var\(\s*(--[\w-]+)", sin_coment)) - set(re.findall(r"(--[\w-]+)\s*:", sin_coment))
     for tema, v in temas.items():
         assert usadas <= set(v), (tema, sorted(usadas - set(v)))
 
@@ -1358,10 +1360,12 @@ def test_indice_estructura():
         guion = re.search(r"<script>[^<]*tema_interfaz[^<]*</script>", cabeza)
         assert guion, "falta el script inline del tema en <head>"
         assert guion.start() < cabeza.index('<link rel="stylesheet"'), "el script del tema va antes de la hoja de estilos"
-        # modelo.js se carga después de dom.js y antes de app.js.
-        orden = [html.index(f"js/{n}.js") for n in ("estado", "iconos", "dom", "modelo", "app")]
+        # modelo.js se carga después de dom.js; vistas.js después de modelo.js y antes de app.js.
+        orden = [html.index(f"js/{n}.js") for n in ("estado", "iconos", "dom", "modelo", "vistas", "app")]
         assert orden == sorted(orden), orden
         assert cliente.get("/static/js/modelo.js").status_code == 200
+        assert cliente.get("/static/js/vistas.js").status_code == 200
+        assert 'id="resumen-vista"' in html and 'id="simple-vacio"' not in html
 
     _en_hilo(_peticiones)
 

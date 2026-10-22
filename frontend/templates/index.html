@@ -64,12 +64,11 @@
     </nav>
 
     <section role="tabpanel" id="panel-resumen" aria-labelledby="tab-resumen" tabindex="0">
-        <div class="simple-vacio" id="simple-vacio">
-            <p class="simple-vacio-titulo">Todavía no hemos revisado tu PC.</p>
-            <button type="button" class="boton-primario boton-grande" id="boton-revisar-vacio">Revisar mi PC</button>
-            <p class="simple-vacio-nota">Suele tardar alrededor de un minuto. Solo lee información: no borra ni cambia tus archivos ni tu configuración.</p>
-        </div>
+        <div id="resumen-vista"></div>
+    </section>
 
+    <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" tabindex="0" hidden>
+        <!-- Provisional: el sello, el mapa y las filas se reemplazan al rehacer esta pestaña. -->
         <div class="panel-diagnostico">
             <div class="panel-diagnostico-cabecera">
                 <span class="sello" id="sello">Sin escaneo todavía</span>
@@ -87,9 +86,7 @@
                 <div class="filas" id="filas"></div>
             </div>
         </div>
-    </section>
 
-    <section role="tabpanel" id="panel-componentes" aria-labelledby="tab-componentes" tabindex="0" hidden>
         <div class="vista-simple" id="simple-contenido">
             <p class="simple-resumen" id="simple-resumen"></p>
             <div class="simple-tarjetas" id="simple-tarjetas"></div>

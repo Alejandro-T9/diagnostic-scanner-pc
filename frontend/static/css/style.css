@@ -689,8 +689,7 @@ body.modo-simple .detalle-panel,
 body.modo-simple .resumen-texto { display: none; }
 
 /* Sin escaneo todavía: nunca se muestran datos inventados como si fueran reales. */
-.simple-vacio { display: none; text-align: center; padding: 32px 0; }
-body.sin-escaneo .simple-vacio { display: block; }
+.simple-vacio { text-align: center; padding: var(--espacio-6) 0; }
 body.sin-escaneo .panel-diagnostico { display: none; }
 .simple-vacio-titulo { font-size: 20px; margin: 0 0 20px 0; }
 .simple-vacio-nota { color: var(--color-texto-secundario); font-size: 14px; margin: 16px 0 0 0; }
@@ -770,6 +769,303 @@ body.sin-escaneo .panel-diagnostico { display: none; }
 .recomendacion { border-left-color: var(--color-acento); }
 .recomendacion-opcion { margin: 8px 0; }
 .recomendacion-opcion summary { cursor: pointer; font-weight: bold; }
+
+/* --- Resumen: tarjeta principal, datos del equipo, "lo primero" y fichas.
+   El color de cada estado llega por --estado-color / --estado-fondo; el estado nunca depende solo del color:
+   siempre va con el icono de su silueta y su palabra. --- */
+.estado--normal { --estado-color: var(--color-verde); --estado-fondo: var(--color-estado-normal-fondo); }
+.estado--advertencia { --estado-color: var(--color-amarillo); --estado-fondo: var(--color-estado-advertencia-fondo); }
+.estado--sospecha { --estado-color: var(--color-naranja); --estado-fondo: var(--color-estado-sospecha-fondo); }
+.estado--critico { --estado-color: var(--color-rojo); --estado-fondo: var(--color-estado-critico-fondo); }
+.estado--no_determinado { --estado-color: var(--color-texto-secundario); --estado-fondo: var(--color-estado-nodeterminado-fondo); }
+
+.resumen {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-5);
+}
+
+.resumen h2 {
+    margin: 0;
+    font-size: var(--texto-l);
+    line-height: 1.3;
+}
+
+/* El informe solo existe con un escaneo real (la vista del Resumen ya solo se dibuja con resultado). */
+body.demo .hero-informe { display: none; }
+
+.boton-secundario {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 var(--espacio-4);
+    background-color: transparent;
+    color: var(--color-acento);
+    border: 1px solid var(--color-acento);
+    border-radius: var(--radio-1);
+    font-family: inherit;
+    font-size: var(--texto-s);
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: var(--transicion-color);
+}
+
+.boton-secundario:hover { background-color: var(--color-acento-suave); }
+
+/* Tarjeta principal ("hero"): lo más grande de la pantalla. */
+.resumen-hero {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--espacio-5);
+    padding: var(--espacio-5) var(--espacio-6);
+    background-color: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
+    border-left: 6px solid var(--estado-color);
+    border-radius: var(--radio-2);
+    box-shadow: var(--sombra-1);
+}
+
+.hero-icono {
+    display: grid;
+    place-items: center;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background-color: var(--estado-fondo);
+    color: var(--estado-color);
+}
+
+.hero-icono svg {
+    width: 48px;
+    height: 48px;
+}
+
+.hero-titular {
+    font-size: var(--texto-xxl);
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.hero-linea {
+    margin: var(--espacio-2) 0 0;
+    font-size: var(--texto-m);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.hero-cobertura {
+    margin: var(--espacio-2) 0 0;
+    color: var(--color-texto-secundario);
+    font-size: var(--texto-s);
+}
+
+/* Datos del equipo + lo primero, lado a lado cuando hay sitio. */
+.resumen-columnas {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: var(--espacio-5);
+    align-items: start;
+}
+
+.resumen-columnas > :only-child { grid-column: 1 / -1; }
+
+.resumen-bloque {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-4);
+    padding: var(--espacio-5);
+    background-color: var(--color-tarjeta);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-2);
+    box-shadow: var(--sombra-1);
+}
+
+.datos-equipo {
+    display: grid;
+    gap: var(--espacio-3);
+    margin: 0;
+}
+
+.datos-equipo > div {
+    display: grid;
+    grid-template-columns: 100px minmax(0, 1fr);
+    gap: var(--espacio-3);
+}
+
+.datos-equipo dt {
+    color: var(--color-texto-secundario);
+    font-size: var(--texto-s);
+}
+
+.datos-equipo dd {
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.lo-primero {
+    display: grid;
+    gap: var(--espacio-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: paso;
+}
+
+.paso {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--espacio-3);
+    padding: var(--espacio-3);
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-1);
+    counter-increment: paso;
+}
+
+.paso::before {
+    content: counter(paso);
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background-color: var(--color-acento-suave);
+    color: var(--color-acento);
+    font-size: var(--texto-s);
+    font-weight: 700;
+}
+
+.paso-texto {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--espacio-1);
+    overflow-wrap: anywhere;
+}
+
+.boton-enlace {
+    min-height: 40px;
+    padding: 0 var(--espacio-3);
+    background: none;
+    border: none;
+    border-radius: var(--radio-1);
+    color: var(--color-acento);
+    font-family: inherit;
+    font-size: var(--texto-s);
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.boton-enlace:hover { background-color: var(--color-acento-suave); }
+
+.lo-primero-nada {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-2);
+    margin: 0;
+    color: var(--color-verde);
+    font-weight: 600;
+}
+
+.lo-primero-nada .icono, .lo-primero-nada svg { width: 24px; height: 24px; }
+
+.resumen-fichas {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-4);
+}
+
+.fichas {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--espacio-4);
+}
+
+.ficha {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--espacio-3);
+    min-width: 0;
+    min-height: 120px;
+    padding: var(--espacio-4);
+    background-color: var(--color-tarjeta);
+    color: var(--color-texto);
+    border: 1px solid var(--color-borde);
+    border-top: 4px solid var(--estado-color);
+    border-radius: var(--radio-2);
+    box-shadow: var(--sombra-1);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: var(--transicion-color), box-shadow 0.15s ease;
+}
+
+/* Lo que no está normal se tiñe con el fondo de su estado: se ve a golpe de vista, y el chip dice cuál es. */
+.ficha:not(.estado--normal) { background-color: var(--estado-fondo); }
+.ficha:hover { box-shadow: var(--sombra-2); }
+
+.ficha-cabecera {
+    display: flex;
+    align-items: center;
+    gap: var(--espacio-2);
+    min-width: 0;
+}
+
+.ficha-icono { display: inline-flex; flex-shrink: 0; color: var(--color-texto-secundario); }
+.ficha-icono svg { width: 24px; height: 24px; }
+
+.ficha-nombre {
+    font-size: var(--texto-m);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.ficha-medida {
+    margin-top: auto;
+    font-size: var(--texto-s);
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 960px) {
+    .fichas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+    .resumen-columnas { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 700px) {
+    .resumen { gap: var(--espacio-4); }
+    .resumen-hero {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: start;
+        gap: var(--espacio-4);
+        padding: var(--espacio-4);
+    }
+    .hero-icono { width: 64px; height: 64px; }
+    .hero-icono svg { width: 40px; height: 40px; }
+    .hero-titular { font-size: var(--texto-xl); }
+    .hero-informe { align-self: stretch; }
+    .resumen-bloque { padding: var(--espacio-4); }
+    .fichas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--espacio-3); }
+}
+
+@media (max-width: 560px) {
+    .paso { grid-template-columns: auto minmax(0, 1fr); }
+    .paso .boton-enlace { grid-column: 2; justify-self: start; padding-left: 0; }
+}
+
+@media (max-width: 380px) {
+    .fichas { grid-template-columns: minmax(0, 1fr); }
+    .datos-equipo > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
 
 /* --- Responsive --- */
 @media (max-width: 640px) {

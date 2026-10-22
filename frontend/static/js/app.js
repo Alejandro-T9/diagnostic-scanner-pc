@@ -5,23 +5,11 @@
 // pestañas (con hash en la URL), menú "Más" y botón único de revisión.
 
 let componenteSeleccionado = null;
-let ultimoResultado = null; // {componentes, cobertura} del último render, para repintar al cambiar de modo
+let ultimoResultado = null; // resultado del último render ({componentes, hechos, cobertura, recomendaciones}), para repintar al cambiar de modo
 let tablaGuias = null;      // respuesta de /api/guias (guías por componente/estado + _veredictos)
 let modo = "simple";
 let escaneando = false;     // hay un /api/scan en curso
 let escaneosReales = 0;     // cuenta resultados reales ya pintados (para abortar una demo que quedó atrás)
-
-function nombreComp(id) {
-    return Object.hasOwn(NOMBRES_COMPONENTES, id) ? NOMBRES_COMPONENTES[id] : id;
-}
-
-function calcularVeredicto(componentes) {
-    const estados = new Set(Object.values(componentes).map((c) => c.estado));
-    for (const nivel of SEVERIDAD) {
-        if (estados.has(nivel)) return nivel.toUpperCase();
-    }
-    return "NORMAL";
-}
 
 function resaltarComponente(id, activo) {
     document.querySelectorAll(`[data-id="${id}"]`).forEach((el) => el.classList.toggle("resaltado", activo));
@@ -58,13 +46,14 @@ function renderizarResumen(componentes, cobertura) {
         : "";
 }
 
-function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
+// resultado = {componentes, hechos?, cobertura?, recomendaciones?}. El Resumen lo dibuja vistas.js; el panel de
+// diagnóstico (sello, mapa y filas) sigue provisionalmente en Componentes hasta que se rehaga esa pestaña.
+function renderizarDiagnostico(resultado) {
+    const { componentes, cobertura, recomendaciones } = resultado;
     document.body.classList.remove("sin-escaneo");
     // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
     // así ninguna clase CSS ni texto sale de un valor no previsto.
-    for (const info of Object.values(componentes)) {
-        if (typeof info.estado !== "string" || !Object.hasOwn(CHIP_TEXTO, info.estado)) info.estado = "no_determinado";
-    }
+    for (const info of Object.values(componentes)) info.estado = normalizarEstado(info.estado);
     const svg = document.getElementById("mapa-svg");
     svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
 
@@ -107,7 +96,8 @@ function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
         filasEl.appendChild(fila);
     }
 
-    ultimoResultado = { componentes, cobertura, recomendaciones };
+    ultimoResultado = resultado;
+    dibujarResumen(resultado, document.getElementById("resumen-vista"));
     renderizarResumen(componentes, cobertura);
     renderizarSimple(componentes);
     renderizarRecomendaciones(recomendaciones);
@@ -227,23 +217,11 @@ function bloqueGuia(guia) {
 // por componente de más a menos grave. Solo DOM + textContent. ---
 function renderizarSimple(componentes) {
     const ids = Object.keys(componentes);
-    const bien = ids.filter((id) => componentes[id].estado === "normal").map(nombreComp);
-    const sinDatos = ids.filter((id) => componentes[id].estado === "no_determinado").map(nombreComp);
-    const atencion = ids.filter((id) => !["normal", "no_determinado"].includes(componentes[id].estado)).map(nombreComp);
-    const noRevisados = sinDatos.length ? `No se pudieron revisar: ${sinDatos.join(", ")}.` : "";
-    let linea;
-    if (!bien.length && !atencion.length) linea = `No pudimos leer ningún componente de tu PC: ${sinDatos.join(", ")}. Prueba cerrar y abrir de nuevo aceptando el aviso de Windows.`;
-    else if (!atencion.length) linea = ["Todo lo que pudimos revisar está bien.", noRevisados].filter(Boolean).join(" ");
-    else linea = [bien.length && `Están bien: ${bien.join(", ")}.`, `Necesitan atención: ${atencion.join(", ")}.`, noRevisados].filter(Boolean).join(" ");
-    document.getElementById("simple-resumen").textContent = linea;
+    document.getElementById("simple-resumen").textContent = lineaResumen(componentes);
 
     const contenedor = document.getElementById("simple-tarjetas");
     contenedor.replaceChildren();
-    const orden = (id) => {
-        const i = SEVERIDAD.indexOf(componentes[id].estado);
-        return i < 0 ? SEVERIDAD.length : i;
-    };
-    ids.slice().sort((a, b) => orden(a) - orden(b)).forEach((id) => {
+    ordenarPorGravedad(ids, componentes).forEach((id) => {
         const info = componentes[id];
         const tarjeta = crear("div", `tarjeta-simple ${info.estado}`);
         const cab = crear("div", "tarjeta-simple-cabecera");
@@ -316,6 +294,8 @@ function renderizarRecomendaciones(recomendaciones) {
 function pintarVacio() {
     document.body.classList.add("sin-escaneo");
     renderizarRecomendaciones(null);
+    dibujarResumen(null, document.getElementById("resumen-vista"));
+    if (escaneando) marcarOcupado(true); // el botón del estado vacío acaba de recrearse
     const sello = document.getElementById("sello");
     sello.textContent = "Sin escaneo todavía";
     sello.className = "sello NO_DETERMINADO";
@@ -328,7 +308,7 @@ function pintarVacio() {
 
 function repintar() {
     if (!ultimoResultado) { pintarVacio(); return; }
-    renderizarDiagnostico(ultimoResultado.componentes, ultimoResultado.cobertura, ultimoResultado.recomendaciones);
+    renderizarDiagnostico(ultimoResultado);
     if (componenteSeleccionado && ultimoResultado.componentes[componenteSeleccionado]) {
         seleccionarComponente(componenteSeleccionado, ultimoResultado.componentes[componenteSeleccionado]);
     }
@@ -403,7 +383,7 @@ async function actualizarStatus() {
 
 // Botón único de revisión (barra superior + el grande del estado vacío): ocupado mientras corre el escaneo.
 function marcarOcupado(ocupado) {
-    const botones = [document.getElementById("boton-revisar"), document.getElementById("boton-revisar-vacio")];
+    const botones = [document.getElementById("boton-revisar"), document.getElementById("boton-revisar-vacio")].filter(Boolean);
     const teniaFoco = botones.includes(document.activeElement);
     botones.forEach((b) => { b.disabled = ocupado; if (ocupado) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy"); b.classList.toggle("ocupado", ocupado); });
     document.getElementById("boton-revisar-texto").textContent =
@@ -425,7 +405,7 @@ async function escanearSistema() {
         await guias;
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
         escaneosReales++;
-        renderizarDiagnostico(resultado.componentes, resultado.cobertura, resultado.recomendaciones);
+        renderizarDiagnostico(resultado);
         // Si había un componente abierto, se refresca con el dato nuevo en
         // vez de perder la selección en cada escaneo.
         if (componenteSeleccionado && resultado.componentes[componenteSeleccionado]) {
@@ -466,14 +446,13 @@ async function verModoDemo() {
         const guia = tabla && tabla[info.componente] && tabla[info.componente][info.estado];
         if (guia) info.guia = guia; else delete info.guia;
     }
-    renderizarDiagnostico(DATOS_MOCK.componentes);
+    renderizarDiagnostico(DATOS_MOCK);
     componenteSeleccionado = null;
     document.getElementById("detalle-panel").replaceChildren(
         crear("p", "detalle-vacio", "Selecciona un componente del mapa o la lista para ver el detalle completo."));
 }
 
 document.getElementById("boton-revisar").addEventListener("click", escanearSistema);
-document.getElementById("boton-revisar-vacio").addEventListener("click", escanearSistema);
 document.getElementById("boton-demo").addEventListener("click", verModoDemo);
 
 // Íconos de la interfaz: cada [data-icono="tipo:nombre"] recibe su SVG (cadenas constantes de iconos.js).
