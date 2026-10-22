@@ -1125,3 +1125,31 @@ este orden: Edge, Chrome, Brave (en `ProgramFiles`, `ProgramFiles(x86)` y
 
 **Motivo:** la laptop del equipo no tiene Edge; sin Brave la app caía al
 navegador predeterminado sin ventana propia.
+
+## 36. Red sin enlace pasa de CRITICO a ADVERTENCIA (enmienda a la 20)
+
+**Fecha:** 2026-10-22
+
+**Decisión:** si ninguna interfaz de red física tiene enlace activo, `red`
+se clasifica **ADVERTENCIA** (antes CRITICO). El resto no cambia: sin
+interfaz física detectada es NO_DETERMINADO; con enlace y errores de
+paquetes es SOSPECHA; con enlace y contador de errores ilegible es
+NO_DETERMINADO; con enlace y cero errores es NORMAL.
+
+**Motivo:** el titular de un CRITICO ("Tu PC tiene un problema serio")
+alarmaba en equipos que simplemente tenían el Wi-Fi apagado o no tenían
+cable. El equipo decidió que sin enlace es una advertencia. Resuelve el
+punto pendiente de la decisión 33.
+
+**Consecuencias:**
+
+- `red` ya no puede producir CRITICO. Se conserva la llave `critico` en
+  `_RECOMENDACIONES` y en `GUIAS` porque todo componente tiene los 5
+  estados por contrato; ahora es un estado inalcanzable con texto honesto
+  (como `mainboard` "critico").
+- Los textos de `GUIAS["red"]` se intercambiaron: la explicación calmada
+  de "no hay enlace" (urgencia baja, lo revisa la propia persona y solo
+  si persiste un técnico) vive en `advertencia`; `critico` pasó a ser el
+  texto de "estado inalcanzable".
+- Se actualizaron `docs/reglas-recomendaciones.md` y `test_red`, que ahora
+  también comprueba que ninguna combinación de interfaces da CRITICO.

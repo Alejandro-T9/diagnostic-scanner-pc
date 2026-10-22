@@ -89,10 +89,13 @@ normal en el propio módulo.
 
 | Condición | Estado | Recomendación |
 |---|---|---|
-| Ninguna interfaz con enlace activo | CRITICO | Revisar la tarjeta de red o su driver — no hay enlace en ninguna interfaz física. |
+| Ninguna interfaz con enlace activo | ADVERTENCIA | Revisa que el cable o el Wi-Fi estén conectados; si sigue sin conexión, revisa la tarjeta de red o su driver. |
 | Enlace activo con errores de paquetes | SOSPECHA | Revisar cables/antena — hay enlace pero con errores de paquetes, evidencia de un posible problema. |
 | Enlace activo sin errores | NORMAL | — |
 | Ninguna interfaz de red detectada | NO_DETERMINADO | No se detectó ninguna interfaz de red — revisar hardware o driver. |
+
+La red no tiene ruta a CRITICO (decisión 36): sin enlace puede ser solo un
+cable desconectado o el Wi-Fi apagado.
 
 ## GPU (`gpu.py` — telemetría auxiliar del Procesador, sin regla propia)
 
