@@ -28,6 +28,7 @@ import shutil
 import socket
 import subprocess
 import threading
+import time
 
 import app
 import equipo
@@ -36,6 +37,7 @@ import lanzador
 import recomendador
 import scanner
 import utils
+from analisis import espacio
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
@@ -1479,6 +1481,61 @@ def test_sin_codigo_del_mapa():
     _en_hilo(_peticion)
 
 
+def test_analisis_espacio():
+    for libre, esperado in ((4.9, "sospecha"), (5.0, "advertencia"), (9.9, "advertencia"), (10.0, "normal"),
+                            (None, "no_determinado")):
+        _assert_estado(f"espacio libre {libre}", espacio._clasificar(libre)[0], esperado)
+
+    disco = {"unidad": "C:", "total_gb": 476.0, "libre_gb": 33.3, "usado_gb": 442.7, "libre_pct": 7.0}
+    carpetas = [{"nombre": "Descargas", "ruta": "C:/Users/x/Downloads", "tamano_gb": 1.5, "archivos": 10}]
+    leer_disco, leer_carpetas = espacio._leer_disco_c, espacio._leer_carpetas
+    try:
+        espacio._leer_disco_c = lambda: disco
+        espacio._leer_carpetas = lambda: carpetas
+        r = espacio.diagnosticar()
+        assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"}
+        assert r["componente"] == "espacio"
+        _assert_estado("espacio simulado 7 %", r["estado"], "advertencia")
+        assert r["datos"]["disco_c"]["libre_pct"] == 7.0 and r["datos"]["carpetas"] == carpetas
+        assert "7 %" in r["mensaje"] and "33 GB de 476 GB" in r["mensaje"], r["mensaje"]
+        assert r["recomendacion"]
+
+        espacio._leer_disco_c = lambda: None
+        _assert_estado("espacio sin lectura", espacio.diagnosticar()["estado"], "no_determinado")
+
+        def _lanza():
+            raise OSError("sin acceso")
+        espacio._leer_disco_c = _lanza
+        _assert_estado("espacio lector lanza", espacio.diagnosticar()["estado"], "no_determinado")
+
+        espacio._leer_disco_c = lambda: disco
+        espacio._leer_carpetas = _lanza
+        r = espacio.diagnosticar()
+        _assert_estado("espacio sin carpetas", r["estado"], "advertencia")
+        assert r["datos"]["carpetas"] == []
+    finally:
+        espacio._leer_disco_c, espacio._leer_carpetas = leer_disco, leer_carpetas
+
+    # Recorrido de carpetas: cuenta archivos, respeta el tope y no entra por enlaces.
+    import tempfile
+    with tempfile.TemporaryDirectory() as raiz:
+        for i in range(5):
+            with open(os.path.join(raiz, f"a{i}.txt"), "wb") as f:
+                f.write(b"x" * 100)
+        os.mkdir(os.path.join(raiz, "sub"))
+        with open(os.path.join(raiz, "sub", "b.txt"), "wb") as f:
+            f.write(b"x" * 50)
+        assert espacio._medir_carpeta(raiz, 5.0, 1000) == (550, 6, False)
+        assert espacio._medir_carpeta(raiz, 5.0, 3)[2] is True
+        assert espacio._medir_carpeta(os.path.join(raiz, "no_existe"), 5.0, 10) is None
+
+    t0 = time.perf_counter()
+    r = espacio.diagnosticar()
+    dt = time.perf_counter() - t0
+    assert r["componente"] == "espacio" and r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico"
+    assert dt <= 4.0, f"espacio tardó {dt:.1f} s"
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
@@ -1517,4 +1574,5 @@ if __name__ == "__main__":
     test_recomendador()
     test_recomendador_so_actual()
     test_recomendador_endurecimiento()
+    test_analisis_espacio()
     print("test_scanner.py: todos los casos OK")
