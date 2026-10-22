@@ -1,4 +1,4 @@
-// frontend/static/js/modelo.js — Lógica pura del armazón (pestañas, tema, modo). Sin DOM ni window:
+// frontend/static/js/modelo.js — Lógica pura (pestañas, tema, modo y datos del Resumen). Sin DOM ni window:
 // se prueba con Node (frontend/tests/modelo.test.js). Script clásico: las funciones quedan globales.
 
 const PESTANAS = ["resumen", "componentes", "recomendaciones", "analisis"];
@@ -42,6 +42,174 @@ function habilitadasSegun(tieneEscaneo, analisisDisponible) {
     return PESTANAS.filter((p) => p !== "analisis" || analisisDisponible);
 }
 
+// --- Resumen: veredicto, línea, medida clave, datos del equipo y "lo primero". Todo devuelve texto plano (nunca HTML). ---
+// En el navegador SEVERIDAD, CHIP_TEXTO y NOMBRES_COMPONENTES son globales de estado.js; en Node se importan.
+const _E = typeof module !== "undefined" ? require("./estado.js") : { SEVERIDAD, CHIP_TEXTO, NOMBRES_COMPONENTES };
+
+const _obj = (v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? v : null);
+const _num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const _txt = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+const _dec = (n) => String(Math.round(n * 10) / 10);   // a lo sumo un decimal: 476.9
+const _datos = (info) => _obj(_obj(info)?.datos);
+const _estadoDe = (info) => normalizarEstado(_obj(info)?.estado);
+const _SIN_MEDIDA = "—";
+
+function nombreComp(id) {
+    return Object.hasOwn(_E.NOMBRES_COMPONENTES, id) ? _E.NOMBRES_COMPONENTES[id] : id;
+}
+
+// Cualquier cosa fuera de los 5 estados (backend raro o viejo) se trata como "no_determinado".
+function normalizarEstado(estado) {
+    return typeof estado === "string" && Object.hasOwn(_E.CHIP_TEXTO, estado) ? estado : "no_determinado";
+}
+
+// El estado más grave presente define el veredicto (orden de SEVERIDAD); sin componentes, NORMAL.
+function calcularVeredicto(componentes) {
+    const estados = new Set(Object.values(_obj(componentes) || {}).map(_estadoDe));
+    for (const nivel of _E.SEVERIDAD) {
+        if (estados.has(nivel)) return nivel.toUpperCase();
+    }
+    return "NORMAL";
+}
+
+// "Están bien: A, B. Necesitan atención: C. No se pudieron revisar: D." (sin grupos vacíos).
+function lineaResumen(componentes) {
+    const comps = _obj(componentes) || {};
+    const ids = Object.keys(comps);
+    if (!ids.length) return "";
+    const grupo = (cumple) => ids.filter((id) => cumple(_estadoDe(comps[id]))).map(nombreComp);
+    const bien = grupo((e) => e === "normal");
+    const sinDatos = grupo((e) => e === "no_determinado");
+    const atencion = grupo((e) => e !== "normal" && e !== "no_determinado");
+    const noRevisados = sinDatos.length ? `No se pudieron revisar: ${sinDatos.join(", ")}.` : "";
+    if (!bien.length && !atencion.length) {
+        return `No pudimos leer ningún componente de tu PC: ${sinDatos.join(", ")}. Prueba cerrar y abrir de nuevo aceptando el aviso de Windows.`;
+    }
+    if (!atencion.length) return ["Todo lo que pudimos revisar está bien.", noRevisados].filter(Boolean).join(" ");
+    return [bien.length && `Están bien: ${bien.join(", ")}.`, `Necesitan atención: ${atencion.join(", ")}.`, noRevisados].filter(Boolean).join(" ");
+}
+
+// Medida corta de la ficha: solo con datos reales; sin dato, "—".
+const _MEDIDAS = {
+    cpu(d) {
+        const t = _num(d.temperatura_c), n = _num(d.nucleos_fisicos);
+        return t !== null ? `${Math.round(t)} °C` : n !== null ? `${n} núcleos` : null;
+    },
+    ram(d) {
+        const gb = _num(d.capacidad_fisica_gb), uso = _num(d.porcentaje_uso);
+        return [gb !== null && `${_dec(gb)} GB`, uso !== null && `${Math.round(uso)} % en uso`].filter(Boolean).join(" · ") || null;
+    },
+    almacenamiento(d) {
+        const disco = Array.isArray(d.discos_internos) ? _obj(d.discos_internos[0]) : null;
+        if (!disco) return null;
+        const gb = _num(disco.tamano_gb);
+        const salud = typeof disco.salud === "string" && Object.hasOwn(_E.CHIP_TEXTO, disco.salud) ? _E.CHIP_TEXTO[disco.salud].toLowerCase() : null;
+        return [gb !== null && `${_dec(gb)} GB`, salud && `salud ${salud}`].filter(Boolean).join(" · ") || null;
+    },
+    bateria(d) {
+        if (d.aplica === false) return "Sin batería";
+        const s = _num(d.salud_porcentaje);
+        return d.aplica === true && s !== null ? `${Math.round(s)} % de salud` : null;
+    },
+    red(d) {
+        const ifs = Array.isArray(d.interfaces) ? d.interfaces.map(_obj).filter(Boolean) : [];
+        const conEnlace = ifs.find((i) => i.link_activo === true);
+        if (conEnlace) { const v = _num(conEnlace.velocidad_mbps); return v !== null ? `${_dec(v)} Mbps` : null; }
+        return ifs.some((i) => i.link_activo === false) ? "Sin enlace" : null;
+    },
+    mainboard(d) {
+        const s = [_txt(d.fabricante), _txt(d.modelo)].filter(Boolean).join(" ");
+        return s.length > 28 ? `${s.slice(0, 27)}…` : s || null;
+    },
+    fuente_poder(d) {
+        const n = Array.isArray(d.rieles) ? d.rieles.length : 0;
+        return n ? `${n} ${n === 1 ? "sensor" : "sensores"} de voltaje` : null;
+    },
+};
+
+function medidaClave(id, info) {
+    const d = _datos(info);
+    if (!d || typeof id !== "string" || !Object.hasOwn(_MEDIDAS, id)) return _SIN_MEDIDA;
+    return _MEDIDAS[id](d) || _SIN_MEDIDA;
+}
+
+// Datos del equipo: solo lo que se leyó. Los que no existen se omiten.
+function datosEquipo(resultado) {
+    const r = _obj(resultado) || {};
+    const comps = _obj(r.componentes) || {};
+    const hechos = _obj(r.hechos) || {};
+    const d = (id) => _datos(comps[id]);
+    const filas = [];
+    const agregar = (etiqueta, valor) => { if (valor) filas.push({ etiqueta, valor }); };
+
+    const mb = d("mainboard");
+    agregar("Equipo", mb && [_txt(mb.fabricante), _txt(mb.modelo)].filter(Boolean).join(" "));
+    agregar("Sistema", _txt(_obj(hechos.so)?.nombre));
+    agregar("Procesador", _txt(d("cpu")?.nombre));
+    const gb = _num(d("ram")?.capacidad_fisica_gb);
+    agregar("Memoria", gb !== null && `${_dec(gb)} GB`);
+
+    let discos = (Array.isArray(hechos.discos) ? hechos.discos : []).map(_obj).filter((x) => x && x.externo !== true && _num(x.tamano_gb) !== null);
+    if (!discos.length) {
+        const internos = d("almacenamiento")?.discos_internos;
+        const primero = Array.isArray(internos) ? _obj(internos[0]) : null;
+        discos = primero && _num(primero.tamano_gb) !== null ? [primero] : [];
+    }
+    agregar("Disco", discos.map((x) => {
+        const tipo = typeof x.tipo === "string" && ["ssd", "hdd"].includes(x.tipo) ? ` ${x.tipo.toUpperCase()}` : "";
+        return `${_dec(x.tamano_gb)} GB${tipo}`;
+    }).join(", "));
+    return filas;
+}
+
+// Hasta `maximo` pasos: componentes con problema y recomendaciones de prioridad alta/media, por urgencia.
+const _URGENCIAS = ["alta", "media", "baja"];
+const _URGENCIA_POR_ESTADO = { critico: "alta", sospecha: "media" };
+
+function loPrimero(resultado, maximo = 3) {
+    const r = _obj(resultado) || {};
+    const candidatos = [];
+    Object.entries(_obj(r.componentes) || {}).forEach(([id, info], orden) => {
+        const i = _obj(info);
+        const estado = _estadoDe(i);
+        if (!i || estado === "normal") return;
+        const guia = _obj(i.guia);
+        const pasos = guia && Array.isArray(guia.que_hacer) ? guia.que_hacer : [];
+        candidatos.push({
+            texto: _txt(pasos[0]) || _txt(i.mensaje) || `${nombreComp(id)}: ${_E.CHIP_TEXTO[estado]}`,
+            destino: `componentes:${id}`,
+            urgencia: guia && _URGENCIAS.includes(guia.urgencia) ? guia.urgencia : (_URGENCIA_POR_ESTADO[estado] || "baja"),
+            peso: _E.SEVERIDAD.indexOf(estado), orden, sinDatos: estado === "no_determinado",
+        });
+    });
+    (Array.isArray(r.recomendaciones) ? r.recomendaciones : []).forEach((rec, orden) => {
+        const x = _obj(rec);
+        if (x && ["alta", "media"].includes(x.prioridad) && _txt(x.titulo)) {
+            candidatos.push({ texto: _txt(x.titulo), destino: "recomendaciones", urgencia: x.prioridad, peso: _E.SEVERIDAD.length, orden: 1000 + orden });
+        }
+    });
+    // Un componente sin datos no desplaza a lo que sí se sabe que importa.
+    const hayUrgente = candidatos.some((c) => !c.sinDatos && c.urgencia !== "baja");
+    const vistos = new Set();
+    const limite = Number.isFinite(maximo) ? Math.max(0, Math.floor(maximo)) : 3;
+    return candidatos
+        .filter((c) => !(hayUrgente && c.sinDatos))
+        .sort((a, b) => _URGENCIAS.indexOf(a.urgencia) - _URGENCIAS.indexOf(b.urgencia) || a.peso - b.peso || a.orden - b.orden)
+        .filter((c) => !vistos.has(c.texto) && vistos.add(c.texto))
+        .slice(0, limite)
+        .map(({ texto, destino, urgencia }) => ({ texto, destino, urgencia }));
+}
+
+// Orden estable de más a menos grave (estado desconocido = no_determinado).
+function ordenarPorGravedad(ids, componentes) {
+    const comps = _obj(componentes) || {};
+    const peso = (id) => _E.SEVERIDAD.indexOf(_estadoDe(comps[id]));
+    return (Array.isArray(ids) ? ids.slice() : []).sort((a, b) => peso(a) - peso(b));
+}
+
 if (typeof module !== "undefined") {
-    module.exports = { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun };
+    module.exports = {
+        PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
+        nombreComp, normalizarEstado, calcularVeredicto, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad,
+    };
 }
