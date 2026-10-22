@@ -4,6 +4,11 @@
 > conocimientos técnicos (qué significa, qué hacer, quién, urgencia y qué
 > preguntarle al técnico) viven en `backend/explicador.py`, no en este
 > documento. Si cambia un umbral aquí, revisa también esos textos.
+>
+> Los textos de los análisis de Windows (F4a: `espacio`, `inicio`,
+> `programas`, `rendimiento`, lista `scanner.ANALISIS`) también viven en
+> `backend/explicador.py`, con sus umbrales (10 %/5 % libre, 10 entradas de
+> inicio, 3 programas recientes de editor desconocido).
 
 Este documento describe, en forma de tabla, la regla real que usa cada
 módulo de `backend/modules/` para pasar de un dato medido a un estado y

@@ -523,8 +523,13 @@ def test_lhm_consumidores():
 def test_explicador():
     llaves = {"que_significa", "que_hacer", "quien", "urgencia", "pregunta_tecnico"}
     prohibidas = ("peligro", "infectad", "limpio", "garantiza")
+    # F4a: los 4 análisis viven aparte de COMPONENTES pero tienen las mismas guías
+    assert scanner.ANALISIS == ["espacio", "inicio", "programas", "rendimiento"], scanner.ANALISIS
+    assert set(scanner.ANALISIS).isdisjoint(scanner.COMPONENTES)
+    assert set(explicador.NOMBRES_ANALISIS) == set(scanner.ANALISIS), explicador.NOMBRES_ANALISIS
+    assert all(v.strip() for v in explicador.NOMBRES_ANALISIS.values())
     # (a) cobertura + (b) forma + (c) reglas por estado + (d) palabras prohibidas
-    for c in scanner.COMPONENTES:
+    for c in scanner.COMPONENTES + scanner.ANALISIS:
         for e in scanner.ESTADOS_VALIDOS:
             g = explicador.GUIAS[c][e]
             assert set(g) == llaves, (c, e, set(g))
@@ -542,6 +547,11 @@ def test_explicador():
                 assert g["urgencia"] == "alta", (c, e)
             if e == "sospecha":
                 assert g["urgencia"] == "media", (c, e)
+            if c in scanner.ANALISIS:  # reglas de F4a: advertencia baja/media y campos cortos
+                if e == "advertencia":
+                    assert g["urgencia"] in ("baja", "media"), (c, e)
+                for campo in (g["que_significa"], g["pregunta_tecnico"], *g["que_hacer"]):
+                    assert len(campo) <= 220, (c, e, len(campo))
             texto = " ".join([g["que_significa"], g["pregunta_tecnico"], *g["que_hacer"]]).lower()
             for palabra in prohibidas:
                 assert palabra not in texto, (c, e, palabra)
@@ -668,10 +678,10 @@ def test_guias_endpoint():
         r = app.app.test_client().get("/api/guias")
         assert r.status_code == 200, r.status_code
         datos = r.get_json()
-        for c in scanner.COMPONENTES:
+        for c in scanner.COMPONENTES + scanner.ANALISIS:
             assert set(datos[c]) == scanner.ESTADOS_VALIDOS, (c, set(datos[c]))
         assert set(datos["_veredictos"]) == set(explicador.FRASES_VEREDICTO), datos["_veredictos"]
-        assert set(datos) == set(scanner.COMPONENTES) | {"_veredictos"}, set(datos)
+        assert set(datos) == set(scanner.COMPONENTES) | set(scanner.ANALISIS) | {"_veredictos"}, set(datos)
     _en_hilo(_peticion)
 
 

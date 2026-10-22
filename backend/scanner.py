@@ -32,6 +32,10 @@ COMPONENTES = [
     "red",
 ]
 
+# Análisis de Windows (F4a), a pedido del usuario. Van aparte de COMPONENTES a
+# propósito: no cambian el veredicto ni la cobertura de los 7 de hardware.
+ANALISIS = ["espacio", "inicio", "programas", "rendimiento"]
+
 # Valores permitidos para la llave "estado" en la respuesta de un módulo.
 # Sistema de 5 niveles (ver docs/DECISIONES.md) — reemplaza al de 3 niveles
 # original. "sospecha" existe para diferenciar "hay evidencia de un posible

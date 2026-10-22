@@ -14,9 +14,11 @@ sin alarmismo, sin marcas ni precios, y nunca afirmar que la PC está
 virus. Si el dato no se pudo leer, se dice tal cual y qué puede intentar la
 persona.
 
-Hay 35 entradas (7 componentes x 5 estados). Algunas son inalcanzables hoy
-porque el módulo correspondiente no produce ese estado (p. ej. mainboard
-"critico" y red "critico"); se redactan igual, con un texto honesto, por si el módulo cambia.
+Hay 55 entradas (11 componentes x 5 estados): los 7 de hardware y los 4
+análisis de Windows de F4a (espacio, inicio, programas, rendimiento). Algunas
+son inalcanzables hoy porque el módulo correspondiente no produce ese estado
+(p. ej. mainboard "critico" y red "critico"; los análisis nunca producen
+"critico"); se redactan igual, con un texto honesto, por si el módulo cambia.
 """
 
 import copy
@@ -314,6 +316,167 @@ GUIAS = {
             "pregunta_tecnico": "¿Puedes comprobar la tarjeta de red con una prueba propia, ya que el programa no pudo leerla?",
         },
     },
+    # --- Análisis de Windows (F4a). Son solo lectura y nunca producen "critico". ---
+    # Espacio libre del disco C: (advertencia bajo 10 %, sospecha bajo 5 %).
+    "espacio": {
+        "normal": {
+            "que_significa": "Al disco principal (C:) le queda al menos un 10 % libre. Windows necesita ese margen para trabajar y actualizarse. Es una medición del momento; no revisa la salud del disco.",
+            "que_hacer": ["De vez en cuando vacía la papelera y borra las descargas que ya no uses."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "Al disco principal le queda menos del 10 % libre. Windows necesita ese margen para trabajar y actualizarse; con poco espacio puede ir más lento o no poder instalar actualizaciones.",
+            "que_hacer": ["Vacía la papelera y borra las descargas que ya no uses.", "Desinstala lo que no uses desde Configuración → Aplicaciones.", "Pasa tus fotos y videos a otro disco o memoria externa."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Qué ocupa más espacio en mi disco principal y qué puedo quitar sin riesgo?",
+        },
+        "sospecha": {
+            "que_significa": "Al disco principal le queda menos del 5 % libre. Con tan poco margen Windows puede ir muy lento, trabarse o no poder actualizarse. Es falta de espacio, no una falla del disco.",
+            "que_hacer": ["Vacía la papelera, borra las descargas que ya no uses y desinstala lo que no uses.", "Pasa tus fotos y videos a otro disco o memoria externa.", "No borres archivos del sistema; si no logras liberar espacio, pide ayuda a un técnico."],
+            "quien": "tu_mismo",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Qué está ocupando tanto espacio y cómo liberarlo sin tocar archivos que Windows necesita?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no tiene una prueba que llegue a nivel crítico en el espacio libre: con muy poco espacio se marca como sospecha. Si ves este resultado, trátalo como un error del análisis.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué medición concreta del espacio libre respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer cuánto espacio libre queda en el disco principal. No significa que esté lleno: solo que el dato no se obtuvo.",
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Mientras tanto, abre Este equipo y mira la barra del disco C: para ver cuánto queda libre."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes ver cuánto espacio libre queda en el disco principal, ya que el programa no pudo leerlo?",
+        },
+    },
+    # Programas de inicio: solo cuenta cuántos hay (advertencia desde 10).
+    "inicio": {
+        "normal": {
+            "que_significa": "Hay pocos programas de inicio (menos de 10). Un programa de inicio es uno que arranca solo al encender el equipo. Es un conteo; no dice si cada uno hace falta.",
+            "que_hacer": ["Si algún día el arranque se alarga, revisa la pestaña Inicio del Administrador de tareas (Ctrl+Mayús+Esc)."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "Hay 10 o más programas de inicio, es decir, que arrancan solos al encender el equipo. Muchos juntos pueden hacer lento el arranque. Que haya muchos no significa que alguno sea malo.",
+            "que_hacer": ["Abre el Administrador de tareas (Ctrl+Mayús+Esc) y entra en la pestaña Inicio.", "Con clic derecho, desactiva los que no necesites al encender. No se borran y puedes volver a activarlos.", "Si dudas de alguno, déjalo como está."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Cuáles de mis programas de inicio puedo desactivar sin problema y cuáles conviene dejar?",
+        },
+        "sospecha": {
+            "que_significa": "Para los programas de inicio esta revisión solo cuenta cuántos hay y los clasifica en otros niveles. Si ves este resultado, es un error al interpretar los datos.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Qué medición de los programas de inicio respalda este resultado?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no tiene una prueba que llegue a nivel crítico en los programas de inicio. Si ves este resultado, trátalo como un error del análisis, no como un diagnóstico.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué medición de los programas de inicio respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer la lista de programas de inicio (los que arrancan solos al encender). No significa que haya demasiados: solo que el dato no se obtuvo.",
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Mientras tanto, mira la lista en el Administrador de tareas (Ctrl+Mayús+Esc), pestaña Inicio."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes revisar qué programas arrancan con el equipo, ya que esta herramienta no pudo leerlos?",
+        },
+    },
+    # Programas instalados: avisa si hay 3 o más de editor desconocido instalados en los últimos 30 días.
+    "programas": {
+        "normal": {
+            "que_significa": "Se leyó la lista de programas instalados y no hay varios recientes de editor desconocido (el editor es quien creó el programa). Esta revisión no busca virus.",
+            "que_hacer": ["Recorre la lista de vez en cuando; lo que no uses puedes quitarlo desde Configuración → Aplicaciones."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "En los últimos 30 días se instalaron 3 o más programas de editor desconocido (quien lo creó). No significa que sean malos: muchos programas no informan su editor. Conviene reconocerlos.",
+            "que_hacer": ["Mira la lista y busca los que no reconozcas o no uses.", "Quita esos desde Configuración → Aplicaciones: menos programas puede aliviar el equipo.", "Si dudas de alguno, pregunta a un técnico antes de quitarlo."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Qué hace este programa y por qué conviene quitarlo?",
+        },
+        "sospecha": {
+            "que_significa": "Para los programas instalados esta revisión no usa el nivel de sospecha: solo avisa si hay varios recientes de editor desconocido. Si ves este resultado, es un error al interpretar los datos.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Qué dato de los programas instalados respalda este resultado?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no tiene una prueba que llegue a nivel crítico en los programas instalados. Si ves este resultado, trátalo como un error del análisis, no como un diagnóstico.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué dato de los programas instalados respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo leer la lista de programas instalados. No significa que haya programas raros: solo que el dato no se obtuvo.",
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Mientras tanto, puedes ver la lista en Configuración → Aplicaciones."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes revisar qué programas hay instalados, ya que esta herramienta no pudo leer la lista?",
+        },
+    },
+    # ¿Por qué va lento?: una foto del momento; advertencia si se detecta al menos una causa.
+    "rendimiento": {
+        "normal": {
+            "que_significa": "En esta foto del momento no se detectó una causa clara de lentitud. Es solo lo medido ahora y no mide todo: el equipo puede ir lento por otras razones.",
+            "que_hacer": ["Si se pone lento, repite el análisis justo en ese momento: así la foto será más útil."],
+            "quien": "nadie",
+            "urgencia": "ninguna",
+            "pregunta_tecnico": "",
+        },
+        "advertencia": {
+            "que_significa": "En esta foto del momento se detectó al menos una posible causa de lentitud (mira el detalle). Es solo lo medido ahora y no mide todo; conviene repetirlo cuando el equipo esté lento.",
+            "que_hacer": ["Lee la causa que se indica y cierra lo que no uses.", "Si la lentitud sigue, repite el análisis cuando el equipo esté lento y muéstraselo a un técnico."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Esta causa explica la lentitud que noto y qué otra prueba conviene hacer?",
+        },
+        "sospecha": {
+            "que_significa": "Para el rendimiento esta revisión solo detecta posibles causas y las marca como advertencia. Si ves este resultado, es un error al interpretar los datos.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "media",
+            "pregunta_tecnico": "¿Qué medición del rendimiento respalda este resultado?",
+        },
+        "critico": {
+            "que_significa": "Esta revisión no tiene una prueba que llegue a nivel crítico en el rendimiento. Si ves este resultado, trátalo como un error del análisis, no como un diagnóstico.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
+            "urgencia": "alta",
+            "pregunta_tecnico": "¿Qué medición del rendimiento respalda este resultado?",
+        },
+        "no_determinado": {
+            "que_significa": "No se pudo medir el rendimiento del equipo en este momento. No significa que vaya mal: solo que no se obtuvo la foto.",
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis.", "Si va lento, abre el Administrador de tareas (Ctrl+Mayús+Esc) y mira qué programa usa más."],
+            "quien": "tu_mismo",
+            "urgencia": "baja",
+            "pregunta_tecnico": "¿Puedes medir qué hace lento el equipo, ya que esta herramienta no pudo hacerlo?",
+        },
+    },
+}
+
+# Nombres legibles de los análisis de Windows (los de hardware ya tienen los suyos en la interfaz).
+NOMBRES_ANALISIS = {
+    "espacio": "Espacio en disco",
+    "inicio": "Programas de inicio",
+    "programas": "Programas instalados",
+    "rendimiento": "¿Por qué va lento?",
 }
 
 
