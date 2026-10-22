@@ -1071,3 +1071,57 @@ segundo plano ni pedirle nada al usuario.
 **Motivo:** cerrar la ventana debe bastar para terminar el programa, y
 las medidas de la prueba real en el USB (tareas 9 y 10 del plan) se
 registrarán en decisiones posteriores (31 y 32).
+
+## 33. Implementación de la capa de lenguaje claro (enmienda a la 28)
+
+**Fecha:** 2026-10-22
+
+La decisión 28 preveía que cada módulo agregara un `codigo` de hallazgo
+que `explicador.py` tradujera. Al implementarla en F2 se simplificó.
+
+**Decisión:**
+
+- La guía se busca por **(componente, estado)**; los módulos **no** agregan
+  `codigo`. Son 35 entradas (7 componentes x 5 estados).
+- Cada guía tiene las llaves `que_significa, que_hacer, quien, urgencia,
+  pregunta_tecnico`.
+- `explicador.py` es la **única fuente** de los textos simples y de
+  `FRASES_VEREDICTO`; el frontend los recibe por `/api/guias` (las frases
+  de veredicto van en `_veredictos`) y no repite ningún texto.
+- El equipo revisa la redacción de los textos.
+- El informe imprimible vive en `backend/informe.py` (`/api/informe`):
+  HTML autocontenido, todo texto del escaneo escapado, fecha en hora local.
+
+**Motivo:** el par (componente, estado) ya basta para dar una explicación
+honesta y evita tocar los 7 módulos y su contrato probado; tener los textos
+en un solo archivo facilita la revisión del equipo.
+
+Pendiente de decisión del equipo: ver si "red sin enlace" (CRITICO) debe
+ser ADVERTENCIA — el titular "Tu PC tiene un problema serio" puede alarmar
+en equipos con Wi-Fi apagado.
+
+## 34. Estado inicial sin datos simulados
+
+**Fecha:** 2026-10-22
+
+**Decisión:** al arrancar, la interfaz **no muestra ningún dato** hasta que
+haya un escaneo real. `DATOS_MOCK` solo se pinta tras pulsar "Ver Modo
+Demostración", siempre con el aviso de datos simulados, y el botón del
+informe se oculta en la demo. Además, en el modo simple un componente
+`no_determinado` se lista aparte ("No se pudieron revisar"), no bajo
+"Necesitan atención": no indica una falla.
+
+**Motivo:** la regla "ningún dato inventado". Se encontró al probar en el
+navegador: la pantalla inicial mostraba datos de demostración como si fueran
+reales (corregido en el commit 034afa6).
+
+## 35. Brave como tercer navegador de la ventana (enmienda a la 30)
+
+**Fecha:** 2026-10-22
+
+**Decisión:** el lanzador busca el navegador para la ventana de la app en
+este orden: Edge, Chrome, Brave (en `ProgramFiles`, `ProgramFiles(x86)` y
+`LocalAppData`), y por último el navegador predeterminado.
+
+**Motivo:** la laptop del equipo no tiene Edge; sin Brave la app caía al
+navegador predeterminado sin ventana propia.
