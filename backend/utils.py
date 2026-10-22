@@ -94,6 +94,9 @@ _LIMITACIONES_CONOCIDAS = [
 ]
 
 
+_QUIEN_TEXTO = {"tu_mismo": "Tú mismo", "tecnico": "Un técnico", "nadie": "Nadie"}
+
+
 def generar_reporte_texto(resultado, veredicto):
     """Arma el reporte de texto plano de un escaneo, para descargar desde
     el dashboard (/api/reporte). Recibe el veredicto ya calculado en vez
@@ -131,6 +134,12 @@ def generar_reporte_texto(resultado, veredicto):
         lineas.append(f"Mensaje: {info.get('mensaje')}")
         if info.get("recomendacion"):
             lineas.append(f"Recomendación: {info['recomendacion']}")
+        guia = info.get("guia")
+        if guia and info.get("estado") != "normal":
+            lineas.append(f"Qué significa: {guia['que_significa']}")
+            lineas.append("Qué hacer:")
+            lineas.extend(f"- {paso}" for paso in guia["que_hacer"])
+            lineas.append(f"Quién lo hace: {_QUIEN_TEXTO.get(guia['quien'], guia['quien'])}")
         if info.get("datos"):
             lineas.append(json.dumps(info["datos"], indent=2, ensure_ascii=False))
         lineas.append("")

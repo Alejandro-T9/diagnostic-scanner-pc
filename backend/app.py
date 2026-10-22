@@ -26,6 +26,7 @@ sys.path.insert(0, BASE_DIR)
 import pythoncom
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
+import explicador
 import scanner
 import utils
 
@@ -111,6 +112,13 @@ def api_scan():
             "estado": "error",
             "mensaje": f"No se pudo completar el escaneo: {error}",
         }), 500
+
+
+@app.route("/api/guias")
+def api_guias():
+    """Tabla completa de guías en lenguaje simple (componente -> estado -> guía)
+    más "_veredictos" (frase corta por veredicto global) para el frontend."""
+    return jsonify({**explicador.GUIAS, "_veredictos": explicador.FRASES_VEREDICTO})
 
 
 @app.route("/api/reporte")

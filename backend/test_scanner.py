@@ -543,6 +543,57 @@ def test_explicador():
     assert g["quien"] == "tu_mismo"
 
 
+def test_escaner_adjunta_guia():
+    import types
+    base = {"componente": "cpu", "estado": "critico", "mensaje": "m", "datos": {"x": 1}, "recomendacion": "r"}
+    importlib_orig = scanner.importlib
+    try:
+        # (a) éxito: conserva las 5 llaves y agrega la guía
+        modulo = types.SimpleNamespace(diagnosticar=lambda: dict(base))
+        scanner.importlib = types.SimpleNamespace(import_module=lambda nombre: modulo)
+        r = scanner._escanear_componente("cpu")
+        assert r["guia"]["urgencia"] == "alta", r
+        assert {k: r[k] for k in base} == base, r
+        # (b) módulo inexistente (importlib real) -> no_determinado con guía
+        scanner.importlib = importlib_orig
+        r = scanner._escanear_componente("inexistente")
+        assert r["estado"] == "no_determinado" and "guia" in r, r
+        # (b2) excepción del módulo y contrato incumplido también llevan guía
+        def _roto():
+            raise RuntimeError("x")
+        scanner.importlib = types.SimpleNamespace(import_module=lambda n: types.SimpleNamespace(diagnosticar=_roto))
+        assert "guia" in scanner._escanear_componente("cpu")
+        scanner.importlib = types.SimpleNamespace(import_module=lambda n: types.SimpleNamespace(diagnosticar=lambda: {"estado": "normal"}))
+        r = scanner._escanear_componente("cpu")
+        assert r["estado"] == "no_determinado" and "guia" in r, r
+    finally:
+        scanner.importlib = importlib_orig
+    # (c) el contrato no cambió
+    assert scanner._cumple_contrato(dict(base)) is True
+    # (e) reporte de texto: solo los componentes no normales llevan la guía
+    resultado = {"componentes": {
+        "cpu": {**base, "guia": explicador.guia_para("cpu", "critico")},
+        "ram": {**base, "componente": "ram", "estado": "normal", "guia": explicador.guia_para("ram", "normal")},
+        "red": {**base, "componente": "red", "estado": "critico"},  # sin guía: no rompe
+    }}
+    texto = utils.generar_reporte_texto(resultado, "CRITICO")
+    assert texto.count("Qué significa:") == 1 and texto.count("Quién lo hace:") == 1, texto
+    assert "Qué hacer:\n- " in texto, texto
+    assert explicador.guia_para("cpu", "critico")["quien"] == "tecnico" and "Quién lo hace: Un técnico" in texto, texto
+
+
+def test_guias_endpoint():
+    def _peticion():
+        r = app.app.test_client().get("/api/guias")
+        assert r.status_code == 200, r.status_code
+        datos = r.get_json()
+        for c in scanner.COMPONENTES:
+            assert set(datos[c]) == scanner.ESTADOS_VALIDOS, (c, set(datos[c]))
+        assert set(datos["_veredictos"]) == set(explicador.FRASES_VEREDICTO), datos["_veredictos"]
+        assert set(datos) == set(scanner.COMPONENTES) | {"_veredictos"}, set(datos)
+    _en_hilo(_peticion)
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -563,4 +614,6 @@ if __name__ == "__main__":
     test_app_rutas()
     test_lanzador()
     test_explicador()
+    test_escaner_adjunta_guia()
+    test_guias_endpoint()
     print("test_scanner.py: todos los casos OK")

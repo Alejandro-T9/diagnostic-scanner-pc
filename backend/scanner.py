@@ -13,6 +13,7 @@ import hashlib
 import importlib
 import time
 
+import explicador
 import utils
 from modules import _lhm
 
@@ -144,16 +145,23 @@ def _escanear_componente(nombre: str) -> dict:
     try:
         modulo = importlib.import_module(f"modules.{nombre}")
     except ImportError:
-        return _resultado_error(nombre, "Módulo no implementado")
+        return _con_guia(nombre, _resultado_error(nombre, "Módulo no implementado"))
 
     try:
         respuesta = modulo.diagnosticar()
     except Exception as error:
-        return _resultado_error(nombre, f"Fallo al ejecutar el diagnóstico: {error}")
+        return _con_guia(nombre, _resultado_error(nombre, f"Fallo al ejecutar el diagnóstico: {error}"))
 
     if not _cumple_contrato(respuesta):
-        return _resultado_error(nombre, "El módulo no respetó el contrato (componente/estado/mensaje/datos)")
-    return respuesta
+        return _con_guia(nombre, _resultado_error(nombre, "El módulo no respetó el contrato (componente/estado/mensaje/datos)"))
+    return _con_guia(nombre, respuesta)
+
+
+def _con_guia(nombre: str, respuesta: dict) -> dict:
+    """Copia de la respuesta con la llave extra "guia" (explicación en
+    lenguaje simple, ver explicador.py). Se agrega DESPUÉS de validar el
+    contrato: _cumple_contrato sigue exigiendo solo las 5 llaves del módulo."""
+    return {**respuesta, "guia": explicador.guia_para(nombre, respuesta["estado"])}
 
 
 def _resultado_error(nombre: str, mensaje: str) -> dict:
