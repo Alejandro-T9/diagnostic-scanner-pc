@@ -28,12 +28,12 @@ LIMITES = "Este informe se basa solo en lo que el programa pudo medir; no reempl
 
 _ESTILOS = """
 body { font-family: "Segoe UI", Arial, sans-serif; color: #1F2328; background: #FFFFFF;
-       max-width: 820px; margin: 24px auto; padding: 0 16px; line-height: 1.5; }
+       max-width: 820px; margin: 24px auto; padding: 0 16px; line-height: 1.5; overflow-wrap: anywhere; }
 h1 { margin: 0 0 4px 0; } h2 { margin: 28px 0 8px 0; border-bottom: 1px solid #D0D7DE; padding-bottom: 4px; }
 .meta { color: #57606A; font-size: 14px; }
 .sello { font-size: 20px; font-weight: bold; margin: 16px 0; }
 .tarjeta { border: 1px solid #D0D7DE; border-left-width: 6px; border-radius: 6px;
-           padding: 10px 14px; margin: 12px 0; page-break-inside: avoid; }
+           padding: 10px 14px; margin: 12px 0; page-break-inside: avoid; overflow-wrap: anywhere; }
 .tarjeta h3 { margin: 0 0 6px 0; font-size: 17px; }
 .chip { display: inline-block; color: #1F2328; background: #FFFFFF; border: 2px solid; border-radius: 12px;
         padding: 0 10px; font-size: 13px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
@@ -89,6 +89,12 @@ def _texto(valor):
     return escape(valor) if isinstance(valor, str) else ""
 
 
+def _parrafo(valor):
+    """<p> con el texto escapado; nada si está vacío (evita <p></p> con margen)."""
+    texto = _texto(valor)
+    return f"<p>{texto}</p>" if texto else ""
+
+
 def _recomendacion(rec):
     if not isinstance(rec, dict):
         return ""
@@ -101,14 +107,14 @@ def _recomendacion(rec):
     # <details open>: el informe no tiene JS y al imprimir debe verse el texto de cada opción.
     detalles = "".join(
         f'<details open><summary>{escape(o["nombre"])}</summary>'
-        f'<p>{_texto(o.get("motivo"))}</p><p>{_texto(o.get("nota"))}</p></details>'
+        f'{_parrafo(o.get("motivo"))}{_parrafo(o.get("nota"))}</details>'
         for o in opciones
     )
     return (
         '<div class="tarjeta" style="border-left-color:#0969DA">'
         f'<h3>{_texto(rec.get("titulo"))}</h3>'
         + (f'<p><strong>Prioridad: {escape(prioridad)}</strong></p>' if prioridad in ("alta", "media", "baja") else "")
-        + f'<p>{_texto(rec.get("detalle"))}</p>'
+        + _parrafo(rec.get("detalle"))
         + (f'<p><strong>Basado en:</strong></p><ul>{base}</ul>' if base else "")
         + detalles
         + '</div>'

@@ -614,7 +614,14 @@ def test_escaner_recomendaciones():
         recomendador.recomendar = lambda resultado, hechos: (llamadas.append((resultado, hechos)), recs_falsas)[1]
         r = scanner.ejecutar_escaneo_completo()
         assert r["hechos"] == hechos_falsos and r["recomendaciones"] == recs_falsas, r
-        assert "hechos" in r["tiempos"] and "total" in r["tiempos"], r["tiempos"]
+        assert {"hechos", "recomendaciones", "total"} <= set(r["tiempos"]), r["tiempos"]
+        # el ID depende solo de los componentes: lo que devuelvan hechos/recomendar no lo cambia
+        id_a = r["id_diagnostico"]
+        equipo.leer_hechos = lambda: {"otro": 1}
+        recomendador.recomendar = lambda resultado, hechos: []
+        assert scanner.ejecutar_escaneo_completo()["id_diagnostico"][-4:] == id_a[-4:]
+        equipo.leer_hechos = lambda: hechos_falsos
+        recomendador.recomendar = lambda resultado, hechos: (llamadas.append((resultado, hechos)), recs_falsas)[1]
         assert llamadas and "componentes" in llamadas[0][0] and llamadas[0][1] == hechos_falsos, llamadas
         # (b) si algo lanza, el escaneo completa igual
         def _roto():
@@ -623,6 +630,7 @@ def test_escaner_recomendaciones():
         with contextlib.redirect_stderr(io.StringIO()):
             r = scanner.ejecutar_escaneo_completo()
         assert r["hechos"] == {} and r["recomendaciones"] == [], r
+        assert "hechos" in r["tiempos"] and "recomendaciones" in r["tiempos"], r["tiempos"]
         equipo.leer_hechos = lambda: hechos_falsos
         recomendador.recomendar = lambda resultado, hechos: _roto()
         with contextlib.redirect_stderr(io.StringIO()):
@@ -638,6 +646,15 @@ def test_escaner_recomendaciones():
         assert esperado in texto, (esperado, texto)
     assert texto.index("--- RECOMENDACIONES ---") < texto.index("--- LIMITACIONES"), texto
     assert "RECOMENDACIONES" not in utils.generar_reporte_texto({"componentes": {}}, "NORMAL")
+    # (d) basura a nivel de campo dentro de recomendaciones válidas: sin excepción ni líneas absurdas
+    basura = [{"titulo": "T1", "detalle": None, "basado_en": "RAM: 4 GB", "opciones": "Windows 10", "quien": ["x"]},
+              {"titulo": "T2", "detalle": 5, "basado_en": 7, "opciones": [{"nombre": "N", "motivo": None, "nota": 3}], "quien": {"a": 1}},
+              {"titulo": "T3", "basado_en": [None, "ok"], "opciones": {"nombre": "x"}, "quien": "tecnico"}]
+    texto = utils.generar_reporte_texto({"componentes": {}, "recomendaciones": basura}, "NORMAL")
+    assert "Detalle: None" not in texto and "None" not in texto, texto
+    assert "- RAM: 4 GB\n" in texto and "- R\n" not in texto and "- ok\n" in texto, texto
+    assert "Opciones:\n- N\n" in texto and "- W\n" not in texto, texto
+    assert "Quién lo hace: Un técnico" in texto and texto.count("Quién lo hace:") == 1, texto
     for raro in (None, "x", [None, {}, {"titulo": "T"}, 5]):
         utils.generar_reporte_texto({"componentes": {}, "recomendaciones": raro}, "NORMAL")
 
@@ -759,6 +776,12 @@ def test_informe_recomendaciones():
     assert "Recomendaciones para tu equipo" in html and "Prioridad: alta" in html and "Basado en:" in html
     assert "<details open><summary>Lubuntu &lt;b&gt;n&lt;/b&gt;</summary>" in html and "Liviano" in html, html
     assert html.index("Recomendaciones para tu equipo") < html.index("Preguntas para tu técnico")
+    assert "Det <i>x</i>" not in html and "Det &lt;i&gt;x&lt;/i&gt;" in html, html  # detalle hostil escapado
+    assert "overflow-wrap: anywhere" in html
+    # opciones sin motivo ni nota: sin <p></p> vacíos
+    vacia = informe.generar_informe_html({**base, "recomendaciones": [
+        {**rec, "detalle": "", "opciones": [{"nombre": "Solo", "motivo": "", "nota": None}]}]}, "CRITICO")
+    assert "<summary>Solo</summary></details>" in vacia and "<p></p>" not in vacia, vacia
     # (c) sin recomendaciones: la sección no aparece
     for v in ({}, {"recomendaciones": []}, {"recomendaciones": None}, {"recomendaciones": "x"}):
         h = informe.generar_informe_html({**base, **v}, "CRITICO")

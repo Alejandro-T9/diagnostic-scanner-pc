@@ -96,6 +96,13 @@ _LIMITACIONES_CONOCIDAS = [
 ]
 
 
+def _como_lista(valor) -> list:
+    """Lista tal cual; un texto suelto es una sola línea (no una por carácter); None o cualquier otra cosa, vacío."""
+    if isinstance(valor, (list, tuple)):
+        return [v for v in valor if v is not None]
+    return [valor] if isinstance(valor, str) and valor else []
+
+
 def generar_reporte_texto(resultado, veredicto):
     """Arma el reporte de texto plano de un escaneo, para descargar desde
     el dashboard (/api/reporte). Recibe el veredicto ya calculado en vez
@@ -150,16 +157,20 @@ def generar_reporte_texto(resultado, veredicto):
             lineas.append("--- RECOMENDACIONES ---")
             for rec in recomendaciones:
                 lineas.append(f"[{rec.get('prioridad', '?')}] {rec['titulo']}")
-                lineas.append(f"Detalle: {rec.get('detalle', '')}")
-                lineas.append("Basado en:")
-                lineas.extend(f"- {dato}" for dato in rec.get("basado_en") or [])
-                opciones = [o for o in rec.get("opciones") or [] if isinstance(o, dict) and o.get("nombre")]
+                if isinstance(rec.get("detalle"), str) and rec["detalle"]:
+                    lineas.append(f"Detalle: {rec['detalle']}")
+                basado = _como_lista(rec.get("basado_en"))
+                if basado:
+                    lineas.append("Basado en:")
+                    lineas.extend(f"- {dato}" for dato in basado)
+                opciones = [o for o in _como_lista(rec.get("opciones")) if isinstance(o, dict) and o.get("nombre")]
                 if opciones:
                     lineas.append("Opciones:")
                     for o in opciones:
-                        nota = f" ({o['nota']})" if o.get("nota") else ""
-                        lineas.append(f"- {o['nombre']}: {o.get('motivo', '')}{nota}")
-                if rec.get("quien"):
+                        motivo = f": {o['motivo']}" if isinstance(o.get("motivo"), str) and o["motivo"] else ""
+                        nota = f" ({o['nota']})" if isinstance(o.get("nota"), str) and o["nota"] else ""
+                        lineas.append(f"- {o['nombre']}{motivo}{nota}")
+                if isinstance(rec.get("quien"), str) and rec["quien"]:
                     lineas.append(f"Quién lo hace: {QUIEN_TEXTO.get(rec['quien'], rec['quien'])}")
                 lineas.append("")
 

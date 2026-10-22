@@ -78,16 +78,22 @@ def ejecutar_escaneo_completo() -> dict:
         componentes[nombre] = _escanear_componente(nombre)
         tiempos[nombre] = round(time.perf_counter() - inicio, 3)
     # Mismo hilo que el escaneo (COM ya inicializado). Si algo falla el
-    # escaneo igual completa, solo sin hechos/recomendaciones.
-    inicio = time.perf_counter()
+    # escaneo igual completa, solo sin hechos/recomendaciones. Cada fase
+    # tiene su propio tiempo: "hechos" (leer el equipo) y "recomendaciones".
     hechos, recomendaciones = {}, []
+    inicio = time.perf_counter()
     try:
         hechos = equipo.leer_hechos()
-        tiempos["hechos"] = round(time.perf_counter() - inicio, 3)
-        recomendaciones = recomendador.recomendar({"componentes": componentes}, hechos)
     except Exception as error:
-        print(f"[scanner] hechos/recomendaciones no disponibles: {error}", file=sys.stderr)
-    tiempos.setdefault("hechos", round(time.perf_counter() - inicio, 3))
+        print(f"[scanner] hechos no disponibles: {error}", file=sys.stderr)
+    tiempos["hechos"] = round(time.perf_counter() - inicio, 3)
+    inicio = time.perf_counter()
+    if hechos:  # sin hechos no se afirma nada del equipo
+        try:
+            recomendaciones = recomendador.recomendar({"componentes": componentes}, hechos)
+        except Exception as error:
+            print(f"[scanner] recomendaciones no disponibles: {error}", file=sys.stderr)
+    tiempos["recomendaciones"] = round(time.perf_counter() - inicio, 3)
     tiempos["total"] = round(time.perf_counter() - inicio_total, 3)
 
     return {
