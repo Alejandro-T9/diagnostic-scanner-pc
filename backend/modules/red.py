@@ -9,6 +9,9 @@ datos).
 Nota: en pruebas, adaptadores virtuales de software de virtualización
 (ej. VirtualBox Host-Only) a veces se filtran como PhysicalAdapter=True
 igual — quirk conocido de WMI, no afecta laptops sin ese software.
+
+Clasificación: sin enlace en ninguna interfaz = advertencia (decisión 36);
+la red nunca produce "critico".
 """
 
 import wmi
@@ -23,7 +26,8 @@ _CONECTADO = 2  # Win32_NetworkAdapter.NetConnectionStatus
 _RECOMENDACIONES = {
     "normal": "",
     "sospecha": "Revisar cables/antena — hay enlace pero con errores de paquetes, evidencia de un posible problema.",
-    "critico": "Revisar la tarjeta de red o su driver — no hay enlace en ninguna interfaz física.",
+    "advertencia": "Revisa que el cable o el Wi-Fi estén conectados; si sigue sin conexión, revisa la tarjeta de red o su driver.",
+    "critico": "Estado no alcanzable para la red: sin enlace es advertencia. Repetir el análisis.",
     "no_determinado": "No se detectó ninguna interfaz de red — revisar hardware o driver.",
 }
 
@@ -66,7 +70,8 @@ def _velocidad_mbps(velocidad):
 def _clasificar(resultados: list) -> tuple:
     con_link = [i for i in resultados if i["link_activo"]]
     if not con_link:
-        return "critico", "Ninguna interfaz de red tiene enlace activo."
+        # Decisión 36: sin enlace puede ser solo Wi-Fi apagado o sin cable; no es "crítico".
+        return "advertencia", "Ninguna interfaz de red tiene enlace activo."
 
     con_errores = [i for i in con_link if i.get("errores_rx") is not None and i["errores_rx"] > 0]
     if con_errores:

@@ -103,7 +103,12 @@ def test_red():
 
     _assert_estado("Enlace activo sin errores confirmados", red._clasificar([con_link])[0], "normal")
     _assert_estado("Enlace activo con errores reales", red._clasificar([con_errores])[0], "sospecha")
-    _assert_estado("Ningún enlace activo", red._clasificar([sin_link])[0], "critico")
+    # Decisión 36: sin enlace es ADVERTENCIA (Wi-Fi apagado o sin cable no es "problema serio").
+    _assert_estado("Ningún enlace activo", red._clasificar([sin_link])[0], "advertencia")
+    # La red ya no puede dar "critico" con ninguna combinación de interfaces.
+    for combo in ([sin_link], [con_link], [con_errores], [sin_dato_errores], [sin_link, con_link],
+                  [sin_link, con_errores], [sin_link, sin_dato_errores], [con_link, con_errores]):
+        assert red._clasificar(combo)[0] != "critico", combo
     # Conteo de errores no leído (None) no es lo mismo que "0 errores
     # confirmados" — antes `or 0` los trataba igual y el enlace salía
     # "normal" sin haber verificado nada.

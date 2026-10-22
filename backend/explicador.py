@@ -16,7 +16,7 @@ persona.
 
 Hay 35 entradas (7 componentes x 5 estados). Algunas son inalcanzables hoy
 porque el módulo correspondiente no produce ese estado (p. ej. mainboard
-"critico"); se redactan igual, con un texto honesto, por si el módulo cambia.
+"critico" y red "critico"); se redactan igual, con un texto honesto, por si el módulo cambia.
 """
 
 import copy
@@ -276,7 +276,7 @@ GUIAS = {
             "pregunta_tecnico": "¿Puedes medir la capacidad de la batería con una herramienta propia?",
         },
     },
-    # Red: mira si hay enlace (cable o Wi-Fi) y si la tarjeta registra paquetes con errores.
+    # Red: mira si hay enlace (cable o Wi-Fi) y si la tarjeta registra paquetes con errores. Sin enlace = advertencia (decisión 36); "critico" es inalcanzable.
     "red": {
         "normal": {
             "que_significa": "La tarjeta de red tiene enlace con tu router o red (por cable o Wi-Fi) y no registra errores en los paquetes de datos. No se comprueba que el internet funcione ni su velocidad.",
@@ -286,11 +286,11 @@ GUIAS = {
             "pregunta_tecnico": "",
         },
         "advertencia": {
-            "que_significa": "Para la red esta revisión no usa el nivel de advertencia. Si ves este resultado, es un error al interpretar los datos.",
-            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
-            "quien": "tecnico",
+            "que_significa": "Ninguna tarjeta de red física tiene conexión en este momento. Puede ser simplemente que no haya cable ni Wi-Fi conectado.",
+            "que_hacer": ["Revisa que el cable esté conectado, o que el Wi-Fi esté activado y el modo avión apagado, y repite.", "Si sigue sin conexión, pide a un técnico que revise la tarjeta y su software de control (driver)."],
+            "quien": "tu_mismo",
             "urgencia": "baja",
-            "pregunta_tecnico": "¿Qué medición de la red respalda este resultado?",
+            "pregunta_tecnico": "¿Qué prueba muestra que falla la tarjeta o su driver y no la red a la que me conecto?",
         },
         "sospecha": {
             "que_significa": "Hay conexión, pero la tarjeta registró paquetes con errores (los paquetes son los pedazos en que viajan los datos). Esta revisión no dice la causa; lo habitual es revisar el cable o la señal.",
@@ -300,11 +300,11 @@ GUIAS = {
             "pregunta_tecnico": "¿Qué prueba muestra que el problema está en la tarjeta del equipo y no en el cable o el router?",
         },
         "critico": {
-            "que_significa": "Ninguna tarjeta de red física tiene conexión en este momento. Puede ser simplemente que no haya cable ni Wi-Fi conectado.",
-            "que_hacer": ["Revisa que el cable esté conectado, o que el Wi-Fi esté activado y el modo avión apagado, y repite.", "Si sigue sin conexión, pide a un técnico que revise la tarjeta y su software de control (driver)."],
-            "quien": "tu_mismo",
+            "que_significa": "Esta revisión no tiene una prueba que llegue a nivel crítico en la red: si no hay conexión, se marca como advertencia. Si ves este resultado, trátalo como un error del análisis, no como un diagnóstico.",
+            "que_hacer": ["Vuelve a ejecutar el análisis.", "Si se repite, muestra el informe a un técnico."],
+            "quien": "tecnico",
             "urgencia": "alta",
-            "pregunta_tecnico": "¿Qué prueba muestra que falla la tarjeta o su driver y no la red a la que me conecto?",
+            "pregunta_tecnico": "¿Qué medición concreta de la red respalda este resultado?",
         },
         "no_determinado": {
             "que_significa": "No se detectó ninguna tarjeta de red, o hay conexión pero no se pudo leer su conteo de errores. Sin ese dato no podemos decir si funciona bien.",
