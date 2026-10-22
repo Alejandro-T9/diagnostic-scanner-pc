@@ -1,0 +1,12 @@
+INSTALADOR OFFLINE (Diagnostic Scanner PC)
+
+1. Crea la carpeta "instaladores" junto a "backend" (en el USB: diagnostic_scanner_pc\instaladores).
+2. Copia ahi los instaladores .exe o .msi que descargaste del sitio OFICIAL de cada programa
+   (por ejemplo 7-Zip, LibreOffice, Firefox, Foxit Reader).
+3. En la pestana Post-instalacion pulsa "Calcular huellas": veras el codigo SHA-256 de cada archivo.
+4. Copia instaladores.ejemplo.json a instaladores\instaladores.json, ajusta los nombres de archivo,
+   los argumentos de instalacion silenciosa y pega cada huella.
+5. Para instalar: abre la app como administrador, pulsa "Instalar" y confirma. Si la huella no coincide,
+   NO se instala.
+
+La app no descarga nada, no incluye activadores y no modifica programas.

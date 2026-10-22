@@ -1384,3 +1384,14 @@ Nueva pestaña «Mantenimiento» y módulo `backend/mantenimiento.py` con una **
 **Política que se mantiene (pedida expresamente por el equipo y rechazada):** la aplicación **no incluye ni automatiza activadores, cracks ni versiones pirata** de Windows, Office, WinRAR u otros, aunque lo pidan en el colegio, y tampoco apaga el antivirus ni Windows Update. La alternativa incluida en el plan es el instalador offline con programas gratuitos y legales (7-Zip, LibreOffice).
 
 **Consecuencias:** las acciones marcadas como administrador solo funcionan con permisos elevados (el módulo lo comprueba y lo explica). Vaciar la papelera, borrar temporales y quitar parches no se pueden deshacer. Probado con comandos simulados; en esta PC solo se ejecutaron las vistas previas, no las acciones.
+
+
+## 45. Instalador offline con verificación de huella (F7b)
+
+**Fecha:** 2026-10-22
+
+`backend/instalador.py` instala programas desde la carpeta `instaladores/` del USB (o `carpeta_instaladores` del perfil, o `DSPC_INSTALADORES`) descritos en `instaladores.json` (ver `instaladores.ejemplo.json` y `instaladores.LEEME.txt`). Cada instalación exige: administrador, archivo `.exe`/`.msi` directamente en la carpeta (sin rutas), **huella SHA-256 declarada que coincida con el archivo** (sin huella o con huella distinta no se instala) y confirmación en pantalla. Los argumentos de instalación silenciosa salen del manifiesto, nunca de la web; corre como tarea larga del módulo de mantenimiento y queda en `mantenimiento.log`. La pestaña Post-instalación muestra qué está instalado, el estado de cada instalador y un botón «Calcular huellas» para llenar el manifiesto.
+
+**Política:** la herramienta no descarga nada, no incluye activadores ni versiones modificadas, y el contenido de ejemplo son programas gratuitos y legales (7-Zip, LibreOffice, Firefox, Foxit). La herramienta no puede garantizar qué archivo pone el equipo en la carpeta: la huella solo prueba que no cambió desde que se anotó.
+
+**Consecuencias:** sin carpeta o manifiesto la sección solo explica cómo crearlos. `instaladores/` está en `.gitignore` (archivos grandes). Probado con instaladores simulados; no se ejecutó ninguna instalación real.

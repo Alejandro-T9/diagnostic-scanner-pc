@@ -556,6 +556,81 @@ function sondearTrabajo(id, tid) {
 dibujarPanelMantenimiento();
 cargarMantenimiento(false);
 
+
+// --- Instaladores del USB (F7b) ---
+const inst = { datos: null, resultados: {}, trabajos: {}, huellas: null, ocupado: null };
+let sondeoInstalacion = null;
+
+function dibujarPanelInstaladores() {
+    dibujarInstaladores(inst.datos, inst, document.getElementById("instaladores-vista"), { alInstalar: instalarPrograma, alHuellas: calcularHuellas });
+}
+
+async function cargarInstaladores() {
+    try {
+        const respuesta = await fetch("/api/instaladores");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        inst.datos = await respuesta.json();
+    } catch (error) {
+        inst.datos = { carpeta: "", existe: false, administrador: false, entradas: [] };
+    }
+    dibujarPanelInstaladores();
+}
+
+async function calcularHuellas() {
+    anunciar("Calculando huellas…");
+    try {
+        const respuesta = await fetch("/api/instaladores/huellas");
+        inst.huellas = respuesta.ok ? (await respuesta.json()).huellas : [];
+    } catch (error) {
+        inst.huellas = [];
+    }
+    dibujarPanelInstaladores();
+}
+
+async function instalarPrograma(id) {
+    inst.ocupado = id;
+    delete inst.resultados[id];
+    delete inst.trabajos[id];
+    dibujarPanelInstaladores();
+    try {
+        const r = await _postJson(`/api/instaladores/${encodeURIComponent(id)}/instalar`, {});
+        inst.resultados[id] = r;
+        anunciar(r.mensaje);
+        if (r.estado === "trabajo") {
+            sondearInstalacion(id, r.trabajo);
+            return;
+        }
+    } catch (error) {
+        inst.resultados[id] = { estado: "error", mensaje: "No se pudo iniciar la instalación." };
+    }
+    inst.ocupado = null;
+    dibujarPanelInstaladores();
+}
+
+function sondearInstalacion(id, tid) {
+    clearInterval(sondeoInstalacion);
+    sondeoInstalacion = setInterval(async () => {
+        try {
+            const respuesta = await fetch(`/api/mantenimiento/trabajo/${encodeURIComponent(tid)}`);
+            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+            inst.trabajos[id] = await respuesta.json();
+        } catch (error) {
+            inst.trabajos[id] = { estado: "error" };
+        }
+        if (inst.trabajos[id].estado !== "corriendo") {
+            clearInterval(sondeoInstalacion);
+            inst.ocupado = null;
+            anunciar("La instalación terminó.");
+            await cargarInstaladores(); // vuelve a leer qué quedó instalado
+        } else {
+            dibujarPanelInstaladores();
+        }
+    }, 2000);
+}
+
+dibujarPanelInstaladores();
+cargarInstaladores();
+
 desdeHash();
 
 // Frases de veredicto del Resumen; al llegar se repinta (si falla, queda el texto de siempre).

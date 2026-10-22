@@ -760,3 +760,65 @@ function dibujarMantenimiento(datos, est, contenedor, { alPrevisualizar, alEjecu
     }
     contenedor.replaceChildren(bloque);
 }
+
+
+// Instaladores del USB (F7b): programas del manifiesto, con huella verificada antes de instalar. datos = /api/instaladores o null.
+// est = {ocupado, resultados, trabajos, huellas}.
+function dibujarInstaladores(datos, est, contenedor, { alInstalar, alHuellas } = {}) {
+    const bloque = crear("div", "analisis");
+    bloque.append(crear("h2", "", "Instaladores del USB"));
+    bloque.append(crear("p", "recomendaciones-nota", "Solo instala programas que ustedes pusieron en la carpeta de instaladores y que coinciden con su huella SHA-256. No descarga nada de internet."));
+    if (!datos || !Array.isArray(datos.entradas)) {
+        bloque.append(crear("p", "", "Cargando…"));
+        contenedor.replaceChildren(bloque);
+        return;
+    }
+    bloque.append(crear("p", "recomendaciones-nota", `Carpeta: ${datos.carpeta}`));
+    if (!datos.existe || !datos.entradas.length) {
+        bloque.append(crear("p", "", datos.existe
+            ? "No hay un archivo instaladores.json con programas. Mira instaladores.LEEME.txt y instaladores.ejemplo.json."
+            : "La carpeta de instaladores no existe todavía. Mira instaladores.LEEME.txt."));
+    }
+    if (!datos.administrador && datos.entradas.length) {
+        bloque.append(crear("p", "aviso-mant", "Para instalar necesitas permisos de administrador: cierra y abre de nuevo la aplicación aceptando el aviso de Windows."));
+    }
+    const lista = crear("div", "analisis-tarjetas");
+    datos.entradas.filter(_esDict).forEach((e) => {
+        const id = String(e.id);
+        const tarjeta = crear("article", "tarjeta-comp");
+        const cab = crear("div", "tarjeta-comp-cabecera");
+        cab.append(crear("h3", "", `${e.nombre}${e.version ? " " + e.version : ""}`));
+        if (e.instalado === true) cab.append(crearChipEstado("normal"));
+        tarjeta.append(cab);
+        tarjeta.append(crear("p", "tarjeta-comp-significa", e.instalado === true ? "Ya está instalado en este equipo." : (e.instalado === false ? "No está instalado." : "No se pudo saber si está instalado.")));
+        if (e.problema) {
+            tarjeta.append(crear("p", "aviso-mant", e.problema));
+        } else {
+            const boton = crear("button", "boton-primario", est.ocupado === id ? "Instalando…" : (e.instalado === true ? "Reinstalar" : "Instalar"));
+            boton.type = "button";
+            boton.disabled = !!est.ocupado || !datos.administrador;
+            boton.addEventListener("click", () => {
+                if (window.confirm(`Instalar ${e.nombre}.\n\nSe comprobará la huella del archivo antes de instalar. ¿Continuar?`) && alInstalar) alInstalar(id);
+            });
+            tarjeta.append(boton);
+        }
+        const r = est.resultados[id];
+        if (_esDict(r)) tarjeta.append(crear("p", r.estado === "error" ? "aviso-mant" : "tarjeta-comp-mensaje", r.mensaje));
+        const t = est.trabajos[id];
+        if (_esDict(t)) {
+            const texto = { corriendo: "Instalando… no cierres la aplicación.", terminado: "Terminó la instalación.", con_avisos: "Terminó con avisos: revisa si quedó instalado.", error: "No se pudo ejecutar." }[t.estado] || "";
+            tarjeta.append(crear("p", t.estado === "terminado" ? "tarjeta-comp-mensaje" : "aviso-mant", texto));
+        }
+        lista.append(tarjeta);
+    });
+    bloque.append(lista);
+    const huellas = crear("button", "boton-mas", "Calcular huellas de los archivos");
+    huellas.type = "button";
+    huellas.addEventListener("click", () => alHuellas && alHuellas());
+    bloque.append(huellas);
+    if (Array.isArray(est.huellas)) {
+        bloque.append(crear("p", "recomendaciones-nota", est.huellas.length ? "Copia cada huella al instaladores.json:" : "No hay archivos .exe o .msi en la carpeta."));
+        if (est.huellas.length) bloque.append(crear("pre", "salida-mant", est.huellas.filter(_esDict).map((h) => `${h.archivo} (${h.mb} MB)\n${h.sha256}`).join("\n\n")));
+    }
+    contenedor.replaceChildren(bloque);
+}

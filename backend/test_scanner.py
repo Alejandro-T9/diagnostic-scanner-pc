@@ -2132,6 +2132,76 @@ def test_analisis_f4b():
         assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico", r
 
 
+def test_instalador():
+    import hashlib
+    import json
+    import os
+    import tempfile
+    import instalador
+    import mantenimiento as m
+    import postinstalacion
+    originales = (m._iniciar_trabajo, utils.es_administrador, postinstalacion._programas_instalados)
+    with tempfile.TemporaryDirectory() as tmp:
+        os.environ["DSPC_INSTALADORES"] = tmp
+        os.environ["DSPC_REGISTRO"] = os.path.join(tmp, "reg", "r.db")
+        try:
+            assert instalador.listar()["entradas"] == [] and instalador.huellas() == []  # sin manifiesto
+            bueno, msi = os.path.join(tmp, "bueno.exe"), os.path.join(tmp, "paquete.msi")
+            for ruta, datos in ((bueno, b"instalador de prueba"), (msi, b"otro")):
+                with open(ruta, "wb") as f:
+                    f.write(datos)
+            h = hashlib.sha256(b"instalador de prueba").hexdigest()
+            manifiesto = {"programas": [
+                {"id": "ok", "nombre": "Bueno", "archivo": "bueno.exe", "args": ["/S"], "sha256": h.upper(), "detectar": "^bueno"},
+                {"id": "msi", "nombre": "Paquete", "archivo": "paquete.msi", "args": ["/qn"], "sha256": hashlib.sha256(b"otro").hexdigest()},
+                {"id": "malo", "nombre": "Cambiado", "archivo": "bueno.exe", "sha256": "0" * 64},
+                {"id": "sinhash", "nombre": "Sin huella", "archivo": "bueno.exe"},
+                {"id": "ruta", "nombre": "Ruta", "archivo": "..\\fuera.exe", "sha256": h},
+                {"id": "ext", "nombre": "Script", "archivo": "bueno.bat", "sha256": h},
+                {"id": "falta", "nombre": "Falta", "archivo": "no_esta.exe", "sha256": h},
+                {"id": "MAL ID", "nombre": "x", "archivo": "bueno.exe", "sha256": h},
+                {"id": "argsmalos", "nombre": "x", "archivo": "bueno.exe", "sha256": h, "args": [1]},
+                "basura", {"nombre": "sin id"},
+            ]}
+            with open(os.path.join(tmp, "instaladores.json"), "w", encoding="utf-8") as f:
+                json.dump(manifiesto, f)
+            postinstalacion._programas_instalados = lambda: [{"nombre": "Bueno 1.0"}]
+            r = instalador.listar()
+            est = {e["id"]: e for e in r["entradas"]}
+            assert set(est) == {"ok", "msi", "malo", "sinhash", "ruta", "ext", "falta"}, set(est)
+            assert est["ok"]["problema"] is None and est["ok"]["instalado"] is True and est["msi"]["instalado"] is None
+            assert all(est[i]["problema"] for i in ("sinhash", "ruta", "ext", "falta")) and est["malo"]["problema"] is None
+            # instalar: administrador, huella que coincide y comando armado solo con datos del manifiesto
+            lanzados = []
+            m._iniciar_trabajo = lambda accion, cmds: (lanzados.append((accion, cmds)), {"estado": "trabajo", "mensaje": "x", "detalle": [], "trabajo": "t1"})[1]
+            utils.es_administrador = lambda: False
+            assert instalador.instalar("ok")["estado"] == "error" and not lanzados
+            utils.es_administrador = lambda: True
+            assert instalador.instalar("inventado")["estado"] == "error"
+            for id_malo in ("sinhash", "ruta", "ext", "falta"):
+                assert instalador.instalar(id_malo)["estado"] == "error", id_malo
+            r = instalador.instalar("malo")
+            assert r["estado"] == "error" and "no coincide" in r["mensaje"] and not lanzados, r
+            r = instalador.instalar("ok")
+            assert r["estado"] == "trabajo" and lanzados == [("instalar_ok", [[bueno, "/S"]])], lanzados
+            instalador.instalar("msi")
+            assert lanzados[-1][1] == [["msiexec", "/i", msi, "/qn"]], lanzados[-1]
+            hs = {x["archivo"]: x["sha256"] for x in instalador.huellas()}
+            assert hs["bueno.exe"] == h and set(hs) == {"bueno.exe", "paquete.msi"}, hs
+            # rutas: GET listar y huellas; instalar exige JSON
+            def _peticion():
+                cl = app.app.test_client()
+                assert len(cl.get("/api/instaladores").get_json()["entradas"]) == 7
+                assert cl.get("/api/instaladores/huellas").get_json()["huellas"]
+                assert cl.post("/api/instaladores/ok/instalar").status_code == 400
+                assert cl.post("/api/instaladores/ok/instalar", json={}).get_json()["estado"] == "trabajo"
+            _en_hilo(_peticion)
+        finally:
+            m._iniciar_trabajo, utils.es_administrador, postinstalacion._programas_instalados = originales
+            os.environ.pop("DSPC_INSTALADORES", None)
+            os.environ.pop("DSPC_REGISTRO", None)
+
+
 def test_mantenimiento_y_nota():
     import os
     import tempfile
@@ -2368,6 +2438,7 @@ def test_registro_y_postinstalacion():
 
 
 if __name__ == "__main__":
+    test_instalador()
     test_mantenimiento_y_nota()
     test_registro_y_postinstalacion()
     test_analisis_f4b()

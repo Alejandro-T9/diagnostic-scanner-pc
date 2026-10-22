@@ -1,0 +1,41 @@
+{
+  "programas": [
+    {
+      "id": "7zip",
+      "nombre": "7-Zip",
+      "version": "ajusta a la que descargaste",
+      "categoria": "compresor",
+      "archivo": "7z-x64.exe",
+      "args": ["/S"],
+      "sha256": "PEGA_AQUI_LA_HUELLA_DE_7z-x64.exe",
+      "detectar": "^7-zip"
+    },
+    {
+      "id": "libreoffice",
+      "nombre": "LibreOffice",
+      "categoria": "oficina",
+      "archivo": "LibreOffice_x64.msi",
+      "args": ["/qn", "/norestart"],
+      "sha256": "PEGA_AQUI_LA_HUELLA_DE_LibreOffice_x64.msi",
+      "detectar": "^libreoffice"
+    },
+    {
+      "id": "firefox",
+      "nombre": "Mozilla Firefox ESR",
+      "categoria": "navegador",
+      "archivo": "Firefox_Setup_ESR.exe",
+      "args": ["/S"],
+      "sha256": "PEGA_AQUI_LA_HUELLA_DE_Firefox_Setup_ESR.exe",
+      "detectar": "^mozilla firefox"
+    },
+    {
+      "id": "foxit",
+      "nombre": "Foxit PDF Reader",
+      "categoria": "pdf",
+      "archivo": "FoxitPDFReader_Setup.exe",
+      "args": ["/VERYSILENT"],
+      "sha256": "PEGA_AQUI_LA_HUELLA_DE_FoxitPDFReader_Setup.exe",
+      "detectar": "^foxit"
+    }
+  ]
+}

@@ -30,6 +30,7 @@ from flask import Flask, Response, jsonify, render_template, request, send_from_
 
 import explicador
 import informe
+import instalador
 import mantenimiento
 import postinstalacion
 import registro
@@ -237,6 +238,28 @@ def api_registro_nota():
 def _cuerpo_json():
     datos = request.get_json(silent=True)
     return datos if isinstance(datos, dict) else {}
+
+
+@app.route("/api/instaladores")
+def api_instaladores():
+    """Programas del manifiesto de la carpeta de instaladores del USB, con su estado (instalado, listo o con problema)."""
+    try:
+        return jsonify(instalador.listar())
+    except Exception as error:
+        return _error_json(f"No se pudo leer la carpeta de instaladores: {error}", 500)
+
+
+@app.route("/api/instaladores/huellas")
+def api_instaladores_huellas():
+    try:
+        return jsonify({"huellas": instalador.huellas()})
+    except Exception as error:
+        return _error_json(f"No se pudieron calcular las huellas: {error}", 500)
+
+
+@app.route("/api/instaladores/<id_programa>/instalar", methods=["POST"])
+def api_instaladores_instalar(id_programa):
+    return jsonify(instalador.instalar(id_programa))
 
 
 @app.route("/api/mantenimiento")
