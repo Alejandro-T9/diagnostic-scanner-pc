@@ -35,9 +35,16 @@
 </div>
 
 <div class="vista-simple" id="vista-simple">
-    <p class="simple-resumen" id="simple-resumen"></p>
-    <div class="simple-tarjetas" id="simple-tarjetas"></div>
-    <a class="boton-reporte" id="boton-informe" href="/api/informe" target="_blank" rel="noopener">Informe para el técnico</a>
+    <div class="simple-vacio" id="simple-vacio">
+        <p class="simple-vacio-titulo">Todavía no hemos revisado tu PC.</p>
+        <button class="boton-escanear boton-grande" id="boton-revisar">Revisar mi PC</button>
+        <p class="simple-vacio-nota">La revisión tarda menos de un minuto y no cambia nada en tu equipo.</p>
+    </div>
+    <div id="simple-contenido">
+        <p class="simple-resumen" id="simple-resumen"></p>
+        <div class="simple-tarjetas" id="simple-tarjetas"></div>
+        <a class="boton-reporte" id="boton-informe" href="/api/informe" target="_blank" rel="noopener">Informe para el técnico</a>
+    </div>
 </div>
 
 <div class="detalle-panel" id="detalle-panel">

@@ -508,6 +508,15 @@ body.modo-simple .panel-diagnostico-cuerpo,
 body.modo-simple .detalle-panel,
 body.modo-simple .resumen-texto { display: none; }
 
+/* Sin escaneo todavía: nunca se muestran datos inventados como si fueran reales. */
+.simple-vacio { display: none; text-align: center; padding: 32px 0; }
+body.sin-escaneo .simple-vacio { display: block; }
+body.sin-escaneo #simple-contenido { display: none; }
+body.modo-simple.sin-escaneo .panel-diagnostico { display: none; }
+.simple-vacio-titulo { font-size: 20px; margin: 0 0 20px 0; }
+.simple-vacio-nota { color: var(--color-texto-secundario); font-size: 14px; margin: 16px 0 0 0; }
+.boton-grande { padding: 16px 40px; font-size: 20px; }
+
 .simple-resumen {
     font-size: 16px;
     margin: 0 0 16px 0;

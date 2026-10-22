@@ -167,6 +167,7 @@ function renderizarResumen(componentes, cobertura) {
 }
 
 function renderizarDiagnostico(componentes, cobertura) {
+    document.body.classList.remove("sin-escaneo");
     const svg = document.getElementById("mapa-svg");
     svg.querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
 
@@ -362,8 +363,20 @@ function renderizarSimple(componentes) {
     });
 }
 
+// Estado inicial (y tras cambiar de modo sin escaneo): sin datos inventados.
+function pintarVacio() {
+    document.body.classList.add("sin-escaneo");
+    const sello = document.getElementById("sello");
+    sello.textContent = "Sin escaneo todavía";
+    sello.className = "sello NO_DETERMINADO";
+    document.getElementById("resumen-texto").textContent = "";
+    document.getElementById("cobertura-texto").textContent = "";
+    document.getElementById("filas").replaceChildren();
+    document.getElementById("mapa-svg").querySelectorAll(".punto, .punto-etiqueta").forEach((el) => el.remove());
+}
+
 function repintar() {
-    if (!ultimoResultado) return;
+    if (!ultimoResultado) { pintarVacio(); return; }
     renderizarDiagnostico(ultimoResultado.componentes, ultimoResultado.cobertura);
     if (componenteSeleccionado && ultimoResultado.componentes[componenteSeleccionado]) {
         seleccionarComponente(componenteSeleccionado, ultimoResultado.componentes[componenteSeleccionado]);
@@ -425,8 +438,10 @@ async function actualizarStatus() {
 
 async function escanearSistema() {
     const boton = document.getElementById("boton-escanear");
+    const botonRevisar = document.getElementById("boton-revisar");
     const barra = document.getElementById("barra-progreso-contenedor");
     boton.disabled = true;
+    botonRevisar.disabled = true;
     barra.classList.add("activa");
     try {
         const respuesta = await fetch("/api/scan");
@@ -444,6 +459,7 @@ async function escanearSistema() {
         mostrarError("No se pudo completar el escaneo. Verifica que el servidor esté corriendo.");
     } finally {
         boton.disabled = false;
+        botonRevisar.disabled = false;
         barra.classList.remove("activa");
     }
 }
@@ -474,6 +490,7 @@ async function verModoDemo() {
 }
 
 document.getElementById("boton-escanear").addEventListener("click", escanearSistema);
+document.getElementById("boton-revisar").addEventListener("click", escanearSistema);
 document.getElementById("boton-demo").addEventListener("click", verModoDemo);
 
 // Sin menú contextual: el dashboard corre en un kiosk sin teclado/mouse
@@ -488,7 +505,7 @@ let modoGuardado = null;
 try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* almacenamiento bloqueado: se usa el modo simple */ }
 aplicarModo(modoGuardado, false);
 
-renderizarDiagnostico(DATOS_MOCK.componentes);
+// Los datos de DATOS_MOCK solo se muestran con "Ver Modo Demostración".
 // Frases de veredicto para el sello; al llegar se repinta (si falla, queda el texto de siempre).
 cargarGuias().then((t) => { if (t) repintar(); });
 actualizarStatus();
