@@ -1008,6 +1008,59 @@ def test_recomendador():
                     assert mala not in t.lower(), (mala, t)
 
 
+def test_recomendador_endurecimiento():
+    # (a) RAM 0.0 no es una lectura real: se usa el respaldo del SO; si tampoco hay, no hay recomendación de SO
+    cpu = ("normal", {"nombre": _CPU_MODERNO, "arquitectura": "x64", "temperatura_c": 50.0})
+    r = _por_id(recomendador.recomendar(_res_reco(
+        ram=("normal", {"capacidad_fisica_gb": 0.0, "capacidad_disponible_so_gb": 8, "porcentaje_uso": 30}), cpu=cpu),
+        _hechos_reco()), "so")
+    assert "RAM: 8 GB" in r["basado_en"], r["basado_en"]
+    for ram in ({"capacidad_fisica_gb": 0.0, "capacidad_disponible_so_gb": 0},
+                {"capacidad_fisica_gb": 0.0, "capacidad_disponible_so_gb": None}, {"capacidad_fisica_gb": 0.0}):
+        assert "so" not in _ids(recomendador.recomendar(_res_reco(ram=("normal", ram), cpu=cpu), _hechos_reco())), ram
+
+    # (b) los motivos de Linux son hechos medidos, sin promesas de rendimiento
+    for gb, sistema in ((16, "ssd"), (2, "hdd"), (1, "ssd")):
+        r = _por_id(recomendador.recomendar(_pc(gb), _hechos_reco(sistema=sistema)), "so")
+        for o in r["opciones"]:
+            assert "fluidez" not in o["motivo"] and "funciona bien" not in o["motivo"], o
+    assert "Con 16 GB de RAM tu equipo cumple lo que suelen pedir" in _por_id(
+        recomendador.recomendar(_pc(16), _hechos_reco()), "so")["opciones"][-1]["motivo"]
+
+    # (c) respaldo: el texto crudo del módulo no se copia; se nombra el disco afectado
+    res = _pc(almacenamiento=("sospecha", {"discos_internos": [
+        {"modelo": "DISCO-A", "salud": "sospecha"}, {"modelo": "DISCO-B", "salud": "normal"}]}))
+    res["componentes"]["almacenamiento"]["mensaje"] = "Salud reducida (Windows Storage Health) en: DISCO-A."
+    r = _por_id(recomendador.recomendar(res, _hechos_reco()), "respaldo")
+    assert "Disco afectado: DISCO-A" in r["basado_en"], r["basado_en"]
+    assert not any("Storage Health" in x or "DISCO-B" in x for x in r["basado_en"]), r["basado_en"]
+    assert _por_id(recomendador.recomendar(_pc(almacenamiento=("critico", {})), _hechos_reco()), "respaldo")["basado_en"] == [
+        "Estado del disco según Windows: crítico"]
+
+    # (d) límites
+    def _ampliar(ram, uso):
+        return "ram_ampliar" in _ids(recomendador.recomendar(_pc(ram, uso=uso), _hechos_reco()))
+    assert not _ampliar(8, 80) and _ampliar(7.9, 80) and _ampliar(4, 80) and not _ampliar(4, 79.9)
+
+    def _bat(salud):
+        return recomendador.recomendar(_pc(bateria=("advertencia", {"aplica": True, "salud_porcentaje": salud})), _hechos_reco())
+    assert "bateria_cambio" not in _ids(_bat(70)) and "bateria_cuidado" in _ids(_bat(70))
+    assert _por_id(_bat(69.9), "bateria_cambio")["prioridad"] == "baja"
+    assert _por_id(_bat(40), "bateria_cambio")["prioridad"] == "baja"
+    assert _por_id(_bat(39.9), "bateria_cambio")["prioridad"] == "media"
+
+    usb = _hechos_reco(sistema="desconocido", discos=[{"modelo": "x", "tipo": "hdd", "externo": True}])
+    assert "disco_ssd" not in _ids(recomendador.recomendar(_pc(), usb))
+
+    assert _nombres(_por_id(recomendador.recomendar(_pc(2), _hechos_reco(sistema="hdd")), "so")) == [
+        "Lubuntu o Linux Mint XFCE", "MiniOS10"]
+    w10 = next(o for o in _por_id(recomendador.recomendar(_pc(8, _CPU_VIEJO), _hechos_reco()), "so")["opciones"]
+               if o["nombre"] == "Windows 10")
+    assert "actualizaciones de seguridad" in w10["nota"], w10
+    opciones = _por_id(recomendador.recomendar(_pc(1), _hechos_reco()), "so")["opciones"]
+    assert opciones[-1]["nombre"] == "Windows 7" and "actualizaciones de seguridad" in opciones[-1]["nota"], opciones
+
+
 if __name__ == "__main__":
     test_ram()
     test_bateria()
@@ -1036,4 +1089,5 @@ if __name__ == "__main__":
     test_equipo()
     test_equipo_rendimiento()
     test_recomendador()
+    test_recomendador_endurecimiento()
     print("test_scanner.py: todos los casos OK")

@@ -53,7 +53,7 @@ def _rec(id_, titulo, detalle, basado_en, prioridad, quien, opciones=()) -> dict
 def _ram_gb(res):
     for clave in ("capacidad_fisica_gb", "capacidad_disponible_so_gb"):
         v = _num(_dato(res, "ram", clave))
-        if v is not None:
+        if v is not None and v > 0:  # ram.py devuelve 0.0 si WMI no trae Capacity: no es una lectura real
             return v
     return None
 
@@ -109,10 +109,10 @@ def _regla_so(res, h):
                      "motivo": f"Tu equipo tiene {g} GB de RAM y un procesador de 64 bits, suficiente para Windows 10."})
     if ram >= 4:
         base.append({"nombre": "Ubuntu o Linux Mint", "nota": "" if arq64 else _NOTA_32,
-                     "motivo": f"Con {g} GB de RAM funciona con fluidez y se actualiza gratis."})
+                     "motivo": f"Con {g} GB de RAM tu equipo cumple lo que suelen pedir estas versiones de Linux."})
     else:
         base.append({"nombre": "Lubuntu o Linux Mint XFCE", "nota": "" if arq64 else _NOTA_32,
-                     "motivo": f"Es liviano: funciona bien con poca memoria ({g} GB)."})
+                     "motivo": f"Con {g} GB de RAM, estas versiones livianas de Linux son una opción pensada para equipos con poca memoria."})
     # shortcut: MiniOS10 exige 64 bits y >= 2 GB (Windows 10 de 64 bits); el brief no fija ese piso para el caso HDD.
     if arq64 and ram >= 2 and (ram < 4 or (sistema == "hdd" and ram < 8)):
         base.append({"nombre": "MiniOS10", "nota": _NOTA_MINIOS,
@@ -178,8 +178,12 @@ def _regla_respaldo(res, h):
     if estado not in ("sospecha", "critico"):
         return None
     basado = ["Estado del disco según Windows: " + ("con señales de desgaste" if estado == "sospecha" else "crítico")]
-    if _comp(res, "almacenamiento").get("mensaje"):
-        basado.append(_comp(res, "almacenamiento")["mensaje"])
+    # No se copia el `mensaje` del módulo ("Salud reducida (Windows Storage Health) en..."): es técnico; solo se nombran los discos afectados.
+    datos = _comp(res, "almacenamiento").get("datos")
+    discos = datos.get("discos_internos") if isinstance(datos, dict) else None
+    for d in discos if isinstance(discos, list) else []:
+        if isinstance(d, dict) and d.get("salud") == estado and d.get("modelo"):
+            basado.append(f"Disco afectado: {d['modelo']}")
     return _rec("respaldo", "Haz hoy una copia de tus archivos importantes",
                 "Windows indica que tu disco tiene señales de desgaste. No significa que vaya a fallar mañana, "
                 "pero conviene tener una copia. Guarda tus fotos, documentos y trabajos en otro disco, en un "
