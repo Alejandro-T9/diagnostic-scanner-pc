@@ -43,8 +43,79 @@ def _windows_activado():
     return None
 
 
-def _nombres_programas() -> list:
-    return [p["nombre"] for p in programas._leer_registro() if isinstance(p, dict) and isinstance(p.get("nombre"), str)]
+def _programas_instalados() -> list:
+    return [p for p in programas._leer_registro() if isinstance(p, dict) and isinstance(p.get("nombre"), str)]
+
+
+def _deep_freeze() -> bool:
+    """True si Faronics Deep Freeze está instalado (existe su servicio). No lee si está congelado: eso pide su contraseña."""
+    try:
+        winreg.CloseKey(winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\DFServ"))
+        return True
+    except OSError:
+        return False
+
+
+def _windows_update_apagado():
+    """True si el servicio de Windows Update está deshabilitado o una directiva apaga las actualizaciones; None si no se pudo leer."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Services\wuauserv") as k:
+            if winreg.QueryValueEx(k, "Start")[0] == 4:
+                return True
+    except OSError:
+        return None
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU") as k:
+            return winreg.QueryValueEx(k, "NoAutoUpdate")[0] == 1
+    except OSError:
+        return False
+
+
+def _version(texto) -> tuple:
+    """'5.50' -> (5, 50); lo que no son números se ignora; () si no hay ninguno."""
+    return tuple(int(n) for n in re.findall(r"\d+", texto or "")[:3])
+
+
+# (patrón del nombre, versión mínima sin fallas graves conocidas, motivo)
+_VIEJOS = [
+    ("winrar", (5, 70), "versión anterior a la 5.70, con una falla grave conocida al abrir archivos comprimidos"),
+    ("mozilla firefox", (128,), "versión sin actualizaciones de seguridad"),
+]
+
+
+def _desactualizados(lista: list) -> list:
+    """Programas conocidos cuya versión instalada es anterior a la mínima segura. Sin versión legible no se acusa nada."""
+    out = []
+    for p in lista:
+        ver = _version(p.get("version"))
+        for patron, minima, motivo in _VIEJOS:
+            if ver and patron in p["nombre"].lower() and ver < minima:
+                out.append(f"{p['nombre']} {p.get('version')}: {motivo}")
+    return out
+
+
+def _item_deep_freeze(instalado) -> list:
+    if not instalado:
+        return []
+    return [_item("deep_freeze", "Deep Freeze instalado", "advertencia", "Este equipo tiene Deep Freeze: si está congelado, lo que instales o cambies se pierde al reiniciar.",
+                  "Descongela el equipo antes de instalar o configurar, y vuelve a congelarlo al terminar.")]
+
+
+def _item_windows_update(apagado) -> dict:
+    t = "Windows Update"
+    if apagado is True:
+        return _item("windows_update", t, "advertencia", "Las actualizaciones automáticas de Windows están apagadas.",
+                     "Actívalas cuando termines la jornada: sin ellas el equipo no recibe parches de seguridad.")
+    if apagado is False:
+        return _item("windows_update", t, "normal", "Las actualizaciones automáticas están activadas.")
+    return _item("windows_update", t, "no_determinado", "No se pudo comprobar el estado de Windows Update.", "Míralo en Configuración → Windows Update.")
+
+
+def _item_desactualizados(lista: list) -> dict:
+    t = "Programas con fallas conocidas"
+    if lista:
+        return _item("viejos", t, "advertencia", "; ".join(lista) + ".", "Reemplázalos por una versión actual del sitio oficial (para comprimir, 7-Zip es gratis).")
+    return _item("viejos", t, "normal", "No se encontraron programas conocidos con versiones peligrosas.")
 
 
 def _perfil() -> dict:
@@ -243,8 +314,12 @@ def revisar() -> dict:
                                  _contar_instaladores(carpeta) if isinstance(carpeta, str) else 0)
         except Exception:
             items.append(_item("perfil", "Perfil del colegio", "no_determinado", "No se pudo aplicar el perfil.", "Revisa perfil.json."))
+    items += _item_deep_freeze(_deep_freeze())  # solo lee una clave del registro; no lanza
+    items.append(_seguro(lambda: _item_windows_update(_windows_update_apagado()), "windows_update", "Windows Update"))
     try:
-        items += _basicos(_nombres_programas())
+        lista = _programas_instalados()
+        items += _basicos([p["nombre"] for p in lista])
+        items.append(_item_desactualizados(_desactualizados(lista)))
     except Exception:
         items.append(_item("programas", "Programas básicos", "no_determinado", "No se pudo leer la lista de programas.", "Revísalos a mano."))
     items += [_item(i, t, "no_determinado", "Se revisa a mano.", q, manual=True) for i, t, q in _MANUALES]

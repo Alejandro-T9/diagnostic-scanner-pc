@@ -2216,16 +2216,25 @@ def test_registro_y_postinstalacion():
         assert postinstalacion._perfil() == {}
     finally:
         os.environ.pop("DSPC_PERFIL", None)
-    originales = (postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._nombres_programas)
+    # F7 (detecciones de solo lectura)
+    d = postinstalacion._desactualizados([{"nombre": "WinRAR 5.50 (64-bit)", "version": "5.50.0"}, {"nombre": "WinRAR", "version": "7.01"},
+                                           {"nombre": "Mozilla Firefox ESR", "version": "115.0"}, {"nombre": "Mozilla Firefox", "version": "140.2"},
+                                           {"nombre": "WinRAR sin versión", "version": None}])
+    assert len(d) == 2 and "5.50" in d[0] and "115" in d[1], d
+    assert postinstalacion._version("5.50") == (5, 50) and postinstalacion._version(None) == () and postinstalacion._version("v7") == (7,)
+    assert postinstalacion._item_desactualizados([])["estado"] == "normal" and postinstalacion._item_desactualizados(d)["estado"] == "advertencia"
+    assert postinstalacion._item_deep_freeze(False) == [] and postinstalacion._item_deep_freeze(True)[0]["estado"] == "advertencia"
+    assert [postinstalacion._item_windows_update(v)["estado"] for v in (True, False, None)] == ["advertencia", "normal", "no_determinado"]
+    originales = (postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._programas_instalados)
     def falla():
         raise OSError("x")
     try:
-        postinstalacion._nombre_equipo = postinstalacion._windows_activado = postinstalacion._nombres_programas = falla
+        postinstalacion._nombre_equipo = postinstalacion._windows_activado = postinstalacion._programas_instalados = falla
         r = postinstalacion.revisar()  # ningún lector rompe la revisión
         assert all(i["estado"] in scanner.ESTADOS_VALIDOS for i in r["items"]), r["items"]
         assert sum(1 for i in r["items"] if i["manual"]) == 3 and "[A MANO]" in r["acta"], r["acta"]
     finally:
-        postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._nombres_programas = originales
+        postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._programas_instalados = originales
     _en_hilo(lambda: [None for c in [app.app.test_client().get("/api/postinstalacion")] if (c.status_code == 200 and c.get_json()["acta"]) or (_ for _ in ()).throw(AssertionError(c.status_code))])
 
 
