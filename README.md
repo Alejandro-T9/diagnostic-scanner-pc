@@ -81,11 +81,11 @@ Reemplaza el esquema original de 3 colores — motivo completo en la
 decisión 20 de `DECISIONES.md`. Cinco estados posibles, de mayor a menor
 severidad para el veredicto global:
 
-- 🔴 **CRÍTICO** — falla confirmada.
-- 🟠 **SOSPECHA** — evidencia real de un posible problema, sin ser falla confirmada.
-- 🟡 **ADVERTENCIA** — se leyó bien, amerita monitoreo, sin indicio de falla.
-- ⚪ **NO_DETERMINADO** — no se pudo leer el dato. No es lo mismo que "está mal".
-- 🟢 **NORMAL** — se leyó bien y está dentro de rango esperado.
+- 🔴 **CRÍTICO** (octágono con cruz) — falla confirmada.
+- 🟠 **SOSPECHA** (rombo) — evidencia real de un posible problema, sin ser falla confirmada.
+- 🟡 **ADVERTENCIA** (triángulo) — se leyó bien, amerita monitoreo, sin indicio de falla.
+- ⚪ **NO_DETERMINADO** (círculo discontinuo; se muestra como «Sin datos») — no se pudo leer el dato. No es lo mismo que "está mal".
+- 🟢 **NORMAL** (círculo con visto) — se leyó bien y está dentro de rango esperado.
 
 ## Modo portable (recomendado)
 

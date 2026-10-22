@@ -1270,17 +1270,25 @@ el SO actual, no lo que el firmware admite).
   mapa físico de la decisión 18**; la ficha de inspección y el panel de detalle de
   esa decisión siguen en pie, ahora como la tabla técnica con fila expandible de la
   pestaña Componentes. Las tarjetas simples con guía se conservan en el modo simple.
+  La selección enlazada de la decisión 18 (pasar el mouse por el mapa resalta la fila
+  y al revés) queda retirada junto con el mapa: ahora se llega al componente desde las
+  fichas y los «Ver …» del Resumen, y el foco cae en el componente elegido.
 - Paleta: **tema claro por defecto** y **oscuro opcional** (botón en la barra,
   recordado en `localStorage` dentro de `try/catch`; `prefers-color-scheme` no se
   sigue a propósito para que la app se vea igual en todos los equipos del colegio).
   La fuente única de tokens (colores, espaciado, radios, sombras, tipografía) sigue
-  siendo `config/palette.css`, con los mismos nombres en ambos temas.
+  siendo `config/palette.css`, con los mismos nombres en ambos temas. La paleta final
+  difiere un poco del spec §2: en el tema claro el amarillo es `#946200` (spec
+  `#9A6700`) y el borde de controles `#7B8797` (spec `#8793A3`), oscurecidos para
+  pasar 4,5:1 (texto) y 3:1 (borde) sobre `--color-fondo`.
 - **Cinco formas de estado** (SVG en línea propios, trazo de 1,75 px, `currentColor`):
   círculo con visto (normal), triángulo con exclamación (advertencia), rombo con
   exclamación (sospecha), octógono con cruz (crítico) y círculo discontinuo con
   interrogación (sin datos). Siempre van junto a la palabra del estado y al color.
   El informe imprimible usa las mismas cinco siluetas, así se distinguen también en
-  blanco y negro.
+  blanco y negro. El informe también cambió el texto de su estado vacío (ahora remite a
+  «Revisar mi PC») y su etiqueta del estado `no_determinado` pasó de «No determinado» a
+  «Sin datos», igual que en la app.
 - **Prueba automática de contraste** (`test_paleta`): en ambos temas, texto ≥ 4,5:1,
   colores de estado y acento ≥ 4,5:1 sobre tarjeta y fondo, bordes de controles ≥ 3:1,
   chips y franjas de aviso ≥ 4,5:1, mismos nombres de token en los dos temas y toda
@@ -1307,7 +1315,7 @@ el SO actual, no lo que el firmware admite).
   y `test_informe_estados_con_forma` (que además compara el informe con la paleta clara).
 - Backend sin cambios de contrato; solo `informe.py` cambió su CSS y sus íconos.
 - Límites conocidos: la verificación visual con capturas es manual, no automática.
-  Lista que debe repetirse al tocar la interfaz: recorrido de las cuatro pestañas en
+  Lista que debe repetirse al tocar la interfaz: recorrido de las tres pestañas visibles (Análisis de Windows sigue oculta hasta F4a) en
   tema claro y oscuro a 1280×720 y a unos 700 px sin desplazamiento horizontal;
   veredicto visible sin desplazarse; estado vacío, demostración y escaneo real;
   informe en pantalla y en vista de impresión; captura en escala de grises con los
