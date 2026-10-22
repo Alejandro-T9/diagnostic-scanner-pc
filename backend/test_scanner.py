@@ -22,6 +22,7 @@ devuelvan lo que se espera en una laptop concreta.
 
 import contextlib
 import io
+import json
 import os
 import re
 import shutil
@@ -37,7 +38,7 @@ import lanzador
 import recomendador
 import scanner
 import utils
-from analisis import espacio
+from analisis import espacio, inicio
 from modules import _lhm, almacenamiento, bateria, cpu, fuente_poder, gpu, mainboard, ram, red
 
 
@@ -1536,6 +1537,78 @@ def test_analisis_espacio():
     assert dt <= 4.0, f"espacio tardó {dt:.1f} s"
 
 
+def test_analisis_inicio():
+    for total, esperado in ((9, "normal"), (10, "advertencia"), (0, "normal"), (None, "no_determinado")):
+        _assert_estado(f"inicio total {total}", inicio._clasificar(total)[0], esperado)
+    # StartupApproved: 02/06 = habilitado; 03/07 = deshabilitado por el usuario; lo demas cuenta como habilitado.
+    assert inicio._habilitado(b"\x02\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00") is True
+    assert inicio._habilitado(b"\x06\x00\x00\x00") is True
+    assert inicio._habilitado(b"\x03\x00\x00\x00\x01\x01\x01\x01\x01\x01\x01\x01") is False
+    assert inicio._habilitado(b"\x07\x00\x00\x00") is False
+    assert inicio._habilitado(None) is True and inicio._habilitado(b"") is True and inicio._habilitado(b"\xff\x00") is True
+
+    def _entradas(prefijo, n, origen):
+        return [{"nombre": f"{prefijo}{i}", "comando": f"C:/p/{prefijo}{i}.exe", "origen": origen, "habilitado": True}
+                for i in range(n)]
+
+    def _lanza():
+        raise OSError("sin acceso")
+
+    run, carpetas, servicios = inicio._leer_run, inicio._leer_carpetas_inicio, inicio._contar_servicios_automaticos
+    try:
+        inicio._contar_servicios_automaticos = lambda: 87
+        inicio._leer_run = lambda: _entradas("run", 6, "usuario")
+        inicio._leer_carpetas_inicio = lambda: _entradas("car", 5, "equipo")
+        r = inicio.diagnosticar()
+        assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "inicio"
+        _assert_estado("inicio 11 habilitadas", r["estado"], "advertencia")
+        assert r["datos"]["total"] == 11 and len(r["datos"]["entradas"]) == 11
+        assert r["datos"]["servicios_automaticos"] == 87 and "11 programas" in r["mensaje"], r["mensaje"]
+        assert r["recomendacion"]
+
+        # Dos deshabilitadas en el Administrador de tareas: salen en la lista pero no cuentan.
+        inicio._leer_run = lambda: _entradas("run", 6, "usuario")[:4] + [
+            {**e, "habilitado": False} for e in _entradas("off", 2, "usuario")]
+        r = inicio.diagnosticar()
+        assert r["datos"]["total"] == 9 and len(r["datos"]["entradas"]) == 11
+        assert sum(1 for e in r["datos"]["entradas"] if e["habilitado"] is False) == 2
+        _assert_estado("inicio 9 habilitadas + 2 deshabilitadas", r["estado"], "normal")
+
+        # Un lector que lanza se ignora; todos lanzando -> no_determinado; servicios None no rompe.
+        inicio._leer_run = _lanza
+        inicio._contar_servicios_automaticos = lambda: None
+        r = inicio.diagnosticar()
+        assert r["datos"]["total"] == 5 and r["datos"]["servicios_automaticos"] is None
+        inicio._leer_carpetas_inicio = _lanza
+        r = inicio.diagnosticar()
+        _assert_estado("inicio sin fuentes", r["estado"], "no_determinado")
+        assert r["datos"]["entradas"] == []
+
+        # Datos hostiles: se conservan crudos (el escape se hace al mostrar).
+        hostil = {"nombre": "<script>alert(1)</script>", "comando": "a & b", "origen": "usuario"}
+        inicio._leer_run = lambda: [hostil]
+        inicio._leer_carpetas_inicio = lambda: []
+        r = inicio.diagnosticar()
+        assert r["datos"]["entradas"][0]["nombre"] == "<script>alert(1)</script>"
+        assert r["datos"]["entradas"][0]["habilitado"] is True and r["datos"]["total"] == 1
+
+        # Muchísimas entradas: lista acotada a 200, total real.
+        inicio._leer_run = lambda: _entradas("m", 300, "equipo")
+        r = inicio.diagnosticar()
+        assert len(r["datos"]["entradas"]) == 200 and r["datos"]["total"] == 300
+        json.dumps(r)
+    finally:
+        inicio._leer_run, inicio._leer_carpetas_inicio = run, carpetas
+        inicio._contar_servicios_automaticos = servicios
+
+    t0 = time.perf_counter()
+    r = inicio.diagnosticar()
+    dt = time.perf_counter() - t0
+    assert set(r) == {"componente", "estado", "mensaje", "datos", "recomendacion"} and r["componente"] == "inicio"
+    assert r["estado"] in scanner.ESTADOS_VALIDOS and r["estado"] != "critico"
+    assert dt <= 4.0, f"inicio tardó {dt:.1f} s"
+
+
 if __name__ == "__main__":
     test_paleta()
     test_frontend_node()
@@ -1575,4 +1648,5 @@ if __name__ == "__main__":
     test_recomendador_so_actual()
     test_recomendador_endurecimiento()
     test_analisis_espacio()
+    test_analisis_inicio()
     print("test_scanner.py: todos los casos OK")

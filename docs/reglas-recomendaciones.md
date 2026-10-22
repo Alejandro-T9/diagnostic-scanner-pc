@@ -112,6 +112,26 @@ con validación de rango físico en ambos) — si no, el campo queda en
 `null` en vez de mostrar un dato de otro sensor o inventado (decisión
 22).
 
+## Análisis de Windows (`backend/analisis/`, F4a)
+
+Solo lectura, sin administrador, y nunca emiten CRITICO. No están en `scanner.COMPONENTES` (lista `scanner.ANALISIS`).
+
+| Módulo | Condición | Estado | Recomendación |
+|---|---|---|---|
+| `espacio.py` | Libre de la unidad del sistema (normalmente C:) < 5 % | SOSPECHA | Libera espacio cuanto antes: vacía la papelera, borra descargas viejas y pasa tus archivos a otro disco. |
+| `espacio.py` | Libre entre 5 % y 10 % | ADVERTENCIA | Conviene liberar espacio pronto: empieza por la papelera y las descargas que ya no uses. |
+| `espacio.py` | Libre ≥ 10 % | NORMAL | — (no hace falta hacer nada) |
+| `espacio.py` | No se pudo leer el disco | NO DETERMINADO | Mira en Este equipo cuánto espacio queda libre y repite el análisis. |
+| `inicio.py` | 10 o más programas de inicio **habilitados** | ADVERTENCIA | Desactiva en el Administrador de tareas los que no necesites al encender. |
+| `inicio.py` | Menos de 10 habilitados | NORMAL | — |
+| `inicio.py` | No se pudo leer ninguna fuente | NO DETERMINADO | Mira la lista en el Administrador de tareas, pestaña Inicio, y repite el análisis. |
+
+`espacio` también informa (sin afectar el estado) el tamaño de `%TEMP%`, `Windows\Temp`, Descargas y la Papelera;
+cada recorrido tiene topes de tiempo y de archivos y marca `parcial` si se cortó. `inicio` suma las claves Run
+(usuario, equipo y 32 bits) y las carpetas Inicio; las entradas que el usuario ya deshabilitó en el Administrador
+de tareas (`StartupApproved`, primer byte 0x03/0x07) se listan pero no cuentan. Los servicios de arranque
+automático se informan aparte y no suman al umbral.
+
 ## Recomendaciones del equipo (F3)
 
 Las calcula `backend/recomendador.py` (`recomendar(resultado, hechos)`) con los
