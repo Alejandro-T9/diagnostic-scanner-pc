@@ -388,6 +388,7 @@ let datosRegistro = null;      // respuesta de /api/registro
 let mensajeRegistro = "";
 let datosPostinstalacion = null;
 let revisandoPost = false;
+const marcadasPost = new Set(); // ids de las tareas a mano marcadas en esta sesión
 
 function puedeGuardarEquipo() {
     return !document.body.classList.contains("sin-escaneo") && !document.body.classList.contains("demo");
@@ -395,7 +396,7 @@ function puedeGuardarEquipo() {
 
 function dibujarPanelEquipos() {
     dibujarEquipos(datosRegistro, puedeGuardarEquipo(), document.getElementById("equipos-vista"), {
-        alGuardar: guardarEquipo, alBorrar: borrarEquipo, mensaje: mensajeRegistro,
+        alGuardar: guardarEquipo, alBorrar: borrarEquipo, mensaje: mensajeRegistro, hayPost: !!datosPostinstalacion,
     });
 }
 
@@ -412,8 +413,10 @@ async function cargarRegistro() {
 }
 
 async function guardarEquipo(campos) {
+    const { incluir_post: incluirPost, ...datos } = campos;
+    if (incluirPost && datosPostinstalacion) datos.postinstalacion = { acta: datosPostinstalacion.acta, marcadas: [...marcadasPost] };
     try {
-        const respuesta = await fetch("/api/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(campos) });
+        const respuesta = await fetch("/api/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
         const cuerpo = await respuesta.json().catch(() => ({}));
         mensajeRegistro = respuesta.ok ? "Equipo guardado en el registro." : (cuerpo.mensaje || "No se pudo guardar el equipo.");
     } catch (error) {
@@ -436,7 +439,10 @@ async function borrarEquipo(equipo) {
 }
 
 function dibujarPanelPostinstalacion() {
-    dibujarPostinstalacion(datosPostinstalacion, revisandoPost, document.getElementById("postinstalacion-vista"), { alRevisar: revisarPostinstalacion });
+    dibujarPostinstalacion(datosPostinstalacion, revisandoPost, document.getElementById("postinstalacion-vista"), {
+        alRevisar: revisarPostinstalacion, marcadas: marcadasPost,
+        alMarcar: (id, marcada) => { if (marcada) marcadasPost.add(id); else marcadasPost.delete(id); },
+    });
 }
 
 async function revisarPostinstalacion() {
@@ -448,6 +454,8 @@ async function revisarPostinstalacion() {
         const respuesta = await fetch("/api/postinstalacion");
         if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
         datosPostinstalacion = await respuesta.json();
+        marcadasPost.clear();
+        dibujarPanelEquipos();
         anunciar("Revisión terminada.");
     } catch (error) {
         mostrarError("No se pudo completar la revisión del equipo.", "escaneo");

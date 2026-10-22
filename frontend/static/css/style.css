@@ -1079,3 +1079,5 @@ body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin e
     background-color: var(--color-tarjeta); color: var(--color-texto);
 }
 .acta-texto { display: block; width: 100%; max-width: 760px; margin: var(--espacio-3) 0; font-family: Consolas, monospace; font-size: var(--texto-s); }
+.campo-registro-marca { display: flex; align-items: center; gap: var(--espacio-2); font-size: var(--texto-s); }
+.analisis > .boton-primario { margin-top: var(--espacio-3); }

@@ -2167,11 +2167,16 @@ def test_registro_y_postinstalacion():
                 assert c.post("/api/registro", json={"etiqueta": "X"}).status_code == 400  # sin escaneo
                 assert c.post("/api/registro", data="etiqueta=X", content_type="text/plain").status_code == 400
                 app._ultimo_escaneo = _escaneo_falso()
-                r = c.post("/api/registro", json={"etiqueta": "Sala 1 - PC 3", "responsable": "Luis"})
+                r = c.post("/api/registro", json={"etiqueta": "Sala 1 - PC 3", "responsable": "Luis", "postinstalacion": {"acta": "Equipo: <b>X</b>\n[OK] algo", "marcadas": ["respaldo", 5, "<i>"]}})
                 assert r.status_code == 201, r.get_data(as_text=True)
-                assert len(c.get("/api/registro").get_json()["equipos"]) == 2
+                assert len(c.get("/api/registro").get_json()["equipos"]) == 2  # el anterior + este
                 h = c.get(f"/api/registro/{r.get_json()['id']}/informe").get_data(as_text=True)
                 assert "&lt;script&gt;alert(1)&lt;/script&gt;" in h and "<script>alert(1)" not in h
+                assert "Revisión posterior a la instalación" in h and "Equipo: &lt;b&gt;X&lt;/b&gt;" in h and "respaldo, &lt;i&gt;" in h and "<b>X</b>" not in h, h[-400:]
+                # una post-instalación inválida no rompe el guardado ni agrega la sección
+                r2 = c.post("/api/registro", json={"etiqueta": "Sin post", "postinstalacion": "x"})
+                assert r2.status_code == 201 and "Revisión posterior" not in c.get(f"/api/registro/{r2.get_json()['id']}/informe").get_data(as_text=True)
+                assert c.delete(f"/api/registro/{r2.get_json()['id']}").status_code == 200
                 assert c.get("/api/registro/csv").mimetype == "text/csv"
                 assert c.get("/api/registro/9999/informe").status_code == 404
                 assert c.delete(f"/api/registro/{r.get_json()['id']}").status_code == 200

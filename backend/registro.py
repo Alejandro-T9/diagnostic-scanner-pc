@@ -59,7 +59,15 @@ def _resumen_equipo(escaneo: dict) -> dict:
     }
 
 
-def guardar(escaneo, analisis, veredicto: str, etiqueta, responsable="", notas="") -> int:
+def _post_valida(post):
+    """Revisión de post-instalación a guardar: solo el texto del acta y las tareas a mano marcadas; None si no es válida."""
+    if not isinstance(post, dict) or not isinstance(post.get("acta"), str) or not post["acta"].strip():
+        return None
+    marcadas = post.get("marcadas") if isinstance(post.get("marcadas"), list) else []
+    return {"acta": post["acta"][:6000], "marcadas": [m[:40] for m in marcadas if isinstance(m, str)][:20]}
+
+
+def guardar(escaneo, analisis, veredicto: str, etiqueta, responsable="", notas="", post=None) -> int:
     """Guarda un equipo y devuelve su id. ValueError si no hay escaneo real o falta la etiqueta."""
     if not isinstance(escaneo, dict) or not escaneo.get("componentes"):
         raise ValueError("Primero revisa tu PC: no hay un escaneo que guardar.")
@@ -68,7 +76,7 @@ def guardar(escaneo, analisis, veredicto: str, etiqueta, responsable="", notas="
         raise ValueError("Escribe un nombre o etiqueta para reconocer el equipo.")
     estados = {n: c.get("estado") for n, c in escaneo["componentes"].items() if isinstance(c, dict)}
     r = _resumen_equipo(escaneo)
-    detalle = json.dumps({"escaneo": escaneo, "analisis": analisis}, ensure_ascii=False, default=str)
+    detalle = json.dumps({"escaneo": escaneo, "analisis": analisis, "postinstalacion": _post_valida(post)}, ensure_ascii=False, default=str)
     with _conectar() as con:
         cur = con.execute(
             "INSERT INTO equipos (fecha, etiqueta, responsable, notas, veredicto, equipo, sistema, procesador, memoria_gb, estados, detalle)"

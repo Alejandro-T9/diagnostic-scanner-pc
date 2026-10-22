@@ -14,6 +14,7 @@ cambiar con la variable de entorno DSPC_PORT.
 
 import os
 import sys
+from html import escape
 
 # El Python portable embeddable (build/python-portable/) trae un
 # python312._pth que desactiva el agregado automático de la carpeta del
@@ -202,7 +203,7 @@ def api_registro():
             return _error_json("Faltan los datos del equipo.", 400)
         veredicto = scanner.clasificar_equipo(_ultimo_escaneo) if _ultimo_escaneo else "SIN_DATOS"
         nuevo = registro.guardar(_ultimo_escaneo, _ultimo_analisis, veredicto, datos.get("etiqueta"),
-                                 datos.get("responsable", ""), datos.get("notas", ""))
+                                 datos.get("responsable", ""), datos.get("notas", ""), datos.get("postinstalacion"))
         return jsonify({"estado": "ok", "id": nuevo}), 201
     except ValueError as error:
         return _error_json(str(error), 400)
@@ -236,7 +237,14 @@ def api_registro_informe(id_equipo):
             return _error_json("Ese equipo no está en el registro.", 404)
         escaneo = detalle.get("escaneo")
         veredicto = scanner.clasificar_equipo(escaneo) if escaneo else "SIN_DATOS"
-        return Response(informe.generar_informe_html(escaneo, veredicto, detalle.get("analisis")), mimetype="text/html")
+        html = informe.generar_informe_html(escaneo, veredicto, detalle.get("analisis"))
+        post = detalle.get("postinstalacion")
+        if isinstance(post, dict) and isinstance(post.get("acta"), str):
+            marcadas = ", ".join(escape(str(m)) for m in post.get("marcadas", []) if isinstance(m, str)) or "ninguna"
+            bloque = (f"<h2>Revisión posterior a la instalación</h2><pre>{escape(post['acta'])}</pre>"
+                      f"<p>Tareas a mano marcadas: {marcadas}.</p>")
+            html = html.replace("</body>", bloque + "</body>", 1)
+        return Response(html, mimetype="text/html")
     except Exception as error:
         return _error_json(f"No se pudo generar el informe: {error}", 500)
 

@@ -493,7 +493,7 @@ function dibujarAnalisis(vista, analisis, contenedor, { alAnalizar, ocupado } = 
 
 
 // Pestaña "Equipos" (F5, opt-in): formulario para guardar el último escaneo + inventario. datos = {equipos, archivo} o null.
-function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, mensaje } = {}) {
+function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, mensaje, hayPost } = {}) {
     const bloque = crear("div", "analisis");
     bloque.append(crear("h2", "", "Equipos revisados"));
     bloque.append(crear("p", "recomendaciones-nota", "Es opcional: solo se guarda lo que tú pides, en un archivo de tu USB. No se envía nada por internet."));
@@ -508,6 +508,15 @@ function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, 
             campo.append(entrada);
             form.append(campo);
         });
+        if (hayPost) {
+            const incluir = crear("label", "campo-registro-marca");
+            const marca = crear("input");
+            marca.type = "checkbox";
+            marca.name = "incluir_post";
+            marca.checked = true;
+            incluir.append(marca, " Incluir la revisión de post-instalación (con las tareas marcadas)");
+            form.append(incluir);
+        }
         const guardar = crear("button", "boton-primario", "Guardar este equipo");
         guardar.type = "submit";
         form.append(guardar);
@@ -560,7 +569,7 @@ function dibujarEquipos(datos, puedeGuardar, contenedor, { alGuardar, alBorrar, 
 }
 
 // Pestaña "Post-instalación" (F6): lista de revisión de un equipo recién instalado. datos = respuesta de /api/postinstalacion o null.
-function dibujarPostinstalacion(datos, ocupado, contenedor, { alRevisar } = {}) {
+function dibujarPostinstalacion(datos, ocupado, contenedor, { alRevisar, marcadas, alMarcar } = {}) {
     const bloque = crear("div", "analisis");
     bloque.append(crear("h2", "", "Equipo recién instalado"));
     bloque.append(crear("p", "recomendaciones-nota", "Revisa lo básico después de instalar o formatear. Solo lee: no instala, no activa y no cambia nada."));
@@ -582,6 +591,8 @@ function dibujarPostinstalacion(datos, ocupado, contenedor, { alRevisar } = {}) 
                 const etiqueta = crear("label");
                 const marca = crear("input");
                 marca.type = "checkbox";
+                marca.checked = !!(marcadas && marcadas.has(i.id));
+                marca.addEventListener("change", () => { if (alMarcar) alMarcar(i.id, marca.checked); });
                 etiqueta.append(marca, ` ${i.titulo}`);
                 titulo.append(etiqueta);
                 cab.append(titulo);
