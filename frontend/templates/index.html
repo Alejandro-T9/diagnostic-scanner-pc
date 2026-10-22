@@ -5,6 +5,10 @@
 {% block content %}
 <div class="cabecera">
     <h1>Diagnostic Scanner PC</h1>
+    <div class="interruptor-modo" id="interruptor-modo" role="group" aria-label="Modo de la interfaz">
+        <button type="button" id="modo-simple-btn" aria-pressed="true">Modo simple</button>
+        <button type="button" id="modo-tecnico-btn" aria-pressed="false">Modo técnico</button>
+    </div>
     <span class="timestamp" id="timestamp">Sin datos aún</span>
 </div>
 
@@ -30,8 +34,14 @@
     </div>
 </div>
 
+<div class="vista-simple" id="vista-simple">
+    <p class="simple-resumen" id="simple-resumen"></p>
+    <div class="simple-tarjetas" id="simple-tarjetas"></div>
+    <a class="boton-reporte" id="boton-informe" href="/api/informe" target="_blank" rel="noopener">Informe para el técnico</a>
+</div>
+
 <div class="detalle-panel" id="detalle-panel">
-    <p class="detalle-vacio">Seleccioná un componente del mapa o la lista para ver el detalle completo.</p>
+    <p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>
 </div>
 
 <div class="acciones">

@@ -456,6 +456,132 @@ body {
     display: block;
 }
 
+/* --- Interruptor de modo (simple / técnico) --- */
+.interruptor-modo {
+    display: inline-flex;
+    border: 1px solid var(--color-borde);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.interruptor-modo button {
+    background-color: transparent;
+    color: var(--color-texto-secundario);
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.interruptor-modo button[aria-pressed="true"] {
+    background-color: var(--color-acento);
+    color: var(--color-fondo);
+}
+
+/* --- Guía dentro del panel de detalle (modo técnico) --- */
+.detalle-guia {
+    background-color: var(--color-fondo);
+    border: 1px solid var(--color-borde);
+    border-radius: 4px;
+    padding: 4px 14px 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+}
+
+.detalle-guia h4 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-acento);
+    margin: 10px 0 0 0;
+}
+
+.detalle-guia p { margin: 8px 0 4px; }
+.detalle-guia ol { margin: 0; padding-left: 20px; }
+
+/* --- Modo simple: se oculta el mapa y el detalle técnico --- */
+.vista-simple { display: none; }
+
+body.modo-simple .vista-simple { display: block; margin-bottom: 24px; }
+body.modo-simple .panel-diagnostico-cuerpo,
+body.modo-simple .detalle-panel,
+body.modo-simple .resumen-texto { display: none; }
+
+.simple-resumen {
+    font-size: 16px;
+    margin: 0 0 16px 0;
+}
+
+.simple-tarjetas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.tarjeta-simple {
+    background-color: var(--color-tarjeta);
+    border-radius: var(--radio-borde);
+    box-shadow: var(--sombra-tarjeta);
+    border-left: 4px solid var(--color-texto-secundario);
+    padding: 16px 20px;
+    font-size: 14px;
+    overflow-wrap: anywhere;
+}
+
+.tarjeta-simple.normal { border-left-color: var(--color-verde); }
+.tarjeta-simple.advertencia { border-left-color: var(--color-amarillo); }
+.tarjeta-simple.sospecha { border-left-color: var(--color-naranja); }
+.tarjeta-simple.critico { border-left-color: var(--color-rojo); }
+
+.tarjeta-simple p { margin: 8px 0; }
+
+.tarjeta-simple-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tarjeta-simple-cabecera h3 {
+    margin: 0;
+    font-size: 17px;
+}
+
+/* El chip global se oculta en pantallas angostas; en la tarjeta siempre se ve. */
+.tarjeta-simple .fila-chip {
+    display: inline-block;
+    flex-shrink: 0;
+    padding: 4px 10px;
+}
+
+.tarjeta-simple-mensaje { color: var(--color-texto-secundario); }
+.tarjeta-simple-pasos { margin: 8px 0; padding-left: 22px; }
+.tarjeta-simple-pasos li { margin-bottom: 4px; }
+
+.tarjeta-simple-etiquetas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.etiqueta-quien, .etiqueta-urgencia {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--color-borde);
+    color: var(--color-texto-secundario);
+}
+
+.etiqueta-quien.tu_mismo { color: var(--color-verde); border-color: var(--color-verde); }
+.etiqueta-quien.tecnico { color: var(--color-acento); border-color: var(--color-acento); }
+.etiqueta-urgencia.alta { color: var(--color-rojo); border-color: var(--color-rojo); }
+.etiqueta-urgencia.media { color: var(--color-naranja); border-color: var(--color-naranja); }
+.etiqueta-urgencia.baja { color: var(--color-amarillo); border-color: var(--color-amarillo); }
+
 /* --- Responsive --- */
 @media (max-width: 640px) {
     .panel-diagnostico-cuerpo {

@@ -96,6 +96,28 @@ const DATOS_MOCK = {
 };
 
 let componenteSeleccionado = null;
+let ultimoResultado = null; // {componentes, cobertura} del último render, para repintar al cambiar de modo
+let tablaGuias = null;      // respuesta de /api/guias (guías por componente/estado + _veredictos)
+let modo = "simple";
+
+// Todo texto que venga del escaneo (mensaje, nombres de dispositivos, guía)
+// pasa por acá antes de entrar a un innerHTML.
+function escapar(valor) {
+    return String(valor).replace(/[&<>"']/g, (c) => (
+        { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+}
+
+function crear(etiqueta, clase, texto) {
+    const nodo = document.createElement(etiqueta);
+    if (clase) nodo.className = clase;
+    if (texto !== undefined) nodo.textContent = texto;
+    return nodo;
+}
+
+function nombreComp(id) {
+    return NOMBRES_COMPONENTES[id] || id;
+}
 
 function iconoSvg(id) {
     return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">${ICONOS[id] || ""}</svg>`;
@@ -122,7 +144,9 @@ function marcarSeleccionado(id) {
 function renderizarResumen(componentes, cobertura) {
     const veredicto = calcularVeredicto(componentes);
     const sello = document.getElementById("sello");
-    sello.textContent = veredicto;
+    // Modo simple: frase en palabras (tabla del backend); sin tabla, el texto de siempre.
+    const frase = tablaGuias && tablaGuias._veredictos && tablaGuias._veredictos[veredicto];
+    sello.textContent = modo === "simple" && frase ? frase : veredicto;
     sello.className = `sello ${veredicto}`;
 
     const conteo = { normal: 0, advertencia: 0, sospecha: 0, critico: 0, no_determinado: 0 };
@@ -168,7 +192,7 @@ function renderizarDiagnostico(componentes, cobertura) {
             etiqueta.setAttribute("x", x);
             etiqueta.setAttribute("y", y > 100 ? y + 26 : y - 14);
             etiqueta.setAttribute("text-anchor", "middle");
-            etiqueta.textContent = NOMBRES_COMPONENTES[id].split(" ")[0].toUpperCase();
+            etiqueta.textContent = nombreComp(id).split(" ")[0].toUpperCase();
             svg.appendChild(etiqueta);
         }
 
@@ -179,10 +203,10 @@ function renderizarDiagnostico(componentes, cobertura) {
             <div class="franja ${info.estado}"></div>
             <div class="fila-icono">${iconoSvg(id)}</div>
             <div class="fila-info">
-                <div class="nombre">${NOMBRES_COMPONENTES[id] || id}</div>
-                <div class="detalle">${info.mensaje}</div>
+                <div class="nombre">${escapar(nombreComp(id))}</div>
+                <div class="detalle">${escapar(info.mensaje)}</div>
             </div>
-            <div class="fila-chip ${info.estado}">${CHIP_TEXTO[info.estado] || info.estado}</div>
+            <div class="fila-chip ${escapar(info.estado)}">${escapar(CHIP_TEXTO[info.estado] || info.estado)}</div>
         `;
         fila.addEventListener("mouseenter", () => resaltarComponente(id, true));
         fila.addEventListener("mouseleave", () => resaltarComponente(id, false));
@@ -190,7 +214,9 @@ function renderizarDiagnostico(componentes, cobertura) {
         filasEl.appendChild(fila);
     }
 
+    ultimoResultado = { componentes, cobertura };
     renderizarResumen(componentes, cobertura);
+    renderizarSimple(componentes);
 }
 
 function seleccionarComponente(id, info) {
@@ -233,16 +259,16 @@ function _renderizarCuerpoDatos(datos) {
             const items = valor.map((item) => `
                 <div class="detalle-subitem">
                     ${Object.entries(item).map(([k, v]) => `
-                        <div class="detalle-fila"><span>${_etiquetaCampo(k)}</span><span class="dato-tecnico">${_formatearValor(k, v)}</span></div>
+                        <div class="detalle-fila"><span>${escapar(_etiquetaCampo(k))}</span><span class="dato-tecnico">${escapar(_formatearValor(k, v))}</span></div>
                     `).join("")}
                 </div>
             `).join("");
-            return `<div class="detalle-grupo"><h4>${_etiquetaCampo(clave)}</h4>${items}</div>`;
+            return `<div class="detalle-grupo"><h4>${escapar(_etiquetaCampo(clave))}</h4>${items}</div>`;
         }
         if (valor !== null && typeof valor === "object") {
-            return `<div class="detalle-grupo"><h4>${_etiquetaCampo(clave)}</h4>${_renderizarCuerpoDatos(valor)}</div>`;
+            return `<div class="detalle-grupo"><h4>${escapar(_etiquetaCampo(clave))}</h4>${_renderizarCuerpoDatos(valor)}</div>`;
         }
-        return `<div class="detalle-fila"><span>${_etiquetaCampo(clave)}</span><span class="dato-tecnico">${_formatearValor(clave, valor)}</span></div>`;
+        return `<div class="detalle-fila"><span>${escapar(_etiquetaCampo(clave))}</span><span class="dato-tecnico">${escapar(_formatearValor(clave, valor))}</span></div>`;
     }).join("");
 }
 
@@ -253,18 +279,119 @@ function renderizarDetalle(id, info) {
         : `<p class="detalle-sin-datos">Sin datos técnicos adicionales para este componente.</p>`;
 
     const recomendacion = info.recomendacion
-        ? `<div class="detalle-recomendacion"><strong>Recomendación:</strong> ${info.recomendacion}</div>`
+        ? `<div class="detalle-recomendacion"><strong>Recomendación:</strong> ${escapar(info.recomendacion)}</div>`
         : "";
 
     panel.innerHTML = `
         <div class="detalle-cabecera">
-            <h3>${NOMBRES_COMPONENTES[id] || id}</h3>
-            <span class="fila-chip ${info.estado}">${CHIP_TEXTO[info.estado] || info.estado}</span>
+            <h3>${escapar(nombreComp(id))}</h3>
+            <span class="fila-chip ${escapar(info.estado)}">${escapar(CHIP_TEXTO[info.estado] || info.estado)}</span>
         </div>
-        <p class="detalle-mensaje">${info.mensaje}</p>
+        <p class="detalle-mensaje">${escapar(info.mensaje)}</p>
         ${recomendacion}
+        ${bloqueGuiaHtml(info.guia)}
         ${cuerpo}
     `;
+}
+
+const QUIEN_TEXTO = {
+    tu_mismo: "Lo puedes hacer tú",
+    tecnico: "Mejor con un técnico",
+    nadie: "No necesita acción",
+};
+
+function pasosGuia(guia) {
+    return Array.isArray(guia.que_hacer) ? guia.que_hacer : [];
+}
+
+// Guía en el panel de detalle (modo técnico). Sin guía no se dibuja nada.
+function bloqueGuiaHtml(guia) {
+    if (!guia) return "";
+    const pasos = pasosGuia(guia).map((p) => `<li>${escapar(p)}</li>`).join("");
+    return `
+        <div class="detalle-guia">
+            <h4>Guía</h4>
+            <p><strong>Qué significa:</strong> ${escapar(guia.que_significa || "")}</p>
+            ${pasos ? `<p><strong>Qué hacer:</strong></p><ol>${pasos}</ol>` : ""}
+            <p><strong>Quién lo hace:</strong> ${escapar(QUIEN_TEXTO[guia.quien] || guia.quien || "")}</p>
+        </div>
+    `;
+}
+
+// --- Modo simple: veredicto en palabras, una línea de resumen y una tarjeta
+// por componente de más a menos grave. Solo DOM + textContent. ---
+function renderizarSimple(componentes) {
+    const ids = Object.keys(componentes);
+    const bien = ids.filter((id) => componentes[id].estado === "normal").map(nombreComp);
+    const atencion = ids.filter((id) => componentes[id].estado !== "normal").map(nombreComp);
+    let linea;
+    if (!atencion.length) linea = "Todo lo que pudimos revisar está bien.";
+    else linea = (bien.length ? `Están bien: ${bien.join(", ")}. ` : "") + `Necesitan atención: ${atencion.join(", ")}.`;
+    document.getElementById("simple-resumen").textContent = linea;
+
+    const contenedor = document.getElementById("simple-tarjetas");
+    contenedor.replaceChildren();
+    const orden = (id) => {
+        const i = SEVERIDAD.indexOf(componentes[id].estado);
+        return i < 0 ? SEVERIDAD.length : i;
+    };
+    ids.slice().sort((a, b) => orden(a) - orden(b)).forEach((id) => {
+        const info = componentes[id];
+        const tarjeta = crear("div", `tarjeta-simple ${info.estado}`);
+        const cab = crear("div", "tarjeta-simple-cabecera");
+        cab.append(crear("h3", "", nombreComp(id)),
+            crear("span", `fila-chip ${info.estado}`, CHIP_TEXTO[info.estado] || info.estado));
+        tarjeta.append(cab, crear("p", "tarjeta-simple-mensaje", info.mensaje));
+        const guia = info.guia;
+        if (guia) {
+            if (guia.que_significa) tarjeta.append(crear("p", "", guia.que_significa));
+            const pasos = pasosGuia(guia);
+            if (pasos.length) {
+                const lista = crear("ol", "tarjeta-simple-pasos");
+                pasos.forEach((p) => lista.append(crear("li", "", p)));
+                tarjeta.append(lista);
+            }
+            const etiquetas = crear("div", "tarjeta-simple-etiquetas");
+            if (QUIEN_TEXTO[guia.quien]) etiquetas.append(crear("span", `etiqueta-quien ${guia.quien}`, QUIEN_TEXTO[guia.quien]));
+            if (["baja", "media", "alta"].includes(guia.urgencia)) {
+                etiquetas.append(crear("span", `etiqueta-urgencia ${guia.urgencia}`, `Urgencia: ${guia.urgencia}`));
+            }
+            if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
+        }
+        contenedor.append(tarjeta);
+    });
+}
+
+function repintar() {
+    if (!ultimoResultado) return;
+    renderizarDiagnostico(ultimoResultado.componentes, ultimoResultado.cobertura);
+    if (componenteSeleccionado && ultimoResultado.componentes[componenteSeleccionado]) {
+        seleccionarComponente(componenteSeleccionado, ultimoResultado.componentes[componenteSeleccionado]);
+    }
+}
+
+function aplicarModo(nuevo, guardar) {
+    modo = nuevo === "tecnico" ? "tecnico" : "simple";
+    document.body.classList.toggle("modo-simple", modo === "simple");
+    document.getElementById("modo-simple-btn").setAttribute("aria-pressed", String(modo === "simple"));
+    document.getElementById("modo-tecnico-btn").setAttribute("aria-pressed", String(modo === "tecnico"));
+    if (guardar) {
+        try { localStorage.setItem("modo_interfaz", modo); } catch (e) { /* sin almacenamiento: solo no se recuerda */ }
+    }
+    repintar();
+}
+
+// Tabla de guías + frases de veredicto. Si falla, la app sigue sin guías.
+async function cargarGuias() {
+    if (tablaGuias) return tablaGuias;
+    try {
+        const respuesta = await fetch("/api/guias");
+        if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+        tablaGuias = await respuesta.json();
+    } catch (error) {
+        tablaGuias = null;
+    }
+    return tablaGuias;
 }
 
 function mostrarError(mensaje) {
@@ -333,12 +460,17 @@ function ocultarDemo() {
     document.getElementById("aviso-demo").classList.remove("activo");
 }
 
-function verModoDemo() {
+async function verModoDemo() {
     mostrarDemo();
+    const tabla = await cargarGuias();
+    for (const info of Object.values(DATOS_MOCK.componentes)) {
+        const guia = tabla && tabla[info.componente] && tabla[info.componente][info.estado];
+        if (guia) info.guia = guia; else delete info.guia;
+    }
     renderizarDiagnostico(DATOS_MOCK.componentes);
     componenteSeleccionado = null;
     document.getElementById("detalle-panel").innerHTML =
-        '<p class="detalle-vacio">Seleccioná un componente del mapa o la lista para ver el detalle completo.</p>';
+        '<p class="detalle-vacio">Selecciona un componente del mapa o la lista para ver el detalle completo.</p>';
 }
 
 document.getElementById("boton-escanear").addEventListener("click", escanearSistema);
@@ -349,6 +481,15 @@ document.getElementById("boton-demo").addEventListener("click", verModoDemo);
 // entre otras cosas que no queremos a mano en ese contexto.
 document.addEventListener("contextmenu", (evento) => evento.preventDefault());
 
+document.getElementById("modo-simple-btn").addEventListener("click", () => aplicarModo("simple", true));
+document.getElementById("modo-tecnico-btn").addEventListener("click", () => aplicarModo("tecnico", true));
+
+let modoGuardado = null;
+try { modoGuardado = localStorage.getItem("modo_interfaz"); } catch (e) { /* almacenamiento bloqueado: se usa el modo simple */ }
+aplicarModo(modoGuardado, false);
+
 renderizarDiagnostico(DATOS_MOCK.componentes);
+// Frases de veredicto para el sello; al llegar se repinta (si falla, queda el texto de siempre).
+cargarGuias().then((t) => { if (t) repintar(); });
 actualizarStatus();
 setInterval(actualizarStatus, 2000);
