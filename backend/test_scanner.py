@@ -817,8 +817,8 @@ def test_equipo():
     assert apto("") is None
     assert apto(None) is None
 
-    llaves = {"so", "firmware", "secure_boot", "tpm_version", "discos", "disco_sistema_tipo"}
-    lectores = ["_leer_so", "_leer_firmware", "_leer_secure_boot", "_leer_tpm", "_leer_discos", "_leer_disco_sistema"]
+    llaves = {"so", "entorno", "firmware", "secure_boot", "tpm_version", "discos", "disco_sistema_tipo"}
+    lectores = ["_leer_so", "_leer_entorno", "_leer_firmware", "_leer_secure_boot", "_leer_tpm", "_leer_discos", "_leer_disco_sistema"]
     originales = {n: getattr(equipo, n) for n in lectores}
 
     def roto(*a, **k):
@@ -830,7 +830,7 @@ def test_equipo():
             setattr(equipo, n, roto)
         hechos = equipo.leer_hechos()
         assert set(hechos) == llaves, hechos
-        assert hechos["so"] is None and hechos["firmware"] is None
+        assert hechos["so"] is None and hechos["firmware"] is None and hechos["entorno"] is None
         assert hechos["secure_boot"] is None and hechos["tpm_version"] is None
         assert hechos["discos"] == [] and hechos["disco_sistema_tipo"] == "desconocido", hechos
 
@@ -851,6 +851,7 @@ def test_equipo():
     hechos = equipo.leer_hechos()
     assert set(hechos) == llaves, hechos
     assert hechos["firmware"] in {"uefi", "bios", None}, hechos["firmware"]
+    assert hechos["entorno"] in {"windows", "winpe", None}, hechos["entorno"]
     assert isinstance(hechos["discos"], list)
     assert hechos["disco_sistema_tipo"] in {"ssd", "hdd", "desconocido"}
 
@@ -947,8 +948,9 @@ def _pc(ram_gb=16, cpu_nombre=_CPU_MODERNO, arq="x64", uso=30, **otros):
                         **otros})
 
 
-def _hechos_reco(arq="64-bit", firmware="uefi", secure_boot=True, tpm="2.0", discos=(), sistema="ssd"):
-    return {"so": {"nombre": "Windows", "build": "1", "arquitectura": arq}, "firmware": firmware,
+def _hechos_reco(arq="64-bit", firmware="uefi", secure_boot=True, tpm="2.0", discos=(), sistema="ssd",
+                 so_nombre="Windows", entorno=None):
+    return {"so": {"nombre": so_nombre, "build": "1", "arquitectura": arq}, "entorno": entorno, "firmware": firmware,
             "secure_boot": secure_boot, "tpm_version": tpm, "discos": list(discos),
             "disco_sistema_tipo": sistema}
 
@@ -976,11 +978,15 @@ def test_recomendador():
     # (b) TPM ilegible (único dato que falta): Windows 11 es la principal, pendiente de confirmar; Windows 10 sigue
     r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(tpm=None)), "so")
     assert _nombres(r)[:2] == ["Windows 11", "Windows 10"], _nombres(r)
-    assert r["opciones"][0]["nota"] == ("Falta confirmar el TPM 2.0 (se lee con permisos de administrador): "
-                                        "compruébalo antes de instalar."), r["opciones"][0]
+    nota = r["opciones"][0]["nota"]
+    assert nota.startswith("Falta confirmar el TPM 2.0, un chip de seguridad que Windows 11 pide."), nota
+    assert "administrador" in nota and "técnico" in nota, nota
     assert r["detalle"].startswith("Según tus componentes te recomendamos: Windows 11 (falta confirmar el TPM 2.0)."), r["detalle"]
-    assert r["quien"] == "tu_mismo", r
-    assert any("TPM: no se pudo leer" in linea for linea in r["basado_en"]), r["basado_en"]
+    assert r["quien"] == "tecnico", r  # sin administrador la persona no puede comprobarlo sola
+    assert any("TPM (chip de seguridad): no se pudo leer" in linea for linea in r["basado_en"]), r["basado_en"]
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(secure_boot=None)), "so")
+    assert "Arranque seguro (Secure Boot), una protección del arranque que Windows 11 pide" in r["opciones"][0]["nota"], r["opciones"][0]
+    assert r["quien"] == "tecnico", r
 
     # (c) procesador antiguo: Windows 11 no se ofrece y se explica por qué
     r = _por_id(recomendador.recomendar(_pc(16, _CPU_VIEJO), _hechos_reco()), "so")
@@ -990,6 +996,17 @@ def test_recomendador():
     assert "Windows 11" not in _nombres(r)
     r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(secure_boot=False)), "so")
     assert "Windows 11" not in _nombres(r)
+    assert ("El Arranque seguro está desactivado hoy; Windows 11 lo pide activado o disponible. "
+            "Un técnico puede revisar si se puede activar.") in r["basado_en"], r["basado_en"]
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco(firmware="bios")), "so")
+    assert "Windows 11" not in _nombres(r)
+    assert ("El equipo arranca hoy en modo BIOS clásico (Legacy); Windows 11 pide modo UEFI. "
+            "Un técnico puede revisar si se puede cambiar.") in r["basado_en"], r["basado_en"]
+    assert "Modo de arranque: BIOS clásica (el antiguo)" in r["basado_en"], r["basado_en"]
+    r = _por_id(recomendador.recomendar(_pc(16), _hechos_reco()), "so")
+    assert "Modo de arranque: UEFI (el moderno)" in r["basado_en"] and "TPM (chip de seguridad): 2.0" in r["basado_en"], r["basado_en"]
+    assert not any("Firmware" in x for x in r["basado_en"]), r["basado_en"]
+    assert "un procesador que, por su modelo, sirve para Windows 11" in r["opciones"][0]["motivo"], r["opciones"][0]
 
     # (d) poca RAM: MiniOS10 aparece, Windows 7 nunca es la principal y va al final
     r = _por_id(recomendador.recomendar(_pc(2, _CPU_VIEJO), _hechos_reco(sistema="hdd")), "so")
@@ -1072,6 +1089,43 @@ def test_recomendador():
                     assert mala not in t.lower(), (mala, t)
 
 
+def test_recomendador_so_actual():
+    """El SO que ya corre en el equipo (Windows 11 real) cuenta; en WinPE no se confía en el nombre."""
+    def so(res, **kw):
+        return _por_id(recomendador.recomendar(res, _hechos_reco(**kw)), "so")
+
+    # (a) Windows 11 real, TPM ilegible: ya lo tiene, sin "falta confirmar" ni Windows 10
+    r = so(_pc(16), so_nombre="Microsoft Windows 11 Pro", entorno="windows", tpm=None)
+    assert _nombres(r)[0] == "Windows 11" and "Windows 10" not in _nombres(r), _nombres(r)
+    assert "Ya lo tienes" in r["opciones"][0]["motivo"], r["opciones"][0]
+    assert "Windows 11 (ya lo tienes instalado)" in r["detalle"], r["detalle"]
+    assert r["detalle"].startswith("Según tus componentes te recomendamos: Windows 11 (ya lo tienes instalado)."), r["detalle"]
+    assert "Sistema actual: Microsoft Windows 11 Pro" in r["basado_en"], r["basado_en"]
+    assert not any("falta confirmar" in t.lower() for t in [r["detalle"], *[o["nota"] for o in r["opciones"]]]), r
+    assert "Ubuntu o Linux Mint" in _nombres(r), _nombres(r)  # lo demás sigue las reglas por RAM
+    assert r["quien"] == "tu_mismo", r
+
+    # (b) WinPE también dice "Windows 11": se aplican las reglas normales
+    r = so(_pc(16), so_nombre="Microsoft Windows 11 Pro", entorno="winpe", tpm=None)
+    assert "falta confirmar" in r["detalle"] and "Windows 10" in _nombres(r), r
+    assert "Ya lo tienes" not in r["opciones"][0]["motivo"], r["opciones"][0]
+    r = so(_pc(16), so_nombre="Microsoft Windows 11 Pro", entorno=None, tpm=None)  # entorno desconocido: igual
+    assert "Ya lo tienes" not in r["opciones"][0]["motivo"], r["opciones"][0]
+
+    # (c) Windows 10 actual: sin cambios (Windows 11 con CPU vieja sigue fuera)
+    r = so(_pc(16, _CPU_VIEJO), so_nombre="Microsoft Windows 10 Pro", entorno="windows")
+    assert _nombres(r)[0] == "Windows 10" and "Windows 11" not in _nombres(r), _nombres(r)
+
+    # (d) Windows 11 instalado con un procesador que la heurística no conoce: sigue siendo Windows 11
+    r = so(_pc(16, "Intel(R) Core(TM) Ultra 7 155H"), so_nombre="Microsoft Windows 11 Home", entorno="windows")
+    assert _nombres(r)[0] == "Windows 11" and "Windows 10" not in _nombres(r), _nombres(r)
+    assert not any("No se pudo comprobar si el procesador" in x for x in r["basado_en"]), r["basado_en"]
+
+    # (e) ARM: la arquitectura se trata como desconocida (sin consejos pensados para x64)
+    assert "so" not in _ids(recomendador.recomendar(_pc(16, "Snapdragon ARM", "ARM64"), _hechos_reco(arq="ARM 64-bit Processor")))
+    assert "so" not in _ids(recomendador.recomendar(_pc(16, _CPU_MODERNO, "x64"), _hechos_reco(arq="ARM 64-bit Processor")))
+
+
 def test_recomendador_endurecimiento():
     # (a) RAM 0.0 no es una lectura real: se usa el respaldo del SO; si tampoco hay, no hay recomendación de SO
     cpu = ("normal", {"nombre": _CPU_MODERNO, "arquitectura": "x64", "temperatura_c": 50.0})
@@ -1120,7 +1174,10 @@ def test_recomendador_endurecimiento():
         "Lubuntu o Linux Mint XFCE", "MiniOS10"]
     w10 = next(o for o in _por_id(recomendador.recomendar(_pc(8, _CPU_VIEJO), _hechos_reco()), "so")["opciones"]
                if o["nombre"] == "Windows 10")
-    assert "actualizaciones de seguridad" in w10["nota"], w10
+    assert "actualizaciones de seguridad" in w10["nota"] and "2025" not in w10["nota"], w10
+    mini = next(o for o in _por_id(recomendador.recomendar(_pc(2), _hechos_reco(sistema="hdd")), "so")["opciones"]
+                if o["nombre"] == "MiniOS10")
+    assert "no viene de Microsoft" in mini["nota"] and "licencia de Windows válida" in mini["nota"], mini
     opciones = _por_id(recomendador.recomendar(_pc(1), _hechos_reco()), "so")["opciones"]
     assert opciones[-1]["nombre"] == "Windows 7" and "actualizaciones de seguridad" in opciones[-1]["nota"], opciones
 
@@ -1154,5 +1211,6 @@ if __name__ == "__main__":
     test_equipo_rendimiento()
     test_equipo_cache_por_hilo()
     test_recomendador()
+    test_recomendador_so_actual()
     test_recomendador_endurecimiento()
     print("test_scanner.py: todos los casos OK")

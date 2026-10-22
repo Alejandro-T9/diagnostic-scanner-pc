@@ -18,13 +18,16 @@ import equipo
 
 _ORDEN_PRIORIDAD = {"alta": 0, "media": 1, "baja": 2}
 
-_NOTA_W10 = ("Windows 10 dejó de recibir actualizaciones de seguridad gratuitas en octubre de 2025; "
+_NOTA_W10 = ("Windows 10 ya no recibe actualizaciones de seguridad gratuitas en la mayoría de los equipos; "
              "úsalo con cuidado y mantén tus archivos respaldados.")
-_NOTA_MINIOS = "Es una versión modificada no oficial de Windows 10; instálala con ayuda de un técnico."
+_NOTA_MINIOS = ("Es una versión modificada de Windows 10 que no viene de Microsoft: no se puede verificar qué se le "
+                "quitó o cambió, y necesita una licencia de Windows válida. Instálala solo con un técnico de confianza.")
 _NOTA_W7 = ("Windows 7 no recibe actualizaciones de seguridad desde 2020. Úsalo solo si tu equipo o tus "
             "programas lo exigen, de preferencia sin internet o con mucho cuidado.")
-_NOTA_TPM = "Falta confirmar el TPM 2.0 (se lee con permisos de administrador): compruébalo antes de instalar."
-_NOTA_SB = "Falta confirmar el Arranque seguro (Secure Boot): compruébalo antes de instalar."
+_NOTA_TPM = ("Falta confirmar el TPM 2.0, un chip de seguridad que Windows 11 pide. Se puede leer abriendo el "
+             "programa como administrador, o un técnico puede revisarlo.")
+_NOTA_SB = ("Falta confirmar el Arranque seguro (Secure Boot), una protección del arranque que Windows 11 pide. "
+            "Un técnico puede revisarlo en la configuración del equipo.")
 _NOTA_32 = "Para procesadores de 32 bits hay pocas versiones compatibles; un técnico debe confirmar cuál sirve."
 
 
@@ -59,9 +62,14 @@ def _ram_gb(res):
 
 
 def _arq64(res, hechos):
-    """True si algún dato dice 64 bits (el procesador lo admite aunque el SO sea de 32), False si dice 32/x86."""
+    """True si algún dato dice 64 bits (el procesador lo admite aunque el SO sea de 32), False si dice 32/x86.
+    None si no se sabe, o si es ARM (los consejos de aquí son para x86/x64)."""
     textos = [str(((hechos or {}).get("so") or {}).get("arquitectura") or ""),
-              str(_dato(res, "cpu", "arquitectura") or "")]
+              str(_dato(res, "cpu", "arquitectura") or ""),
+              str(_dato(res, "cpu", "nombre") or "")]
+    if any("ARM" in t.upper() for t in textos):
+        return None
+    textos = textos[:2]
     if any("64" in t for t in textos):
         return True
     if any("32" in t or "x86" in t for t in textos):
@@ -78,13 +86,13 @@ def _windows11(cpu_nombre, h):
     elif apto is None:
         razones.append("No se pudo comprobar si el procesador sirve para Windows 11")
     if fw == "bios":
-        razones.append("Firmware BIOS clásica: Windows 11 pide UEFI")
+        razones.append("El equipo arranca hoy en modo BIOS clásico (Legacy); Windows 11 pide modo UEFI. Un técnico puede revisar si se puede cambiar.")
     elif fw != "uefi":
-        razones.append("No se pudo leer el tipo de firmware (Windows 11 pide UEFI)")
+        razones.append("No se pudo leer el modo de arranque (Windows 11 pide UEFI)")
     if sb is False:
-        razones.append("Arranque seguro (Secure Boot) desactivado: Windows 11 lo pide")
+        razones.append("El Arranque seguro está desactivado hoy; Windows 11 lo pide activado o disponible. Un técnico puede revisar si se puede activar.")
     if tpm == "1.2":
-        razones.append("TPM 1.2: Windows 11 pide 2.0")
+        razones.append("TPM 1.2 (chip de seguridad antiguo): Windows 11 pide la versión 2.0")
     if razones:
         return None, razones, []
     # Un dato ilegible no descarta Windows 11 (no se afirma incompatibilidad): queda pendiente de confirmar.
@@ -99,14 +107,23 @@ def _regla_so(res, h):
         return None
     cpu_nombre, sistema = _dato(res, "cpu", "nombre"), h.get("disco_sistema_tipo")
     g = _g(ram)
+    nombre_so = str((h.get("so") or {}).get("nombre") or "")
+    # En WinPE el nombre también dice "Windows 11": solo se confía en él en un Windows real.
+    ya_w11 = h.get("entorno") == "windows" and "windows 11" in nombre_so.lower()
     w11, razones, pendientes = None, [], []
     base = []
-    if arq64 and ram >= 4:
+    if ya_w11:
+        w11 = {"nombre": "Windows 11", "nota": "", "motivo": "Ya lo tienes instalado en este equipo."}
+    elif arq64 and ram >= 4:
         w11, razones, pendientes = _windows11(cpu_nombre, h)
         if w11:
-            w11["motivo"] = f"Tu equipo tiene {g} GB de RAM, un procesador reciente y cumple los requisitos que se pudieron comprobar."
+            w11["motivo"] = (f"Tu equipo tiene {g} GB de RAM, un procesador que, por su modelo, sirve para Windows 11 "
+                             "y cumple los requisitos que se pudieron comprobar.")
+    if arq64 and ram >= 4 and not ya_w11:
         base.append({"nombre": "Windows 10", "nota": _NOTA_W10,
                      "motivo": f"Tu equipo tiene {g} GB de RAM y un procesador de 64 bits, suficiente para Windows 10."})
+    # shortcut: la app corre en Python de 64 bits, así que en la práctica no se llega a las ramas de 32 bits;
+    # se dejan por si se agrega una versión de 32 bits.
     if ram >= 4:
         base.append({"nombre": "Ubuntu o Linux Mint", "nota": "" if arq64 else _NOTA_32,
                      "motivo": f"Con {g} GB de RAM tu equipo cumple lo que suelen pedir estas versiones de Linux."})
@@ -124,22 +141,28 @@ def _regla_so(res, h):
         base.insert(0, w11)
     if not base:
         return None
-    basado = [f"RAM: {g} GB"]
+    basado = [f"Sistema actual: {nombre_so}"] if ya_w11 else []
+    basado.append(f"RAM: {g} GB")
     if cpu_nombre:
         basado.append(f"Procesador: {cpu_nombre}")
     basado.append("Arquitectura: 64 bits" if arq64 else "Arquitectura: 32 bits")
     if h.get("firmware") in ("uefi", "bios"):
-        basado.append("Firmware: UEFI" if h["firmware"] == "uefi" else "Firmware: BIOS clásica")
+        basado.append("Modo de arranque: UEFI (el moderno)" if h["firmware"] == "uefi"
+                      else "Modo de arranque: BIOS clásica (el antiguo)")
     if arq64 and ram >= 4:
         tpm = h.get("tpm_version")
-        basado.append(f"TPM: {tpm}" if tpm else "TPM: no se pudo leer (se lee con permisos de administrador)")
+        basado.append(f"TPM (chip de seguridad): {tpm}" if tpm
+                      else "TPM (chip de seguridad): no se pudo leer (se lee con permisos de administrador)")
     if sistema in ("ssd", "hdd"):
         basado.append(f"Disco principal: {sistema.upper()}")
     basado += razones
     principal = base[0]["nombre"]
-    if w11:
-        principal += f" (falta confirmar {' y '.join(pendientes)})" if pendientes else ""
-    quien = "tu_mismo" if base[0]["nombre"] in ("Windows 11", "Windows 10") else "tecnico"
+    if ya_w11:
+        principal += " (ya lo tienes instalado)"
+    elif w11 and pendientes:
+        principal += f" (falta confirmar {' y '.join(pendientes)})"
+    # Con datos por confirmar la persona no puede comprobarlo sola (pide administrador o herramientas).
+    quien = "tu_mismo" if base[0]["nombre"] in ("Windows 11", "Windows 10") and not pendientes else "tecnico"
     return _rec("so", "Sistema operativo que conviene a tu equipo",
                 f"Según tus componentes te recomendamos: {principal}. También puedes ver otras opciones.",
                 basado, "baja", quien, base)

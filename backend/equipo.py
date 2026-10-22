@@ -84,6 +84,11 @@ def _leer_so() -> dict:
     return {"nombre": so.Caption, "build": so.BuildNumber, "arquitectura": so.OSArchitecture}
 
 
+def _leer_entorno():
+    """"windows" | "winpe": WinPE también dice "Windows 11" en su nombre, así que el nombre solo vale en un Windows real."""
+    return utils.detectar_entorno()
+
+
 def _leer_firmware():
     """kernel32.GetFirmwareType: 1 = BIOS, 2 = UEFI (PEFirmwareType del registro no es fiable)."""
     tipo = ctypes.c_int(0)
@@ -152,6 +157,7 @@ def leer_hechos() -> dict:
     try:
         return {
             "so": seguro(_leer_so, None),
+            "entorno": seguro(_leer_entorno, None),
             "firmware": seguro(_leer_firmware, None),
             "secure_boot": seguro(_leer_secure_boot, None),
             "tpm_version": seguro(_leer_tpm, None),
