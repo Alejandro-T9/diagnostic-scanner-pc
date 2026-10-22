@@ -793,6 +793,7 @@ body.sin-escaneo .panel-diagnostico { display: none; }
 
 /* El informe solo existe con un escaneo real (la vista del Resumen ya solo se dibuja con resultado). */
 body.demo .hero-informe { display: none; }
+body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin el enlace no sobra una tercera columna (ni su hueco) */
 
 .boton-secundario {
     display: inline-flex;
@@ -997,7 +998,7 @@ body.demo .hero-informe { display: none; }
     padding: var(--espacio-4);
     background-color: var(--color-tarjeta);
     color: var(--color-texto);
-    border: 1px solid var(--color-borde);
+    border: 1px solid var(--color-borde-control);
     border-top: 4px solid var(--estado-color);
     border-radius: var(--radio-2);
     box-shadow: var(--sombra-1);
@@ -1043,7 +1044,7 @@ body.demo .hero-informe { display: none; }
 
 @media (max-width: 700px) {
     .resumen { gap: var(--espacio-4); }
-    .resumen-hero {
+    .resumen-hero, body.demo .resumen-hero {
         grid-template-columns: minmax(0, 1fr);
         justify-items: start;
         gap: var(--espacio-4);

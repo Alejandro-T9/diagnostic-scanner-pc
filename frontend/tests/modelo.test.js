@@ -4,7 +4,7 @@ const assert = require("assert");
 const { iconoEstado, iconoComponente, iconoUi } = require("../static/js/iconos.js");
 const { CHIP_TEXTO } = require("../static/js/estado.js");
 const { PESTANAS, pestanaDesdeHash, siguientePestana, temaValido, modoValido, habilitadasSegun,
-    calcularVeredicto, normalizarEstado, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
+    calcularVeredicto, normalizarEstado, nombreComp, lineaResumen, medidaClave, datosEquipo, loPrimero, ordenarPorGravedad } = require("../static/js/modelo.js");
 
 const ESTADOS = ["normal", "advertencia", "sospecha", "critico", "no_determinado"];
 const COMPONENTES = ["mainboard", "cpu", "ram", "almacenamiento", "fuente_poder", "bateria", "red"];
@@ -112,6 +112,34 @@ assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [] 
 assert.strictEqual(medidaClave("zzz", {}), "—");
 assert.strictEqual(medidaClave("__proto__", { datos: {} }), "—");
 assert.strictEqual(medidaClave(undefined, undefined), "—");
+// M1: rangos plausibles (capacidades > 0, porcentajes 0-100, temperatura 0-110 °C); fuera de rango o no finito -> "—"
+[-300, 111, Infinity, NaN].forEach((t) => assert.strictEqual(medidaClave("cpu", { datos: { temperatura_c: t } }), "—", `temp ${t}`));
+assert.strictEqual(medidaClave("cpu", { datos: { temperatura_c: 110 } }), "110 °C");
+assert.strictEqual(medidaClave("cpu", { datos: { temperatura_c: 0 } }), "0 °C"); // 0 está dentro del rango de cpu.py
+assert.strictEqual(medidaClave("cpu", { datos: { temperatura_c: -300, nucleos_fisicos: 4 } }), "4 núcleos"); // temp implausible: cae a núcleos
+assert.strictEqual(medidaClave("cpu", { datos: { nucleos_fisicos: 0 } }), "—");
+assert.strictEqual(medidaClave("ram", { datos: { capacidad_fisica_gb: 0 } }), "—");
+assert.strictEqual(medidaClave("ram", { datos: { capacidad_fisica_gb: -4 } }), "—");
+assert.strictEqual(medidaClave("ram", { datos: { capacidad_fisica_gb: 16, porcentaje_uso: 140 } }), "16 GB");
+assert.strictEqual(medidaClave("ram", { datos: { capacidad_fisica_gb: 16, porcentaje_uso: -1 } }), "16 GB");
+assert.strictEqual(medidaClave("ram", { datos: { porcentaje_uso: 0 } }), "0 % en uso");
+assert.strictEqual(medidaClave("bateria", { datos: { aplica: true, salud_porcentaje: 140 } }), "—");
+assert.strictEqual(medidaClave("bateria", { datos: { aplica: true, salud_porcentaje: -5 } }), "—");
+assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [{ tamano_gb: 0, salud: "normal" }] } }), "salud normal");
+assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [{ tamano_gb: -1 }] } }), "—");
+assert.strictEqual(medidaClave("red", { datos: { interfaces: [{ link_activo: true, velocidad_mbps: 0 }] } }), "—");
+assert.strictEqual(medidaClave("red", { datos: { interfaces: [{ link_activo: true, velocidad_mbps: -10 }] } }), "—");
+// M2: red prefiere la primera interfaz con enlace QUE TIENE velocidad
+assert.strictEqual(medidaClave("red", { datos: { interfaces: [{ link_activo: true }, { link_activo: true, velocidad_mbps: 300 }] } }), "300 Mbps");
+assert.strictEqual(medidaClave("red", { datos: { interfaces: [{ link_activo: true, velocidad_mbps: 0 }, { link_activo: true, velocidad_mbps: 54 }] } }), "54 Mbps");
+assert.strictEqual(medidaClave("red", { datos: { interfaces: [{ link_activo: true }, { link_activo: false }] } }), "—"); // con enlace pero sin velocidad
+// M4: texto de salud del disco
+assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [{ tamano_gb: 500, salud: "no_determinado" }] } }), "500 GB · salud no determinada");
+assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [{ tamano_gb: 500, salud: "critico" }] } }), "500 GB · salud crítico");
+assert.strictEqual(medidaClave("almacenamiento", { datos: { discos_internos: [{ salud: "sospecha" }] } }), "salud sospecha");
+// M5: un solo sensor, e ids que son nombres de propiedades heredadas
+assert.strictEqual(medidaClave("fuente_poder", { datos: { rieles: [1] } }), "1 sensor de voltaje");
+['constructor', '__proto__', 'toString'].forEach((id) => assert.strictEqual(medidaClave(id, { datos: { rieles: [1] } }), "—", id));
 
 // (b) lineaResumen
 assert.strictEqual(lineaResumen(todos("normal")), "Todo lo que pudimos revisar está bien.");
@@ -182,6 +210,18 @@ assert.strictEqual(hostil[0].valor, "<img onerror=x> m"); // cadena cruda: el es
 const sinHechos = datosEquipo({ componentes: { almacenamiento: comp("almacenamiento", "normal", { datos: { discos_internos: [{ tamano_gb: 250 }] } }) } });
 assert.deepStrictEqual(sinHechos, [{ etiqueta: "Disco", valor: "250 GB" }]);
 assert.deepStrictEqual(datosEquipo({ componentes: {}, hechos: { discos: [{ tipo: "desconocido", tamano_gb: 120 }] } }), [{ etiqueta: "Disco", valor: "120 GB" }]);
+
+// M1: datosEquipo omite valores fuera de rango
+assert.deepStrictEqual(datosEquipo({ componentes: { ram: comp("ram", "normal", { datos: { capacidad_fisica_gb: 0 } }) } }), []);
+assert.deepStrictEqual(datosEquipo({ componentes: { ram: comp("ram", "normal", { datos: { capacidad_fisica_gb: -8 } }) } }), []);
+assert.deepStrictEqual(datosEquipo({ componentes: {}, hechos: { discos: [{ tamano_gb: 0 }, { tamano_gb: -5 }] } }), []);
+assert.deepStrictEqual(datosEquipo({ componentes: { almacenamiento: comp("almacenamiento", "normal", { datos: { discos_internos: [{ tamano_gb: 0 }] } }) } }), []);
+// M5: ids que coinciden con propiedades heredadas no usan el prototipo
+assert.strictEqual(nombreComp("constructor"), "constructor");
+assert.strictEqual(nombreComp("__proto__"), "__proto__");
+const heredados = JSON.parse('{"constructor":{"estado":"critico"},"__proto__":{"estado":"normal"},"cpu":{"estado":"normal"}}');
+assert.strictEqual(lineaResumen(heredados), "Están bien: __proto__, Procesador. Necesitan atención: constructor.");
+assert.deepStrictEqual(ordenarPorGravedad(["cpu", "constructor", "__proto__"], heredados), ["constructor", "cpu", "__proto__"]);
 
 // (e) normalizarEstado, calcularVeredicto, ordenarPorGravedad
 ESTADOS.forEach((e) => assert.strictEqual(normalizarEstado(e), e));

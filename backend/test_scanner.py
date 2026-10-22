@@ -1231,9 +1231,12 @@ def test_paleta():
     # (g) toda var(--x) de style.css (sin contar el respaldo) está definida en ambos temas, salvo las
     # propiedades locales que la propia hoja declara (p. ej. --estado-color), cuyo valor sí sale de la paleta
     sin_coment = re.sub(r"/\*.*?\*/", "", estilos, flags=re.S)
-    usadas = set(re.findall(r"var\(\s*(--[\w-]+)", sin_coment)) - set(re.findall(r"(--[\w-]+)\s*:", sin_coment))
+    locales = set(re.findall(r"(--[\w-]+)\s*:", sin_coment))
+    usadas = set(re.findall(r"var\(\s*(--[\w-]+)", sin_coment)) - locales
     for tema, v in temas.items():
         assert usadas <= set(v), (tema, sorted(usadas - set(v)))
+        # una propiedad local con el mismo nombre que un token taparía a la paleta (y a su tema oscuro)
+        assert not (locales & set(v)), (tema, sorted(locales & set(v)))
 
     # (i) color-scheme declarado en cada tema (controles y barras de desplazamiento nativos)
     sin_comentarios = re.sub(r"/\*.*?\*/", "", paleta, flags=re.S)

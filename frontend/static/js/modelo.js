@@ -48,6 +48,11 @@ const _E = typeof module !== "undefined" ? require("./estado.js") : { SEVERIDAD,
 
 const _obj = (v) => (v !== null && typeof v === "object" && !Array.isArray(v) ? v : null);
 const _num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+// Rangos plausibles (cpu.py usa 0-110 °C): un valor fuera de rango es un sensor con basura, no una medida.
+const _rango = (v, min, max) => { const n = _num(v); return n !== null && n >= min && n <= max ? n : null; };
+const _pos = (v) => { const n = _num(v); return n !== null && n > 0 ? n : null; };   // capacidades, núcleos, velocidades
+const _pct = (v) => _rango(v, 0, 100);
+const _temp = (v) => _rango(v, 0, 110);
 const _txt = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
 const _dec = (n) => String(Math.round(n * 10) / 10);   // a lo sumo un decimal: 476.9
 const _datos = (info) => _obj(_obj(info)?.datos);
@@ -92,29 +97,33 @@ function lineaResumen(componentes) {
 // Medida corta de la ficha: solo con datos reales; sin dato, "—".
 const _MEDIDAS = {
     cpu(d) {
-        const t = _num(d.temperatura_c), n = _num(d.nucleos_fisicos);
+        const t = _temp(d.temperatura_c), n = _pos(d.nucleos_fisicos);
         return t !== null ? `${Math.round(t)} °C` : n !== null ? `${n} núcleos` : null;
     },
     ram(d) {
-        const gb = _num(d.capacidad_fisica_gb), uso = _num(d.porcentaje_uso);
+        const gb = _pos(d.capacidad_fisica_gb), uso = _pct(d.porcentaje_uso);
         return [gb !== null && `${_dec(gb)} GB`, uso !== null && `${Math.round(uso)} % en uso`].filter(Boolean).join(" · ") || null;
     },
     almacenamiento(d) {
         const disco = Array.isArray(d.discos_internos) ? _obj(d.discos_internos[0]) : null;
         if (!disco) return null;
-        const gb = _num(disco.tamano_gb);
-        const salud = typeof disco.salud === "string" && Object.hasOwn(_E.CHIP_TEXTO, disco.salud) ? _E.CHIP_TEXTO[disco.salud].toLowerCase() : null;
+        const gb = _pos(disco.tamano_gb);
+        const salud = typeof disco.salud === "string" && Object.hasOwn(_E.CHIP_TEXTO, disco.salud)
+            ? (disco.salud === "no_determinado" ? "no determinada" : _E.CHIP_TEXTO[disco.salud].toLowerCase()) : null;
         return [gb !== null && `${_dec(gb)} GB`, salud && `salud ${salud}`].filter(Boolean).join(" · ") || null;
     },
     bateria(d) {
         if (d.aplica === false) return "Sin batería";
-        const s = _num(d.salud_porcentaje);
+        const s = _pct(d.salud_porcentaje);
         return d.aplica === true && s !== null ? `${Math.round(s)} % de salud` : null;
     },
     red(d) {
         const ifs = Array.isArray(d.interfaces) ? d.interfaces.map(_obj).filter(Boolean) : [];
-        const conEnlace = ifs.find((i) => i.link_activo === true);
-        if (conEnlace) { const v = _num(conEnlace.velocidad_mbps); return v !== null ? `${_dec(v)} Mbps` : null; }
+        const conEnlace = ifs.filter((i) => i.link_activo === true);
+        if (conEnlace.length) { // la primera con velocidad conocida; si ninguna la tiene, no hay medida
+            const v = conEnlace.map((i) => _pos(i.velocidad_mbps)).find((x) => x !== null);
+            return v !== undefined ? `${_dec(v)} Mbps` : null;
+        }
         return ifs.some((i) => i.link_activo === false) ? "Sin enlace" : null;
     },
     mainboard(d) {
@@ -146,14 +155,14 @@ function datosEquipo(resultado) {
     agregar("Equipo", mb && [_txt(mb.fabricante), _txt(mb.modelo)].filter(Boolean).join(" "));
     agregar("Sistema", _txt(_obj(hechos.so)?.nombre));
     agregar("Procesador", _txt(d("cpu")?.nombre));
-    const gb = _num(d("ram")?.capacidad_fisica_gb);
+    const gb = _pos(d("ram")?.capacidad_fisica_gb);
     agregar("Memoria", gb !== null && `${_dec(gb)} GB`);
 
-    let discos = (Array.isArray(hechos.discos) ? hechos.discos : []).map(_obj).filter((x) => x && x.externo !== true && _num(x.tamano_gb) !== null);
+    let discos = (Array.isArray(hechos.discos) ? hechos.discos : []).map(_obj).filter((x) => x && x.externo !== true && _pos(x.tamano_gb) !== null);
     if (!discos.length) {
         const internos = d("almacenamiento")?.discos_internos;
         const primero = Array.isArray(internos) ? _obj(internos[0]) : null;
-        discos = primero && _num(primero.tamano_gb) !== null ? [primero] : [];
+        discos = primero && _pos(primero.tamano_gb) !== null ? [primero] : [];
     }
     agregar("Disco", discos.map((x) => {
         const tipo = typeof x.tipo === "string" && ["ssd", "hdd"].includes(x.tipo) ? ` ${x.tipo.toUpperCase()}` : "";
