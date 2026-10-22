@@ -3,7 +3,7 @@ backend/informe.py — Informe imprimible (HTML) del último escaneo, para lleva
 
 SEGURIDAD: todo texto que viene del escaneo (mensajes, datos como el modelo
 de un disco, textos de la guía, ID) pasa por html.escape; solo los literales
-fijos de este archivo van sin escapar. El HTML es autocontenido: estilos en
+fijos de este archivo (incluidos los íconos SVG) van sin escapar. El HTML es autocontenido: estilos en
 línea, sin JS ni recursos externos (debe verse igual sin internet).
 """
 
@@ -19,28 +19,62 @@ NOMBRES = {
     "bateria": "Batería", "red": "Red",
 }
 ESTADOS = {
-    "normal": ("Normal", "#3FB950"), "advertencia": ("Advertencia", "#D29922"),
-    "sospecha": ("Sospecha", "#DB6D28"), "critico": ("Crítico", "#F85149"),
-    "no_determinado": ("No determinado", "#8B949E"),
+    "normal": "Normal", "advertencia": "Advertencia", "sospecha": "Sospecha",
+    "critico": "Crítico", "no_determinado": "No determinado",
+}
+
+# Íconos de estado: mismas siluetas y atributos que frontend/static/js/iconos.js (una forma distinta por estado,
+# legible también en blanco y negro). Cadenas FIJAS: nunca llevan datos del escaneo.
+_SVG_ABRE = ('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" '
+             'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">')
+
+
+def _svg(cuerpo):
+    return f"{_SVG_ABRE}{cuerpo}</svg>"
+
+
+ICONOS_ESTADO = {
+    "normal": _svg('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/>'),
+    "advertencia": _svg('<path d="M12 3.5 21.5 20h-19z"/><path d="M12 9.8v4.2"/><path d="M12 16.8h.01"/>'),
+    "sospecha": _svg('<path d="M12 2.5 21.5 12 12 21.5 2.5 12z"/><path d="M12 7.6v4.2"/><path d="M12 16.4h.01"/>'),
+    "critico": _svg('<path d="M8.06 2.5h7.88L21.5 8.06v7.88l-5.56 5.56H8.06L2.5 15.94V8.06z"/><path d="M9 9l6 6M15 9l-6 6"/>'),
+    "no_determinado": _svg('<circle cx="12" cy="12" r="9" stroke-dasharray="3 3.2"/>'
+                           '<path d="M9.6 9.6a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.2.9-1.2 1.8"/><path d="M12 16.9h.01"/>'),
 }
 
 LIMITES = "Este informe se basa solo en lo que el programa pudo medir; no reemplaza la revisión de un técnico."
 
+# Valores del tema CLARO de config/palette.css, copiados porque el informe no carga archivos externos
+# (test_informe_estados_con_forma verifica que sigan iguales a la paleta).
 _ESTILOS = """
-body { font-family: "Segoe UI", Arial, sans-serif; color: #1F2328; background: #FFFFFF;
+:root {
+  --color-fondo: #F4F6F9; --color-tarjeta: #FFFFFF; --color-texto: #1B2430; --color-texto-secundario: #566273;
+  --color-marino: #0F2A47; --color-acento: #1F5FBF; --color-borde: #D5DBE3;
+  --color-verde: #1A7F4B; --color-amarillo: #946200; --color-naranja: #B54708; --color-rojo: #B42318;
+  --color-estado-normal-fondo: #EEF8F2; --color-estado-advertencia-fondo: #FEF7E6; --color-estado-sospecha-fondo: #FDF0E4;
+  --color-estado-critico-fondo: #FDEDEB; --color-estado-nodeterminado-fondo: #F0F2F6;
+}
+.estado-normal { --e: var(--color-verde); --f: var(--color-estado-normal-fondo); }
+.estado-advertencia { --e: var(--color-amarillo); --f: var(--color-estado-advertencia-fondo); }
+.estado-sospecha { --e: var(--color-naranja); --f: var(--color-estado-sospecha-fondo); }
+.estado-critico { --e: var(--color-rojo); --f: var(--color-estado-critico-fondo); }
+.estado-no_determinado { --e: var(--color-texto-secundario); --f: var(--color-estado-nodeterminado-fondo); }
+body { font-family: "Segoe UI", Arial, sans-serif; color: var(--color-texto); background: var(--color-fondo);
        max-width: 820px; margin: 24px auto; padding: 0 16px; line-height: 1.5; overflow-wrap: anywhere; }
-h1 { margin: 0 0 4px 0; } h2 { margin: 28px 0 8px 0; border-bottom: 1px solid #D0D7DE; padding-bottom: 4px; }
-.meta { color: #57606A; font-size: 14px; }
+h1 { margin: 0 0 4px 0; color: var(--color-marino); }
+h2 { margin: 28px 0 8px 0; border-bottom: 1px solid var(--color-borde); padding-bottom: 4px; }
+.meta { color: var(--color-texto-secundario); font-size: 14px; }
 .sello { font-size: 20px; font-weight: bold; margin: 16px 0; }
-.tarjeta { border: 1px solid #D0D7DE; border-left-width: 6px; border-radius: 6px;
-           padding: 10px 14px; margin: 12px 0; page-break-inside: avoid; overflow-wrap: anywhere; }
+.tarjeta { background: var(--color-tarjeta); border: 1px solid var(--color-borde); border-left: 6px solid var(--e, var(--color-acento));
+           border-radius: 8px; padding: 10px 14px; margin: 12px 0; page-break-inside: avoid; overflow-wrap: anywhere; }
 .tarjeta h3 { margin: 0 0 6px 0; font-size: 17px; }
-.chip { display: inline-block; color: #1F2328; background: #FFFFFF; border: 2px solid; border-radius: 12px;
+.chip { display: inline-block; color: var(--color-texto); background: var(--f); border: 2px solid var(--e); border-radius: 12px;
         padding: 0 10px; font-size: 13px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
+.chip svg { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; color: var(--e); }
 .tarjeta p { margin: 4px 0; } .tarjeta ul { margin: 4px 0 4px 20px; padding: 0; }
 .tarjeta details { margin: 6px 0; } .tarjeta summary { cursor: pointer; font-weight: bold; }
-.limites { margin-top: 28px; font-size: 14px; color: #57606A; }
-@media print { .no-imprimir { display: none; } .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
+.limites { margin-top: 28px; font-size: 14px; color: var(--color-texto-secundario); }
+@media print { .no-imprimir { display: none; } .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; background: #FFFFFF; } h2 { page-break-after: avoid; } }
 """
 
 
@@ -60,13 +94,15 @@ def _pagina(cuerpo):
 
 
 def _tarjeta(nombre, comp):
-    etiqueta, color = ESTADOS.get(comp.get("estado"), (str(comp.get("estado")), "#8B949E"))
+    estado = comp.get("estado")
+    clave = estado if estado in ESTADOS else "no_determinado"  # un estado desconocido nunca llega a una clase CSS
+    etiqueta = ESTADOS.get(estado, str(estado))
     guia = comp.get("guia") if isinstance(comp.get("guia"), dict) else None
     detalle = ""
     if guia:
         pasos = guia.get("que_hacer")
         pasos = "".join(f"<li>{escape(str(p))}</li>" for p in pasos) if isinstance(pasos, list) else ""
-        normal = comp.get("estado") == "normal"
+        normal = estado == "normal"
         quien = "No hace falta" if normal else explicador.QUIEN_TEXTO.get(guia.get("quien"), "Un técnico")
         titulo_pasos = "Para mantenerlo bien:" if normal else "Qué hacer:"
         detalle = (
@@ -75,9 +111,9 @@ def _tarjeta(nombre, comp):
             f'<p><strong>Quién lo hace:</strong> {escape(quien)}</p>'
         )
     return (
-        f'<div class="tarjeta" style="border-left-color:{color}">'
+        f'<div class="tarjeta estado-{clave}">'
         f'<h3>{escape(NOMBRES.get(nombre, nombre))}'
-        f'<span class="chip" style="border-color:{color}">{escape(etiqueta)}</span></h3>'
+        f'<span class="chip estado-{clave}">{ICONOS_ESTADO[clave]}{escape(etiqueta)}</span></h3>'
         f'<p>{escape(str(comp.get("mensaje", "")))}</p>'
         + detalle
         + '</div>'
@@ -111,7 +147,7 @@ def _recomendacion(rec):
         for o in opciones
     )
     return (
-        '<div class="tarjeta" style="border-left-color:#0969DA">'
+        '<div class="tarjeta">'
         f'<h3>{_texto(rec.get("titulo"))}</h3>'
         + (f'<p><strong>Prioridad: {escape(prioridad)}</strong></p>' if prioridad in ("alta", "media", "baja") else "")
         + _parrafo(rec.get("detalle"))

@@ -799,6 +799,64 @@ def test_informe_recomendaciones():
     assert "Recomendaciones para tu equipo" in informe.generar_informe_html({**base, "recomendaciones": raros}, "CRITICO")
 
 
+def test_informe_estados_con_forma():
+    """El informe usa los valores claros de palette.css (variables en línea) y cada estado lleva su ícono de forma
+    ANTES del texto, el mismo que la app (iconos.js); sigue escapando y sin recursos externos."""
+    import informe
+    raiz = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+    def comp(nombre, estado):
+        return {"componente": nombre, "estado": estado, "mensaje": f"mensaje {nombre}", "datos": {},
+                "recomendacion": "r", "guia": explicador.guia_para(nombre, estado)}
+    estados = {"mainboard": "normal", "ram": "advertencia", "almacenamiento": "sospecha",
+               "cpu": "critico", "red": "no_determinado"}
+    base = {"id_diagnostico": "ID-1", "timestamp": "2026-10-21T10:00:00+00:00",
+            "componentes": {n: comp(n, e) for n, e in estados.items()}}
+    html = informe.generar_informe_html(base, "CRITICO")
+
+    # (a) por tarjeta: <svg aria-hidden> + texto del estado dentro del chip, ícono primero; los 5 son distintos
+    chips = re.findall(r'<span class="chip [^"]*">(<svg.*?</svg>)([^<]+)</span>', html, flags=re.S)
+    assert [t for _, t in chips].count("Normal") == 1 and len(chips) == 5, chips
+    assert {t for _, t in chips} == {"Normal", "Advertencia", "Sospecha", "Crítico", "No determinado"}, chips
+    assert len({svg for svg, _ in chips}) == 5, "los 5 íconos de estado deben ser distintos"
+    for svg, _ in chips:
+        assert 'aria-hidden="true"' in svg and 'stroke="currentColor"' in svg and "<script" not in svg, svg
+    assert html.count("<svg") == 5, "ningún otro SVG (y ninguno con datos del escaneo)"
+
+    # (b) mismas siluetas que la app: la forma principal de cada estado está también en iconos.js
+    with open(os.path.join(raiz, "frontend", "static", "js", "iconos.js"), encoding="utf-8") as f:
+        js = f.read()
+    formas = {"normal": '<circle cx="12" cy="12" r="9"/>', "advertencia": "M12 3.5 21.5 20h-19z",
+              "sospecha": "M12 2.5 21.5 12 12 21.5 2.5 12z",
+              "critico": "M8.06 2.5h7.88L21.5 8.06v7.88l-5.56 5.56H8.06L2.5 15.94V8.06z", "no_determinado": 'stroke-dasharray="3 3.2"'}
+    por_texto = {t: svg for svg, t in chips}
+    etiquetas = {"normal": "Normal", "advertencia": "Advertencia", "sospecha": "Sospecha", "critico": "Crítico",
+                 "no_determinado": "No determinado"}
+    for e, forma in formas.items():
+        assert forma in js and forma in por_texto[etiquetas[e]], (e, forma)
+
+    # (c) variables CSS en línea con los valores CLAROS de palette.css, incluidos los fondos teñidos de cada estado
+    with open(os.path.join(raiz, "config", "palette.css"), encoding="utf-8") as f:
+        claro = _variables_css(f.read(), ":root")
+    en_informe = _variables_css(re.search(r"<style>(.*?)</style>", html, flags=re.S).group(1), ":root")
+    obligatorias = ["--color-fondo", "--color-tarjeta", "--color-texto", "--color-texto-secundario", "--color-marino",
+                    "--color-borde", "--color-acento", "--color-verde", "--color-amarillo", "--color-naranja", "--color-rojo"]
+    obligatorias += [f"--color-estado-{e}-fondo" for e in _ESTADOS_PALETA]
+    for nombre in obligatorias:
+        assert en_informe.get(nombre) == claro[nombre], (nombre, en_informe.get(nombre), claro.get(nombre))
+    assert all(claro[n] == v for n, v in en_informe.items()), "variable del informe que no está en la paleta clara"
+
+    # (d) sigue escapando (estado hostil, mensajes hostiles) y sin recursos externos
+    hostil = _escaneo_falso()
+    hostil["componentes"]["cpu"]["estado"] = "<u>x</u>"
+    h = informe.generar_informe_html(hostil, "CRITICO")
+    assert "<u>x</u>" not in h and "&lt;u&gt;x&lt;/u&gt;" in h and "<script>alert(1)</script>" not in h, h
+    assert h.count("<svg") == 2 and "&lt;script&gt;" in h  # estado desconocido -> ícono de "no determinado", sin texto crudo
+    for pagina in (html, h):
+        assert "<link" not in pagina and "src=" not in pagina and "http://" not in pagina and "https://" not in pagina
+        assert "print-color-adjust" in pagina
+
+
 def test_equipo():
     # (a) clasificación de discos
     assert equipo.tipo_disco(4, None) == "ssd"
@@ -1439,6 +1497,7 @@ if __name__ == "__main__":
     test_guias_endpoint()
     test_informe()
     test_informe_recomendaciones()
+    test_informe_estados_con_forma()
     test_equipo()
     test_equipo_rendimiento()
     test_equipo_cache_por_hilo()
