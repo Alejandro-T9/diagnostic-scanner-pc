@@ -264,6 +264,12 @@ function _detalleTecnico(id, info) {
     return cuerpo;
 }
 
+// Desplaza lo mínimo para que el elemento se vea (sin animación si se pidió movimiento reducido).
+function _aVista(elemento) {
+    const reducido = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    elemento.scrollIntoView({ block: "nearest", behavior: reducido ? "auto" : "smooth" });
+}
+
 // Abre o cierra una fila de la tabla técnica (aria-expanded + el detalle que controla).
 function _alternarFila(fila, abrir) {
     fila.classList.toggle("abierta", abrir);
@@ -286,25 +292,34 @@ function _filaComponente(id, info, n) {
     boton.append(flecha, icono, crear("span", "fila-comp-nombre", nombreComp(id)));
     const nombre = crear("th", "celda-nombre");
     nombre.scope = "row";
+    nombre.setAttribute("role", "rowheader"); // los roles explícitos mantienen la semántica de tabla aunque el CSS apile las filas (display:block)
     nombre.append(boton);
     const celda = (rotulo, clase, ...contenido) => {
         const td = crear("td", clase);
+        td.setAttribute("role", "cell");
         td.dataset.label = rotulo; // en ventana angosta el CSS lo muestra como rótulo de la fila apilada
         td.append(...contenido);
         return td;
     };
     const fila = crear("tr", `fila-comp estado--${estado}`);
     fila.dataset.id = id;
+    fila.setAttribute("role", "row");
     fila.append(nombre, celda("Estado", "", crearChipEstado(estado)),
         celda("Medición clave", "dato-tecnico", medidaClave(id, info)),
         celda("Mensaje", "", typeof info.mensaje === "string" ? info.mensaje : ""));
     // El botón recibe Enter/Espacio y su clic sube hasta la fila: un solo manejador sirve a mouse y teclado.
-    fila.addEventListener("click", () => _alternarFila(fila, !fila.classList.contains("abierta")));
+    fila.addEventListener("click", () => {
+        const abrir = !fila.classList.contains("abierta");
+        _alternarFila(fila, abrir);
+        if (abrir) _aVista(detalle); // el detalle queda debajo de la fila: que no se quede fuera de la pantalla
+    });
 
     const detalle = crear("tr", `detalle-comp estado--${estado}`);
     detalle.id = idDetalle;
     detalle.hidden = true;
+    detalle.setAttribute("role", "row");
     const celdaDetalle = crear("td");
+    celdaDetalle.setAttribute("role", "cell");
     celdaDetalle.colSpan = 4;
     celdaDetalle.append(_detalleTecnico(id, info));
     detalle.append(celdaDetalle);
@@ -313,14 +328,18 @@ function _filaComponente(id, info, n) {
 
 function _tablaComponentes(ids, comps, abiertas) {
     const encabezado = crear("tr");
+    encabezado.setAttribute("role", "row");
     ["Componente", "Estado", "Medición clave", "Mensaje"].forEach((t) => {
         const th = crear("th", "", t);
         th.scope = "col";
+        th.setAttribute("role", "columnheader");
         encabezado.append(th);
     });
     const cabeza = crear("thead");
+    cabeza.setAttribute("role", "rowgroup");
     cabeza.append(encabezado);
     const cuerpo = crear("tbody");
+    cuerpo.setAttribute("role", "rowgroup");
     const filas = new Map();
     ids.forEach((id, n) => {
         const [fila, detalle] = _filaComponente(id, comps[id], n);
@@ -329,6 +348,7 @@ function _tablaComponentes(ids, comps, abiertas) {
         filas.set(id, fila);
     });
     const tabla = crear("table", "tabla-comp");
+    tabla.setAttribute("role", "table");
     tabla.append(crear("caption", "sr-only", "Componentes del equipo: estado, medición clave y mensaje. Cada fila se puede abrir para ver el detalle técnico."), cabeza, cuerpo);
     const envoltura = crear("div", "tabla-comp-envoltura");
     envoltura.append(tabla);
@@ -369,8 +389,5 @@ function dibujarComponentes(resultado, modo, seleccionado, contenedor) {
         raiz.append(lista);
     }
     contenedor.replaceChildren(raiz);
-    if (destino) { // sin efecto si la pestaña no se ve (panel oculto)
-        const reducido = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        destino.scrollIntoView({ block: "nearest", behavior: reducido ? "auto" : "smooth" });
-    }
+    if (destino) _aVista(destino); // sin efecto si la pestaña no se ve (panel oculto)
 }

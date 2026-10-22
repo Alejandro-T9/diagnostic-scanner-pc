@@ -1014,7 +1014,8 @@ body.demo .resumen-hero { grid-template-columns: auto minmax(0, 1fr); } /* sin e
     }
     .tabla-comp tbody tr:first-child { margin-top: 0; }
     .fila-comp.abierta { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom-color: transparent; box-shadow: none; }
-    .fila-comp > td { display: flex; align-items: baseline; gap: var(--espacio-3); padding: var(--espacio-2) var(--espacio-4); border-top: none; }
+    /* min-width:0 + anywhere: un texto largo sin espacios se parte en vez de recortarse dentro del flex */
+    .fila-comp > td { display: flex; align-items: baseline; gap: var(--espacio-3); min-width: 0; padding: var(--espacio-2) var(--espacio-4); border-top: none; overflow-wrap: anywhere; }
     .fila-comp > td::before {
         content: attr(data-label);
         flex: 0 0 104px;

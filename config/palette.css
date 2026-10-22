@@ -39,8 +39,7 @@
     --color-borde: #D5DBE3;
     --color-borde-control: #7B8797;   /* botones, campos, chips: >= 3:1 sobre tarjeta y fondo */
 
-    /* Realces basados en el acento (grilla del mapa, fila resaltada/seleccionada) */
-    --color-grilla: rgba(31, 95, 191, 0.07);
+    /* Realces basados en el acento (fila resaltada/seleccionada) */
     --color-acento-tenue: rgba(31, 95, 191, 0.07);
     --color-acento-suave: rgba(31, 95, 191, 0.12);
 
@@ -102,7 +101,6 @@
     --color-borde: #2C3745;
     --color-borde-control: #6B7A8C;
 
-    --color-grilla: rgba(110, 168, 255, 0.07);
     --color-acento-tenue: rgba(110, 168, 255, 0.07);
     --color-acento-suave: rgba(110, 168, 255, 0.14);
 
