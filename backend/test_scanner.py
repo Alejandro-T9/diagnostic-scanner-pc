@@ -2190,6 +2190,27 @@ def test_registro_y_postinstalacion():
     assert "activador" in postinstalacion._licencia(False)["que_hacer"].lower()
     b = {i["titulo"]: i["estado"] for i in postinstalacion._basicos(["Google Chrome", "7-Zip 23", "Foxit Reader"])}
     assert b["Navegador (además de Edge)"] == b["Compresor de archivos"] == b["Lector de PDF"] == "normal" and b["Suite de oficina"] == "advertencia", b
+    # F6b: ficha en el acta, actualizaciones, reinicio y perfil del colegio
+    import datetime
+    hoy = datetime.date(2026, 10, 22)
+    assert postinstalacion._actualizaciones(None)["estado"] == "no_determinado"
+    assert postinstalacion._actualizaciones(datetime.date(2026, 9, 1), hoy)["estado"] == "normal"
+    assert postinstalacion._actualizaciones(datetime.date(2026, 8, 1), hoy)["estado"] == "advertencia"
+    assert [postinstalacion._reinicio(v)["estado"] for v in (True, False, None)] == ["advertencia", "normal", "no_determinado"]
+    assert postinstalacion._nombre("PC-SALA1-03", "pc-")["estado"] == "normal" and postinstalacion._nombre("DESKTOP-ABC1234", "PC-")["estado"] == "advertencia"
+    perfil = {"zona_horaria": "SA Pacific Standard Time", "idioma": "es", "carpeta_instaladores": "x"}
+    ok = {i["id"]: i["estado"] for i in postinstalacion._del_perfil(perfil, "SA Pacific Standard Time", "es-CO", 3)}
+    mal = {i["id"]: i["estado"] for i in postinstalacion._del_perfil(perfil, "UTC", "en-US", 0)}
+    assert set(ok.values()) == {"normal"} and set(mal.values()) == {"advertencia"} and len(ok) == 3, (ok, mal)
+    assert postinstalacion._del_perfil({}, None, None, 0) == []
+    acta = postinstalacion.texto_acta("PC-1", [], {"fabricante": "ACME", "modelo": "X1", "serial": "S123", "sistema": "Windows 11", "macs": ["AA:BB"]})
+    assert "Modelo: ACME X1" in acta and "Serial: S123" in acta and "MAC: AA:BB" in acta, acta
+    assert "Serial" not in postinstalacion.texto_acta("PC-1", [], {"serial": ""}) and "Modelo" not in postinstalacion.texto_acta("PC-1", [], None)
+    os.environ["DSPC_PERFIL"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no_existe.json")
+    try:
+        assert postinstalacion._perfil() == {}
+    finally:
+        os.environ.pop("DSPC_PERFIL", None)
     originales = (postinstalacion._nombre_equipo, postinstalacion._windows_activado, postinstalacion._nombres_programas)
     def falla():
         raise OSError("x")
