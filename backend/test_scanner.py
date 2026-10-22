@@ -746,6 +746,32 @@ def test_informe():
         informe.generar_informe_html = generar
 
 
+def test_informe_recomendaciones():
+    import informe
+    rec = {"id": "so", "titulo": "<script>alert(1)</script> & Co", "detalle": "Det <i>x</i>",
+           "basado_en": ["RAM: 4 GB", "<u>cpu</u>"], "prioridad": "alta", "quien": "tecnico",
+           "opciones": [{"nombre": "Lubuntu <b>n</b>", "motivo": "Liviano", "nota": "<b>x</b>"}]}
+    base = _escaneo_falso()
+    # (a)(b) escapado, <details open> con el nombre, y antes de las preguntas
+    html = informe.generar_informe_html({**base, "recomendaciones": [rec]}, "CRITICO")
+    assert "<script>alert(1)</script>" not in html and "<b>x</b>" not in html and "<u>cpu</u>" not in html, html
+    assert "&lt;script&gt;" in html and "&lt;b&gt;x&lt;/b&gt;" in html
+    assert "Recomendaciones para tu equipo" in html and "Prioridad: alta" in html and "Basado en:" in html
+    assert "<details open><summary>Lubuntu &lt;b&gt;n&lt;/b&gt;</summary>" in html and "Liviano" in html, html
+    assert html.index("Recomendaciones para tu equipo") < html.index("Preguntas para tu técnico")
+    # (c) sin recomendaciones: la sección no aparece
+    for v in ({}, {"recomendaciones": []}, {"recomendaciones": None}, {"recomendaciones": "x"}):
+        h = informe.generar_informe_html({**base, **v}, "CRITICO")
+        assert "Recomendaciones para tu equipo" not in h, v
+    # (d) tolerancia a datos mal formados: no lanza
+    raros = [None, 5, "x", {}, {"titulo": "t", "basado_en": 7, "opciones": "x"},
+             {"titulo": "t", "basado_en": [3, None], "prioridad": 9, "opciones": [None, {}, {"motivo": "m"}]},
+             {"titulo": None, "detalle": [], "opciones": [{"nombre": "n", "nota": None}]}]
+    for r in raros:
+        informe.generar_informe_html({**base, "recomendaciones": [r, rec]}, "CRITICO")
+    assert "Recomendaciones para tu equipo" in informe.generar_informe_html({**base, "recomendaciones": raros}, "CRITICO")
+
+
 def test_equipo():
     # (a) clasificación de discos
     assert equipo.tipo_disco(4, None) == "ssd"
@@ -972,6 +998,7 @@ if __name__ == "__main__":
     test_escaner_recomendaciones()
     test_guias_endpoint()
     test_informe()
+    test_informe_recomendaciones()
     test_equipo()
     test_recomendador()
     print("test_scanner.py: todos los casos OK")

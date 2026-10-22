@@ -168,7 +168,7 @@ function renderizarResumen(componentes, cobertura) {
         : "";
 }
 
-function renderizarDiagnostico(componentes, cobertura) {
+function renderizarDiagnostico(componentes, cobertura, recomendaciones) {
     document.body.classList.remove("sin-escaneo");
     // Un estado desconocido (backend raro/viejo) se trata como "no_determinado":
     // así ninguna clase CSS ni texto sale de un valor no previsto.
@@ -222,9 +222,10 @@ function renderizarDiagnostico(componentes, cobertura) {
         filasEl.appendChild(fila);
     }
 
-    ultimoResultado = { componentes, cobertura };
+    ultimoResultado = { componentes, cobertura, recomendaciones };
     renderizarResumen(componentes, cobertura);
     renderizarSimple(componentes);
+    renderizarRecomendaciones(recomendaciones);
 }
 
 function seleccionarComponente(id, info) {
@@ -374,9 +375,51 @@ function renderizarSimple(componentes) {
     });
 }
 
+// Recomendaciones del equipo (F3): solo de escaneos reales que las traigan; sin lista, el bloque no existe.
+function renderizarRecomendaciones(recomendaciones) {
+    const bloque = document.getElementById("recomendaciones");
+    bloque.replaceChildren();
+    const lista = Array.isArray(recomendaciones) ? recomendaciones.filter((r) => r && typeof r === "object") : [];
+    bloque.hidden = !lista.length;
+    if (!lista.length) return;
+    bloque.append(crear("h2", "", "Recomendaciones para tu equipo"),
+        crear("p", "recomendaciones-nota", "Son sugerencias basadas en lo que se pudo medir en este equipo."));
+    const texto = (v) => (typeof v === "string" ? v : "");
+    lista.forEach((rec) => {
+        const tarjeta = crear("div", "tarjeta-simple recomendacion");
+        tarjeta.append(crear("h3", "", texto(rec.titulo)));
+        if (texto(rec.detalle)) tarjeta.append(crear("p", "", rec.detalle));
+        if (Array.isArray(rec.basado_en) && rec.basado_en.some((b) => typeof b === "string")) {
+            tarjeta.append(crear("p", "", "Basado en:"));
+            const ul = crear("ul", "tarjeta-simple-pasos");
+            rec.basado_en.filter((b) => typeof b === "string").forEach((b) => ul.append(crear("li", "", b)));
+            tarjeta.append(ul);
+        }
+        if (Array.isArray(rec.opciones)) {
+            rec.opciones.filter((o) => o && typeof o.nombre === "string").forEach((o) => {
+                const det = crear("details", "recomendacion-opcion");
+                det.append(crear("summary", "", o.nombre));
+                if (texto(o.motivo)) det.append(crear("p", "", o.motivo));
+                if (texto(o.nota)) det.append(crear("p", "", o.nota));
+                tarjeta.append(det);
+            });
+        }
+        const etiquetas = crear("div", "tarjeta-simple-etiquetas");
+        if (["baja", "media", "alta"].includes(rec.prioridad)) {
+            etiquetas.append(crear("span", `etiqueta-urgencia ${rec.prioridad}`, `Prioridad: ${rec.prioridad}`));
+        }
+        if (rec.quien === "tu_mismo" || rec.quien === "tecnico") {
+            etiquetas.append(crear("span", `etiqueta-quien ${rec.quien}`, QUIEN_TEXTO[rec.quien]));
+        }
+        if (etiquetas.childNodes.length) tarjeta.append(etiquetas);
+        bloque.append(tarjeta);
+    });
+}
+
 // Estado inicial (y tras cambiar de modo sin escaneo): sin datos inventados.
 function pintarVacio() {
     document.body.classList.add("sin-escaneo");
+    renderizarRecomendaciones(null);
     const sello = document.getElementById("sello");
     sello.textContent = "Sin escaneo todavía";
     sello.className = "sello NO_DETERMINADO";
@@ -388,7 +431,7 @@ function pintarVacio() {
 
 function repintar() {
     if (!ultimoResultado) { pintarVacio(); return; }
-    renderizarDiagnostico(ultimoResultado.componentes, ultimoResultado.cobertura);
+    renderizarDiagnostico(ultimoResultado.componentes, ultimoResultado.cobertura, ultimoResultado.recomendaciones);
     if (componenteSeleccionado && ultimoResultado.componentes[componenteSeleccionado]) {
         seleccionarComponente(componenteSeleccionado, ultimoResultado.componentes[componenteSeleccionado]);
     }
@@ -463,7 +506,7 @@ async function escanearSistema() {
         await guias;
         ocultarDemo(); // un escaneo real siempre reemplaza al modo demo
         escaneosReales++;
-        renderizarDiagnostico(resultado.componentes, resultado.cobertura);
+        renderizarDiagnostico(resultado.componentes, resultado.cobertura, resultado.recomendaciones);
         // Si había un componente abierto, se refresca con el dato nuevo en
         // vez de perder la selección en cada escaneo.
         if (componenteSeleccionado && resultado.componentes[componenteSeleccionado]) {

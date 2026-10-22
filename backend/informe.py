@@ -38,6 +38,7 @@ h1 { margin: 0 0 4px 0; } h2 { margin: 28px 0 8px 0; border-bottom: 1px solid #D
 .chip { display: inline-block; color: #1F2328; background: #FFFFFF; border: 2px solid; border-radius: 12px;
         padding: 0 10px; font-size: 13px; font-weight: bold; margin-left: 8px; vertical-align: middle; }
 .tarjeta p { margin: 4px 0; } .tarjeta ul { margin: 4px 0 4px 20px; padding: 0; }
+.tarjeta details { margin: 6px 0; } .tarjeta summary { cursor: pointer; font-weight: bold; }
 .limites { margin-top: 28px; font-size: 14px; color: #57606A; }
 @media print { .no-imprimir { display: none; } .chip, .tarjeta { -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; max-width: none; } h2 { page-break-after: avoid; } }
 """
@@ -83,6 +84,37 @@ def _tarjeta(nombre, comp):
     )
 
 
+def _texto(valor):
+    """Texto escapado de un campo del escaneo; vacío si no es str."""
+    return escape(valor) if isinstance(valor, str) else ""
+
+
+def _recomendacion(rec):
+    if not isinstance(rec, dict):
+        return ""
+    prioridad = rec.get("prioridad")
+    base = rec.get("basado_en")
+    base = "".join(f"<li>{escape(b)}</li>" for b in base if isinstance(b, str)) if isinstance(base, list) else ""
+    opciones = rec.get("opciones")
+    opciones = [o for o in opciones if isinstance(o, dict) and isinstance(o.get("nombre"), str)] \
+        if isinstance(opciones, list) else []
+    # <details open>: el informe no tiene JS y al imprimir debe verse el texto de cada opción.
+    detalles = "".join(
+        f'<details open><summary>{escape(o["nombre"])}</summary>'
+        f'<p>{_texto(o.get("motivo"))}</p><p>{_texto(o.get("nota"))}</p></details>'
+        for o in opciones
+    )
+    return (
+        '<div class="tarjeta" style="border-left-color:#0969DA">'
+        f'<h3>{_texto(rec.get("titulo"))}</h3>'
+        + (f'<p><strong>Prioridad: {escape(prioridad)}</strong></p>' if prioridad in ("alta", "media", "baja") else "")
+        + f'<p>{_texto(rec.get("detalle"))}</p>'
+        + (f'<p><strong>Basado en:</strong></p><ul>{base}</ul>' if base else "")
+        + detalles
+        + '</div>'
+    )
+
+
 def generar_informe_html(resultado, veredicto):
     """Documento HTML completo del escaneo; página amable si no hay escaneo."""
     if not resultado or not resultado.get("componentes"):
@@ -115,6 +147,10 @@ def generar_informe_html(resultado, veredicto):
         else:
             bloque_preguntas = "<p>No hacen falta preguntas: todo está normal.</p>"
 
+    recs = resultado.get("recomendaciones")
+    recs = "".join(_recomendacion(r) for r in recs) if isinstance(recs, list) else ""
+    bloque_recs = f"<h2>Recomendaciones para tu equipo</h2>{recs}" if recs else ""
+
     cuerpo = (
         '<h1>Informe de diagnóstico</h1>'
         f'<div class="meta">ID: {escape(str(resultado.get("id_diagnostico", "")))} · '
@@ -124,6 +160,7 @@ def generar_informe_html(resultado, veredicto):
         + f'<div class="sello">{escape(str(sello))}</div>'
         '<div class="meta">Según lo que el programa pudo medir.</div>'
         + "".join(_tarjeta(n, c) for n, c in ordenados)
+        + bloque_recs
         + '<h2>Preguntas para tu técnico</h2>' + bloque_preguntas
         + f'<p class="limites">{LIMITES}</p>'
     )

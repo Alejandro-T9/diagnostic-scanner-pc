@@ -599,6 +599,15 @@ body.modo-simple.sin-escaneo #boton-escanear { display: none; }
 .etiqueta-urgencia.media { color: var(--color-naranja); border-color: var(--color-naranja); }
 .etiqueta-urgencia.baja { color: var(--color-amarillo); border-color: var(--color-amarillo); }
 
+/* --- Recomendaciones del equipo (F3): reusa .tarjeta-simple y las etiquetas --- */
+.recomendaciones { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.recomendaciones[hidden] { display: none; }
+.recomendaciones h2 { margin: 0; font-size: 20px; }
+.recomendaciones-nota { margin: 0; color: var(--color-texto-secundario); font-size: 14px; }
+.recomendacion { border-left-color: var(--color-acento); }
+.recomendacion-opcion { margin: 8px 0; }
+.recomendacion-opcion summary { cursor: pointer; font-weight: bold; }
+
 /* --- Responsive --- */
 @media (max-width: 640px) {
     .panel-diagnostico-cuerpo {
