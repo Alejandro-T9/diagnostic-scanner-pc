@@ -55,7 +55,7 @@ GUIAS = {
             "pregunta_tecnico": "",
         },
         "advertencia": {
-            "que_significa": "La placa principal no informa su fabricante o modelo reales: trae textos de relleno. Es común en equipos armados o reacondicionados y no prueba por sí solo una falla.",
+            "que_significa": "La placa principal no informa su fabricante o modelo reales: trae textos de relleno. Puede pasar por cómo se configuró de fábrica o porque el equipo no entregó el dato, y no prueba por sí solo una falla.",
             "que_hacer": ["Pide a un técnico que mire la placa y confirme su marca y modelo."],
             "quien": "tecnico",
             "urgencia": "baja",
@@ -86,7 +86,7 @@ GUIAS = {
     # Procesador: solo su temperatura decide el estado (advertencia desde 70 °C, crítico sobre 85 °C).
     "cpu": {
         "normal": {
-            "que_significa": "El procesador (el \"cerebro\" del equipo) está por debajo de 70 °C, una temperatura normal. Es lo único que esta revisión mide del procesador.",
+            "que_significa": "El procesador (el \"cerebro\" del equipo) está por debajo de 70 °C, una temperatura normal. Es la medición que decide su estado.",
             "que_hacer": ["Limpia el polvo de las rejillas de ventilación de vez en cuando."],
             "quien": "nadie",
             "urgencia": "ninguna",
@@ -124,7 +124,7 @@ GUIAS = {
     # Memoria RAM: solo mide cuánta se usa en el momento (advertencia desde 80 %, crítico sobre 95 %).
     "ram": {
         "normal": {
-            "que_significa": "La memoria RAM (donde el equipo guarda lo que está usando en este momento) se usa por debajo del 80 %. Mide cuánta se usa; no prueba que los módulos estén sanos.",
+            "que_significa": "La memoria RAM (donde el equipo guarda lo que está usando en este momento) se usa por debajo del 80 %. Mide cuánta se usa; no prueba que las piezas de memoria estén sanas.",
             "que_hacer": ["Cierra los programas y pestañas que no estés usando."],
             "quien": "nadie",
             "urgencia": "ninguna",
@@ -146,7 +146,7 @@ GUIAS = {
         },
         "critico": {
             "que_significa": "La memoria RAM se está usando por encima del 95 %. El equipo puede ponerse muy lento o trabarse. Es lo medido en este momento, no un daño comprobado.",
-            "que_hacer": ["Guarda tu trabajo y cierra los programas que no necesites.", "Reinicia el equipo y repite el análisis para ver si se repite."],
+            "que_hacer": ["Guarda tu trabajo y cierra los programas que no necesites.", "Reinicia el equipo y vuelve a analizar para ver si el uso sigue igual de alto."],
             "quien": "tu_mismo",
             "urgencia": "alta",
             "pregunta_tecnico": "¿Qué programa consume tanta memoria, o qué prueba muestra que los módulos instalados no alcanzan?",
@@ -190,8 +190,8 @@ GUIAS = {
             "pregunta_tecnico": "¿Puedes recuperar mis archivos antes de tocar el disco, y qué prueba muestra que debe cambiarse?",
         },
         "no_determinado": {
-            "que_significa": "No se pudo leer la salud del disco interno, o no se encontró ninguno. Sin ese dato no podemos decir si está sano.",
-            "que_hacer": ["Cierra la aplicación, ábrela de nuevo aceptando el aviso de Windows y repite el análisis.", "Mientras tanto, mantén copia de tus archivos importantes."],
+            "que_significa": "No se encontró ningún disco interno, o se encontró pero no se pudo leer su salud. En ambos casos no podemos decir si está sano.",
+            "que_hacer": ["Cierra la aplicación, ábrela de nuevo y repite el análisis. Si el equipo tiene disco y sigue igual, puede ayudar aceptar el aviso de permisos de Windows.", "Mientras tanto, mantén copia de tus archivos importantes."],
             "quien": "tu_mismo",
             "urgencia": "baja",
             "pregunta_tecnico": "¿Puedes revisar el disco con una prueba propia, ya que el programa no pudo leer su salud?",
@@ -215,7 +215,7 @@ GUIAS = {
         },
         "sospecha": {
             "que_significa": "Un sensor de voltaje dio una lectura imposible (cero o más de 20 voltios). Puede ser un fallo del sensor o de la alimentación; esta revisión no distingue cuál.",
-            "que_hacer": ["Repite el análisis con el cargador conectado.", "Si se repite, pide a un técnico que mida la alimentación con un instrumento."],
+            "que_hacer": ["Repite el análisis para ver si la lectura se repite.", "Si se repite, pide a un técnico que mida la alimentación con un instrumento."],
             "quien": "tecnico",
             "urgencia": "media",
             "pregunta_tecnico": "¿Qué medición propia muestra que falla la alimentación y no solo el sensor?",
@@ -228,7 +228,7 @@ GUIAS = {
             "pregunta_tecnico": "¿Qué medición de voltaje respalda este resultado?",
         },
         "no_determinado": {
-            "que_significa": "No se pudo leer ningún sensor de voltaje. Es común en laptops, que no siempre los ofrecen. No indica una falla.",
+            "que_significa": "No se pudo leer ningún sensor de voltaje: las laptops a menudo no los ofrecen, o el programa no pudo cargar su lector de sensores. No indica una falla.",
             "que_hacer": ["Puedes intentar cerrar la aplicación y abrirla de nuevo aceptando el aviso de Windows de permisos.", "Si no cambia, este dato no se puede revisar con esta herramienta; si dudas de la alimentación, consulta a un técnico."],
             "quien": "tu_mismo",
             "urgencia": "baja",
@@ -259,7 +259,7 @@ GUIAS = {
             "pregunta_tecnico": "¿Qué medición de la batería respalda este resultado?",
         },
         "critico": {
-            "que_significa": "La batería conserva menos del 40 % de su capacidad original. Es probable que se descargue muy rápido y que el equipo no dure sin enchufar.",
+            "que_significa": "La batería conserva menos del 40 % de su capacidad original. Es probable que dure bastante menos que cuando era nueva.",
             "que_hacer": ["Usa el equipo conectado al cargador.", "Consulta a un técnico para cambiar la batería."],
             "quien": "tecnico",
             "urgencia": "alta",
@@ -276,8 +276,8 @@ GUIAS = {
     # Red: mira si hay enlace (cable o Wi-Fi) y si la tarjeta registra paquetes con errores.
     "red": {
         "normal": {
-            "que_significa": "La tarjeta de red tiene conexión (por cable o Wi-Fi) y no registra errores en los paquetes de datos. Esto no mide qué tan rápido es tu internet.",
-            "que_hacer": ["Si el internet se pone lento, reinicia el módem o router antes de pensar en una falla del equipo."],
+            "que_significa": "La tarjeta de red tiene enlace con tu router o red (por cable o Wi-Fi) y no registra errores en los paquetes de datos. No se comprueba que el internet funcione ni su velocidad.",
+            "que_hacer": ["Mantén al día las actualizaciones de Windows, que incluyen mejoras del software de la tarjeta de red."],
             "quien": "nadie",
             "urgencia": "ninguna",
             "pregunta_tecnico": "",
